@@ -1,26 +1,614 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@font-face {
+  font-family: 'Doto';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/doto.woff2') format('woff2');
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  /* Surfaces — Light Mode Default */
+  --color-void: #FFFFFF;
+  --color-surface: #F5F5F5;
+  --color-raised: #EBEBEB;
+  --color-hairline: #E0E0E0;
+
+  /* Text */
+  --color-ink: #0A0A0A;
+  --color-ink-dim: #6B6B6B;
+  --color-ink-faint: #A0A0A0;
+
+  /* Signal & Verification Accents */
+  --color-signal: #D6002A;
+  --color-signal-dim: #FDE8EC;
+  --color-verified: #00D97E;
+
+  /* Fonts */
+  --font-display: var(--font-doto), monospace;
+  --font-mono: var(--font-geist-mono), monospace;
+  --font-sans: var(--font-geist-sans), system-ui;
+
+  /* Radii */
+  --radius-none: 0px;
+  --radius-sm: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Light Theme Overrides */
+:root[data-theme="light"],
+[data-theme="light"] {
+  --color-void: #FFFFFF;
+  --color-surface: #F5F5F5;
+  --color-raised: #EBEBEB;
+  --color-hairline: #E0E0E0;
+  --color-ink: #0A0A0A;
+  --color-ink-dim: #6B6B6B;
+  --color-ink-faint: #A0A0A0;
+  --color-signal: #D6002A;
+  --color-signal-dim: #FDE8EC;
+  --color-verified: #00D97E;
+}
+
+/* Void Dark Theme Overrides */
+:root[data-theme="void"],
+[data-theme="void"] {
+  --color-void: #09090B;
+  --color-surface: #121215;
+  --color-raised: #1A1A1E;
+  --color-hairline: #27272A;
+  --color-ink: #F4F4F5;
+  --color-ink-dim: #A1A1AA;
+  --color-ink-faint: #52525B;
+  --color-signal: #FF4500;
+  --color-signal-dim: #2A1208;
+  --color-verified: #00D97E;
+}
+
+/* Thermal Dark Mode Overrides */
+:root[data-theme="thermal"],
+[data-theme="thermal"] {
+  --color-void: #050B14;
+  --color-surface: #0F172A;
+  --color-raised: #1E293B;
+  --color-hairline: #1E293B;
+  --color-ink: #F8FAFC;
+  --color-ink-dim: #94A3B8;
+  --color-ink-faint: #64748B;
+  --color-signal: #38BDF8;
+  --color-signal-dim: #0C4A6E;
+  --color-verified: #00D97E;
+}
+
+/* Brand Logo Dual Theme Switching (Default dark, switches to light in data-theme="light") */
+.tlf-brand-logo-dark {
+  display: block !important;
+}
+.tlf-brand-logo-light {
+  display: none !important;
+}
+
+:root[data-theme="light"] .tlf-brand-logo-dark,
+[data-theme="light"] .tlf-brand-logo-dark {
+  display: none !important;
+}
+
+:root[data-theme="light"] .tlf-brand-logo-light,
+[data-theme="light"] .tlf-brand-logo-light {
+  display: block !important;
+}
+
+* {
+  border-color: var(--color-hairline);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-void);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
 }
+
+/* Only fade colors on explicit user-triggered theme changes (toggled via
+ * the theme buttons — they add `data-theme-transitioning` briefly).
+ * Never on page load / refresh, which is where the "flash" was coming
+ * from — the 0.4s transition was animating the paint of the very first
+ * frame before CSS variables settled. */
+html[data-theme-transitioning] body,
+html[data-theme-transitioning] * {
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+/* Rank ticker animation */
+@property --tick {
+  syntax: "<integer>";
+  inherits: false;
+  initial-value: 0;
+}
+
+.rank-ticker {
+  font-family: var(--font-display);
+  font-weight: 900;
+  transition: --tick 0.4s steps(10);
+  counter-set: tick var(--tick);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rank-ticker {
+    transition: none;
+  }
+  .marquee-track {
+    animation: none !important;
+  }
+}
+
+/* Marquee animation for sponsored strip */
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  animation: marquee 55s linear infinite;
+  will-change: transform;
+}
+
+.marquee-container:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-void);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-hairline);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-faint);
+}
+
+/* Utility to hide scrollbars completely */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Selection */
+::selection {
+  background: var(--color-signal);
+  color: #FFFFFF;
+}
+
+/* --- Airflow Sweep Animation — Pseudo-element approach --- */
+@keyframes airflowPulse {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateX(-30%);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(30%);
+  }
+}
+
+/* Base styles for all airflow cards */
+.airflow-daily-1, .airflow-daily-2, .airflow-daily-3,
+.airflow-weekly-1, .airflow-weekly-2, .airflow-weekly-3,
+.airflow-monthly-1, .airflow-monthly-2, .airflow-monthly-3,
+.airflow-yearly-1, .airflow-yearly-2, .airflow-yearly-3,
+.airflow-alltime-1, .airflow-alltime-2, .airflow-alltime-3 {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.airflow-daily-1::before, .airflow-daily-2::before, .airflow-daily-3::before,
+.airflow-weekly-1::before, .airflow-weekly-2::before, .airflow-weekly-3::before,
+.airflow-monthly-1::before, .airflow-monthly-2::before, .airflow-monthly-3::before,
+.airflow-yearly-1::before, .airflow-yearly-2::before, .airflow-yearly-3::before,
+.airflow-alltime-1::before, .airflow-alltime-2::before, .airflow-alltime-3::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  width: 200% !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+/* Ensure card contents sit above the airflow glow */
+.airflow-daily-1 > *, .airflow-daily-2 > *, .airflow-daily-3 > *,
+.airflow-weekly-1 > *, .airflow-weekly-2 > *, .airflow-weekly-3 > *,
+.airflow-monthly-1 > *, .airflow-monthly-2 > *, .airflow-monthly-3 > *,
+.airflow-yearly-1 > *, .airflow-yearly-2 > *, .airflow-yearly-3 > *,
+.airflow-alltime-1 > *, .airflow-alltime-2 > *, .airflow-alltime-3 > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* --- DAILY (Signal Red) --- */
+.airflow-daily-1::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(214, 0, 42, 0.18) 30%, rgba(214, 0, 42, 0.35) 50%, rgba(214, 0, 42, 0.18) 70%, transparent 100%) !important;
+  animation: airflowPulse 4s ease-in-out infinite !important;
+}
+.airflow-daily-2::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(214, 0, 42, 0.12) 30%, rgba(214, 0, 42, 0.22) 50%, rgba(214, 0, 42, 0.12) 70%, transparent 100%) !important;
+  animation: airflowPulse 5s ease-in-out infinite !important;
+}
+.airflow-daily-3::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(214, 0, 42, 0.08) 30%, rgba(214, 0, 42, 0.15) 50%, rgba(214, 0, 42, 0.08) 70%, transparent 100%) !important;
+  animation: airflowPulse 6s ease-in-out infinite !important;
+}
+
+/* --- Unique Dynamic Keyframes for Top Weekly & Monthly Shifting Gradients --- */
+@keyframes airflowShiftWeekly1 {
+  0%, 100% {
+    opacity: 0.45;
+    transform: translateX(-35%) scaleY(1);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.90;
+    transform: translateX(35%) scaleY(1.05);
+    filter: hue-rotate(25deg);
+  }
+}
+
+@keyframes airflowShiftWeekly2 {
+  0%, 100% {
+    opacity: 0.40;
+    transform: translateX(35%) scaleY(1);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(-35%) scaleY(1.05);
+    filter: hue-rotate(-20deg);
+  }
+}
+
+@keyframes airflowShiftWeekly3 {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateX(-25%) scaleY(1);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.80;
+    transform: translateX(25%) scaleY(1.05);
+    filter: hue-rotate(30deg);
+  }
+}
+
+@keyframes airflowShiftMonthly1 {
+  0%, 100% {
+    opacity: 0.50;
+    transform: translateX(-35%) scaleY(1);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.95;
+    transform: translateX(35%) scaleY(1.05);
+    filter: hue-rotate(35deg);
+  }
+}
+
+@keyframes airflowShiftMonthly2 {
+  0%, 100% {
+    opacity: 0.40;
+    transform: translateX(35%) scaleY(1);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.85;
+    transform: translateX(-35%) scaleY(1.05);
+    filter: hue-rotate(-25deg);
+  }
+}
+
+@keyframes airflowShiftMonthly3 {
+  0%, 100% {
+    opacity: 0.35;
+    transform: translateX(-25%) scaleY(1);
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    opacity: 0.80;
+    transform: translateX(25%) scaleY(1.05);
+    filter: hue-rotate(20deg);
+  }
+}
+
+/* --- WEEKLY TOP 3 — Unique Dynamic Gradients --- */
+/* Weekly #1: Electric Cyan & Neon Emerald Shift */
+.airflow-weekly-1::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(14, 165, 233, 0.25) 20%, rgba(16, 185, 129, 0.48) 50%, rgba(56, 189, 248, 0.25) 80%, transparent 100%) !important;
+  animation: airflowShiftWeekly1 4.5s ease-in-out infinite !important;
+}
+
+/* Weekly #2: Magenta Orchid & Hot Crimson Shift */
+.airflow-weekly-2::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(217, 70, 239, 0.22) 20%, rgba(244, 63, 94, 0.42) 50%, rgba(236, 72, 153, 0.22) 80%, transparent 100%) !important;
+  animation: airflowShiftWeekly2 5.5s ease-in-out infinite !important;
+}
+
+/* Weekly #3: Solar Amber & Sunburst Gold Shift */
+.airflow-weekly-3::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.22) 20%, rgba(251, 191, 36, 0.45) 50%, rgba(249, 115, 22, 0.22) 80%, transparent 100%) !important;
+  animation: airflowShiftWeekly3 6.5s ease-in-out infinite !important;
+}
+
+/* --- MONTHLY TOP 3 — Unique Dynamic Gradients --- */
+/* Monthly #1: Deep Cosmic Violet & Sapphire Indigo Shift */
+.airflow-monthly-1::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.28) 20%, rgba(99, 102, 241, 0.52) 50%, rgba(192, 132, 252, 0.28) 80%, transparent 100%) !important;
+  animation: airflowShiftMonthly1 4.2s ease-in-out infinite !important;
+}
+
+/* Monthly #2: Plasma Teal & Luminous Mint Shift */
+.airflow-monthly-2::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(20, 184, 166, 0.24) 20%, rgba(52, 211, 153, 0.46) 50%, rgba(45, 212, 191, 0.24) 80%, transparent 100%) !important;
+  animation: airflowShiftMonthly2 5.2s ease-in-out infinite !important;
+}
+
+/* Monthly #3: Flame Orange & Radiant Coral Shift */
+.airflow-monthly-3::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(249, 115, 22, 0.25) 20%, rgba(239, 68, 68, 0.48) 50%, rgba(251, 146, 60, 0.25) 80%, transparent 100%) !important;
+  animation: airflowShiftMonthly3 6.2s ease-in-out infinite !important;
+}
+
+/* --- YEARLY (Radiant Gold/Amber) --- */
+.airflow-yearly-1::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.24) 30%, rgba(245, 158, 11, 0.45) 50%, rgba(245, 158, 11, 0.24) 70%, transparent 100%) !important;
+  animation: airflowPulse 4s ease-in-out infinite !important;
+}
+.airflow-yearly-2::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.15) 30%, rgba(245, 158, 11, 0.30) 50%, rgba(245, 158, 11, 0.15) 70%, transparent 100%) !important;
+  animation: airflowPulse 5s ease-in-out infinite !important;
+}
+.airflow-yearly-3::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.09) 30%, rgba(245, 158, 11, 0.20) 50%, rgba(245, 158, 11, 0.09) 70%, transparent 100%) !important;
+  animation: airflowPulse 6s ease-in-out infinite !important;
+}
+
+/* --- ALL-TIME (Prestige Flame Rose) --- */
+.airflow-alltime-1::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.26) 30%, rgba(244, 63, 94, 0.50) 50%, rgba(244, 63, 94, 0.26) 70%, transparent 100%) !important;
+  animation: airflowPulse 3.5s ease-in-out infinite !important;
+}
+.airflow-alltime-2::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.16) 30%, rgba(244, 63, 94, 0.32) 50%, rgba(244, 63, 94, 0.16) 70%, transparent 100%) !important;
+  animation: airflowPulse 4.5s ease-in-out infinite !important;
+}
+.airflow-alltime-3::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.10) 30%, rgba(244, 63, 94, 0.22) 50%, rgba(244, 63, 94, 0.10) 70%, transparent 100%) !important;
+  animation: airflowPulse 5.5s ease-in-out infinite !important;
+}
+
+/* ============================================= */
+/* 12 Unique Product Gradient Color Palette      */
+/* ============================================= */
+
+.product-gradient-0, .product-gradient-1, .product-gradient-2,
+.product-gradient-3, .product-gradient-4, .product-gradient-5,
+.product-gradient-6, .product-gradient-7, .product-gradient-8,
+.product-gradient-9, .product-gradient-10, .product-gradient-11 {
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.product-gradient-0::before, .product-gradient-1::before, .product-gradient-2::before,
+.product-gradient-3::before, .product-gradient-4::before, .product-gradient-5::before,
+.product-gradient-6::before, .product-gradient-7::before, .product-gradient-8::before,
+.product-gradient-9::before, .product-gradient-10::before, .product-gradient-11::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  width: 200% !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+.product-gradient-0 > *, .product-gradient-1 > *, .product-gradient-2 > *,
+.product-gradient-3 > *, .product-gradient-4 > *, .product-gradient-5 > *,
+.product-gradient-6 > *, .product-gradient-7 > *, .product-gradient-8 > *,
+.product-gradient-9 > *, .product-gradient-10 > *, .product-gradient-11 > * {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* 0: Signal Crimson Red */
+.product-gradient-0::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.18) 30%, rgba(225, 29, 72, 0.42) 50%, rgba(244, 63, 94, 0.18) 70%, transparent 100%) !important;
+  animation: airflowPulse 4s ease-in-out infinite !important;
+}
+
+/* 1: Electric Sky Cyan */
+.product-gradient-1::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(14, 165, 233, 0.20) 30%, rgba(56, 189, 248, 0.45) 50%, rgba(14, 165, 233, 0.20) 70%, transparent 100%) !important;
+  animation: airflowPulse 5s ease-in-out infinite !important;
+}
+
+/* 2: Ultra Violet & Electric Indigo */
+.product-gradient-2::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.20) 30%, rgba(192, 132, 252, 0.45) 50%, rgba(168, 85, 247, 0.20) 70%, transparent 100%) !important;
+  animation: airflowPulse 4.5s ease-in-out infinite !important;
+}
+
+/* 3: Golden Amber & Solar Gold */
+.product-gradient-3::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.22) 30%, rgba(251, 191, 36, 0.48) 50%, rgba(245, 158, 11, 0.22) 70%, transparent 100%) !important;
+  animation: airflowPulse 5.5s ease-in-out infinite !important;
+}
+
+/* 4: Emerald Matrix Green */
+.product-gradient-4::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.20) 30%, rgba(52, 211, 153, 0.45) 50%, rgba(16, 185, 129, 0.20) 70%, transparent 100%) !important;
+  animation: airflowPulse 4.2s ease-in-out infinite !important;
+}
+
+/* 5: Hot Coral Sunset */
+.product-gradient-5::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(249, 115, 22, 0.22) 30%, rgba(251, 146, 60, 0.48) 50%, rgba(249, 115, 22, 0.22) 70%, transparent 100%) !important;
+  animation: airflowPulse 5.2s ease-in-out infinite !important;
+}
+
+/* 6: Deep Sapphire Blue */
+.product-gradient-6::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.22) 30%, rgba(96, 165, 250, 0.48) 50%, rgba(59, 130, 246, 0.22) 70%, transparent 100%) !important;
+  animation: airflowPulse 4.8s ease-in-out infinite !important;
+}
+
+/* 7: Magenta Orchid */
+.product-gradient-7::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(217, 70, 239, 0.20) 30%, rgba(240, 171, 252, 0.45) 50%, rgba(217, 70, 239, 0.20) 70%, transparent 100%) !important;
+  animation: airflowPulse 5.4s ease-in-out infinite !important;
+}
+
+/* 8: Teal Plasma */
+.product-gradient-8::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(20, 184, 166, 0.22) 30%, rgba(45, 212, 191, 0.48) 50%, rgba(20, 184, 166, 0.22) 70%, transparent 100%) !important;
+  animation: airflowPulse 4.4s ease-in-out infinite !important;
+}
+
+/* 9: Lime Pulse */
+.product-gradient-9::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(132, 204, 22, 0.22) 30%, rgba(163, 230, 53, 0.48) 50%, rgba(132, 204, 22, 0.22) 70%, transparent 100%) !important;
+  animation: airflowPulse 5.1s ease-in-out infinite !important;
+}
+
+/* 10: Rose Quartz */
+.product-gradient-10::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(244, 114, 182, 0.22) 30%, rgba(251, 113, 133, 0.48) 50%, rgba(244, 114, 182, 0.22) 70%, transparent 100%) !important;
+  animation: airflowPulse 4.6s ease-in-out infinite !important;
+}
+
+/* 11: Electric Laser Violet */
+.product-gradient-11::before {
+  background: linear-gradient(90deg, transparent 0%, rgba(139, 92, 246, 0.22) 30%, rgba(167, 139, 250, 0.48) 50%, rgba(139, 92, 246, 0.22) 70%, transparent 100%) !important;
+  animation: airflowPulse 5.3s ease-in-out infinite !important;
+}
+
+/* Seamless instant view transitions & rendering optimizations */
+html {
+  scroll-behavior: smooth;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+/* LaunchFeed Logo Square-by-Square Assembling Animation */
+@keyframes lfAssembleSq1 {
+  0% {
+    opacity: 0;
+    transform: translate(-3.5px, -3.5px) scale(0.5);
+  }
+  14%, 82% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  92%, 100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes lfAssembleSq2 {
+  0%, 14% {
+    opacity: 0;
+    transform: translate(3.5px, -3.5px) scale(0.5);
+  }
+  28%, 82% {
+    opacity: 0.85;
+    transform: translate(0, 0) scale(1);
+  }
+  92%, 100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes lfAssembleSq3 {
+  0%, 28% {
+    opacity: 0;
+    transform: translate(-3.5px, 3.5px) scale(0.5);
+  }
+  42%, 82% {
+    opacity: 0.65;
+    transform: translate(0, 0) scale(1);
+  }
+  92%, 100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes lfAssembleSq4 {
+  0%, 42% {
+    opacity: 0;
+    transform: translate(3.5px, 3.5px) scale(0.5);
+  }
+  56%, 82% {
+    opacity: 0.35;
+    transform: translate(0, 0) scale(1);
+  }
+  92%, 100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+@keyframes lfAssemblePulse {
+  0%, 56% {
+    filter: drop-shadow(0 0 0px transparent);
+  }
+  65%, 82% {
+    filter: drop-shadow(0 0 4px var(--signal, #ff4f00));
+  }
+  92%, 100% {
+    filter: drop-shadow(0 0 0px transparent);
+  }
+}
+
+.lf-assemble-sq1 {
+  transform-origin: 3.75px 3.75px;
+  animation: lfAssembleSq1 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.lf-assemble-sq2 {
+  transform-origin: 12.25px 3.75px;
+  animation: lfAssembleSq2 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.lf-assemble-sq3 {
+  transform-origin: 3.75px 12.25px;
+  animation: lfAssembleSq3 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.lf-assemble-sq4 {
+  transform-origin: 12.25px 12.25px;
+  animation: lfAssembleSq4 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.lf-assemble-glow {
+  animation: lfAssemblePulse 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+

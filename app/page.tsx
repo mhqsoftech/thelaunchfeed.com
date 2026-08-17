@@ -1,69 +1,128 @@
-import Image from "next/image";
+import { getFeedProducts } from "@/lib/queries/products";
+import { getCategoriesWithCounts } from "@/lib/queries/categories";
+import { prisma } from "@/lib/db";
+import HomeFeedClient, { type HomeFeedInitialData } from "@/components/home/HomeFeedClient";
+import type { LiveTopProductItem } from "@/components/home/HomeEditorialSection";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ tab?: string; page?: string; q?: string }>;
+}) {
+  const params = searchParams ? await searchParams : {};
+  const requestedTab = params.tab as "daily" | "weekly" | "monthly" | "yearly" | "alltime" | undefined;
+  const validTab = requestedTab && ["daily", "weekly", "monthly", "yearly", "alltime"].includes(requestedTab)
+    ? requestedTab
+    : "daily";
+
+  let initialFeed: HomeFeedInitialData | undefined = undefined;
+  let initialCategories: { id?: string; slug: string; name: string; productCount: number }[] = [];
+  let liveTopProducts: LiveTopProductItem[] = [];
+
+  try {
+    const [feed, cats, topProducts] = await Promise.all([
+      getFeedProducts({ tab: validTab, page: 1, limit: 50 }),
+      getCategoriesWithCounts().catch(() => []),
+      prisma.product.findMany({
+        where: { status: "LIVE" },
+        orderBy: { voteCount: "desc" },
+        take: 5,
+        select: {
+          id: true,
+          name: true,
+          tagline: true,
+          slug: true,
+          voteCount: true,
+          owner: { select: { username: true, name: true } },
+          category: { select: { name: true } },
+          revenue: { select: { mrrCents: true, isVerified: true } },
+        },
+      }).catch(() => []),
+    ]);
+
+    initialFeed = {
+      products: feed.products.map((p) => ({
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        tagline: p.tagline,
+        votes: p.voteCount ?? p.votes ?? 0,
+        voteCount: p.voteCount ?? p.votes ?? 0,
+        maker: p.maker || (p.owner?.username ? `@${p.owner.username}` : "@maker"),
+        makerName: p.makerName || p.owner?.name || p.owner?.username || "Maker",
+        category: p.category || "Tech",
+        logoUrl: p.logoUrl || null,
+        launchedAt: p.launchedAt ? new Date(p.launchedAt).toISOString().slice(0, 10) : undefined,
+        revenue: p.revenue || "",
+        rank: p.rank,
+      })),
+      totalCount: feed.totalCount,
+      totalPages: feed.totalPages,
+    };
+    initialCategories = cats;
+    liveTopProducts = topProducts;
+  } catch (err) {
+    console.error("Failed to preload initial feed on server:", err);
+  }
+
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${siteUrl}/#website`,
+        name: "The Launch Feed",
+        url: siteUrl,
+        description:
+          "The daily software and AI product leaderboard with 360-degree technical architecture intelligence, founder manifestos, and verified revenue transparency.",
+        publisher: {
+          "@type": "Organization",
+          name: "The Launch Feed",
+          url: siteUrl,
+          logo: {
+            "@type": "ImageObject",
+            url: `${siteUrl}/icon.svg`,
+          },
+        },
+        potentialAction: {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: `${siteUrl}/?q={search_term_string}`,
+          },
+          "query-input": "required name=search_term_string",
+        },
+      },
+      {
+        "@type": "ItemList",
+        "@id": `${siteUrl}/#daily-leaderboard`,
+        name: "Today's Top Software Launches",
+        itemListElement: (initialFeed?.products || []).slice(0, 10).map((p, idx) => ({
+          "@type": "ListItem",
+          position: idx + 1,
+          name: p.name,
+          url: `${siteUrl}/product/${p.slug}`,
+        })),
+      },
+    ],
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <HomeFeedClient
+        initialFeed={initialFeed}
+        initialTab={validTab}
+        initialCategories={initialCategories}
+        liveTopProducts={liveTopProducts}
+      />
+    </>
   );
 }

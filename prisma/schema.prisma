@@ -1,0 +1,550 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  // URL is configured in prisma.config.ts (Prisma 7 no longer accepts it here).
+  provider = "postgresql"
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// USERS  ·  Better Auth is the source of truth. Sessions, credentials, and
+// OAuth accounts live in Session/Account/Verification below. User.id is the
+// Better Auth user id and every FK across the app targets it.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  username      String   @unique
+  name          String   @default("")
+  title         String?
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  bio           String?  @db.Text
+  websiteUrl    String?
+  twitterHandle String?
+  githubHandle  String?
+
+  isProfilePublic   Boolean @default(true)
+  showRevenuePublic Boolean @default(false)
+
+  // Product ids the user has bookmarked ("saved"). Kept as an inline
+  // array so the profile Saved tab can hydrate without a join. Vote/upvote
+  // state lives in the Vote table below.
+  savedProductIds String[] @default([])
+
+  role      UserRole @default(MAKER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions           Session[]
+  accounts           Account[]
+  products           Product[]           @relation("ProductOwner")
+  makerOn            ProductMaker[]
+  votes              Vote[]
+  comments           Comment[]
+  submissions        Submission[]        @relation("SubmissionOwner")
+  revenueConnections RevenueConnection[]
+  featuredPurchases  FeaturedPurchase[]
+  emailsAsRecipient  EmailLog[]          @relation("EmailRecipient")
+  flagsRaised        CommentFlag[]       @relation("FlagRaiser")
+
+  @@index([username])
+  @@index([isProfilePublic])
+}
+
+enum UserRole {
+  MAKER
+  MODERATOR
+  ADMIN
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// BETTER AUTH TABLES  ·  managed by the better-auth Prisma adapter. Field
+// names and types are dictated by better-auth's core schema; do not rename.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @db.Text
+  refreshToken          String?   @db.Text
+  idToken               String?   @db.Text
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String    @db.Text
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@index([identifier])
+  @@index([expiresAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// SUBMISSIONS  ·  everything a user submits before it becomes a live Product.
+// The Inngest scheduled-publish cron reads status=SCHEDULED where
+// scheduledFor <= now(), creates the Product, emits `product.launched`.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Submission {
+  id           String            @id @default(cuid())
+  ownerId      String
+  owner        User              @relation("SubmissionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name         String
+  tagline      String            @db.VarChar(255)
+  description  String?           @db.Text
+  websiteUrl   String
+  logoUrl      String?
+  screenshots  String[]
+  videoUrl     String?
+  tags         String[]
+  categoryId   String?
+  details      Json?
+  category     Category?         @relation(fields: [categoryId], references: [id])
+
+  makerName    String
+  makerHandle  String
+  makerEmail   String
+
+  status           SubmissionStatus @default(SCHEDULED)
+  scheduledFor     DateTime
+  publishedAt      DateTime?
+  rejectedAt       DateTime?
+  rejectionReason  String?          @db.Text
+
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  publishedProductId String?     @unique
+  publishedProduct   Product?    @relation("PublishedFromSubmission", fields: [publishedProductId], references: [id])
+
+  @@index([status, scheduledFor])
+  @@index([ownerId])
+  @@index([createdAt])
+}
+
+enum SubmissionStatus {
+  SCHEDULED
+  PUBLISHED
+  REJECTED
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// PRODUCTS  ·  live listings that appear on the boards.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Product {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  tagline     String   @db.VarChar(255)
+  description String?  @db.Text
+  websiteUrl  String
+  logoUrl     String?
+  screenshots String[]
+  videoUrl    String?
+  tags        String[]
+  categoryId  String?
+  details     Json?
+
+  category Category?      @relation(fields: [categoryId], references: [id])
+  ownerId  String
+  owner    User           @relation("ProductOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  makers   ProductMaker[]
+
+  status     ProductStatus @default(LIVE)
+  launchedAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  voteCount    Int @default(0)
+  commentCount Int @default(0)
+
+  dailyRank   Int?
+  weeklyRank  Int?
+  monthlyRank Int?
+
+  votes         Vote[]
+  comments      Comment[]
+  revenue       ProductRevenue?
+  rankings      RankSnapshot[]
+  featuredSlots FeaturedSlot[]
+  fromSubmission Submission?    @relation("PublishedFromSubmission")
+
+  @@index([status, voteCount(sort: Desc), launchedAt(sort: Desc)])
+  @@index([status, launchedAt(sort: Desc), voteCount(sort: Desc)])
+  @@index([categoryId])
+  @@index([launchedAt(sort: Desc)])
+  @@index([status, launchedAt])
+  @@index([slug])
+  @@index([ownerId])
+  @@index([dailyRank])
+  @@index([weeklyRank])
+  @@index([monthlyRank])
+}
+
+enum ProductStatus {
+  DRAFT
+  LIVE
+  ARCHIVED
+}
+
+model ProductMaker {
+  id        String @id @default(cuid())
+  productId String
+  userId    String
+  role      String @default("maker")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  name        String       @unique
+  createdAt   DateTime     @default(now())
+  createdById String?
+  products    Product[]
+  submissions Submission[]
+
+  @@index([slug])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// VOTING & COMMENTS
+// ──────────────────────────────────────────────────────────────────────────────
+
+model Vote {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String
+  createdAt DateTime @default(now())
+
+  ipHash    String?
+  userAgent String?
+  isFlagged Boolean @default(false)
+  weight    Float   @default(1.0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId, isFlagged])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  body      String   @db.Text
+  productId String
+  userId    String
+  parentId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isDeleted Boolean  @default(false)
+  isFlagged Boolean  @default(false)
+
+  product Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("Thread", fields: [parentId], references: [id])
+  replies Comment[] @relation("Thread")
+  flags   CommentFlag[]
+
+  @@index([productId, createdAt])
+  @@index([isFlagged, isDeleted])
+}
+
+model CommentFlag {
+  id         String   @id @default(cuid())
+  commentId  String
+  raisedById String
+  reason     String?
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+  resolution FlagResolution?
+
+  comment  Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  raisedBy User    @relation("FlagRaiser", fields: [raisedById], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, raisedById])
+  @@index([resolvedAt])
+}
+
+enum FlagResolution {
+  DELETED
+  DISMISSED
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// RANK SNAPSHOTS  ·  written by the ranking cron; used to detect rank changes
+// for the top-3 / #1 email templates.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model RankSnapshot {
+  id        String     @id @default(cuid())
+  productId String
+  period    RankPeriod
+  periodKey String
+  rank      Int
+  score     Float
+  voteCount Int
+  createdAt DateTime   @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, period, periodKey])
+  @@index([period, periodKey, rank])
+}
+
+enum RankPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// REVENUE
+// ──────────────────────────────────────────────────────────────────────────────
+
+model RevenueConnection {
+  id                String           @id @default(cuid())
+  userId            String
+  provider          RevenueProvider
+  accessToken       String           @db.Text
+  refreshToken      String?          @db.Text
+  tokenExpiresAt    DateTime?
+  externalAccountId String           @default("")
+  status            ConnectionStatus @default(ACTIVE)
+  lastSyncedAt      DateTime?
+  lastSyncError     String?          @db.Text
+  createdAt         DateTime         @default(now())
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revenues ProductRevenue[]
+
+  @@unique([userId, provider, externalAccountId])
+  @@index([status, lastSyncedAt])
+}
+
+enum RevenueProvider {
+  STRIPE
+  RAZORPAY
+  DODOPAYMENTS
+  PADDLE
+  LEMONSQUEEZY
+  CHARGEBEE
+  POLAR
+  REVENUECAT
+  GUMROAD
+  FASTSPRING
+  PAYSTACK
+  SQUARE
+  CREEM
+}
+
+enum ConnectionStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+model ProductRevenue {
+  id                String         @id @default(cuid())
+  productId         String         @unique
+  connectionId      String
+  mrrCents          Int            @default(0)
+  arrCents          Int            @default(0)
+  totalRevenueCents Int            @default(0)
+  currency          String         @default("usd")
+  momGrowthPct      Float?
+  customerCount     Int?
+  isVerified        Boolean        @default(false)
+  verifiedAt        DateTime?
+  syncedAt          DateTime       @default(now())
+  displayMode       RevenueDisplay @default(EXACT)
+
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  connection RevenueConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  history    RevenueSnapshot[]
+
+  @@index([mrrCents(sort: Desc)])
+  @@index([isVerified])
+}
+
+enum RevenueDisplay {
+  EXACT
+  ROUNDED
+  RANGE
+  HIDDEN
+}
+
+model RevenueSnapshot {
+  id         String   @id @default(cuid())
+  revenueId  String
+  mrrCents   Int
+  capturedAt DateTime @default(now())
+
+  revenue ProductRevenue @relation(fields: [revenueId], references: [id], onDelete: Cascade)
+
+  @@index([revenueId, capturedAt])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// FEATURED / ROTATING SLOTS
+// A slot is either PAID (backed by a FeaturedPurchase → productId) or CUSTOM
+// (admin-authored, external URL). The board reads both flavors at render time.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model FeaturedSlot {
+  id            String       @id @default(cuid())
+  kind          SlotKind
+  position      SlotPosition
+  order         Int          @default(0)
+
+  productId     String?
+  product       Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Custom (admin-added, external URL) fields
+  customName    String?
+  customTagline String?
+  customUrl     String?
+  customLogoUrl String?
+
+  startsAt      DateTime     @default(now())
+  endsAt        DateTime?
+
+  purchaseId    String?
+  purchase      FeaturedPurchase? @relation(fields: [purchaseId], references: [id])
+
+  createdAt     DateTime     @default(now())
+
+  @@index([position, order])
+  @@index([kind, position])
+  @@index([startsAt, endsAt])
+}
+
+enum SlotKind {
+  PAID
+  CUSTOM
+}
+
+enum SlotPosition {
+  FEATURED
+  ROTATING
+}
+
+model FeaturedPurchase {
+  id                    String         @id @default(cuid())
+  userId                String
+  stripeSessionId       String         @unique
+  stripePaymentIntentId String?
+  amountCents           Int
+  currency              String         @default("usd")
+  status                PurchaseStatus @default(PENDING)
+  createdAt             DateTime       @default(now())
+
+  user  User           @relation(fields: [userId], references: [id])
+  slots FeaturedSlot[]
+}
+
+enum PurchaseStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// EMAIL LOG & AUTOMATION  ·  every send (manual, broadcast, or automation)
+// gets an EmailLog row. AutomationRule is a per-template on/off with per-tenant
+// override that the Inngest handlers read before sending.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model EmailLog {
+  id           String       @id @default(cuid())
+  toEmail      String
+  toUserId     String?
+  toUser       User?        @relation("EmailRecipient", fields: [toUserId], references: [id])
+  templateId   String
+  subject      String
+  html         String?      @db.Text
+  status       EmailStatus  @default(QUEUED)
+  provider     String       @default("resend")
+  providerId   String?
+  errorMessage String?      @db.Text
+  triggerEvent String?
+  meta         Json?
+  createdAt    DateTime     @default(now())
+  sentAt       DateTime?
+
+  @@index([toEmail, createdAt])
+  @@index([templateId, createdAt])
+  @@index([status, createdAt])
+}
+
+enum EmailStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+  COMPLAINED
+}
+
+model AutomationRule {
+  id         String   @id @default(cuid())
+  templateId String   @unique
+  trigger    String
+  enabled    Boolean  @default(true)
+  updatedAt  DateTime @updatedAt
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// APP CONFIG  ·  simple key/value store (submission lead time, feature flags…).
+// ──────────────────────────────────────────────────────────────────────────────
+
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
