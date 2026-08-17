@@ -63,6 +63,13 @@ function SignInInner() {
 
   const resetError = () => setMessage(null);
 
+  useEffect(() => {
+    const errorParam = search.get("error");
+    if (errorParam) {
+      setMessage({ kind: "error", text: decodeURIComponent(errorParam) });
+    }
+  }, [search]);
+
   // Check if authenticated locally or via Neon Auth callback
   useEffect(() => {
     let cancelled = false;
@@ -82,41 +89,40 @@ function SignInInner() {
       } catch {}
 
       // 2. Check if Neon Auth has an active session from recent OAuth redirect
-      try {
-        const neonAuthUrl =
-          process.env.NEXT_PUBLIC_NEON_AUTH_URL ||
-          "https://ep-silent-hall-ay1xix2o.neonauth.c-5.us-east-2.aws.neon.tech/neondb/auth";
+      const neonAuthUrl = process.env.NEXT_PUBLIC_NEON_AUTH_URL;
+      if (neonAuthUrl) {
+        try {
+          const neonSessionRes = await fetch(`${neonAuthUrl}/get-session`, {
+            credentials: "include",
+            headers: {
+              Origin: window.location.origin,
+            },
+          });
 
-        const neonSessionRes = await fetch(`${neonAuthUrl}/get-session`, {
-          credentials: "include",
-          headers: {
-            Origin: window.location.origin,
-          },
-        });
+          if (neonSessionRes.ok) {
+            const neonData = await neonSessionRes.json();
+            if (neonData?.session?.token && !cancelled) {
+              // Sync to local Next.js cookies and PostgreSQL
+              const syncRes = await fetch("/api/auth/sync-session", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  sessionToken: neonData.session.token,
+                  userId: neonData.user?.id,
+                }),
+              });
 
-        if (neonSessionRes.ok) {
-          const neonData = await neonSessionRes.json();
-          if (neonData?.session?.token && !cancelled) {
-            // Sync to local Next.js cookies and PostgreSQL
-            const syncRes = await fetch("/api/auth/sync-session", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                sessionToken: neonData.session.token,
-                userId: neonData.user?.id,
-              }),
-            });
-
-            if (syncRes.ok) {
-              const syncData = await syncRes.json();
-              if (syncData?.session && !cancelled) {
-                saveSession(syncData.session);
-                window.location.href = returnTo;
+              if (syncRes.ok) {
+                const syncData = await syncRes.json();
+                if (syncData?.session && !cancelled) {
+                  saveSession(syncData.session);
+                  window.location.href = returnTo;
+                }
               }
             }
           }
-        }
-      } catch {}
+        } catch {}
+      }
     }
 
     checkAuth();
@@ -280,46 +286,8 @@ function SignInInner() {
   async function onSocial(provider: "google" | "github") {
     resetError();
     setStatus("loading");
-    try {
-      const neonAuthUrl =
-        process.env.NEXT_PUBLIC_NEON_AUTH_URL ||
-        "https://ep-silent-hall-ay1xix2o.neonauth.c-5.us-east-2.aws.neon.tech/neondb/auth";
-
-      const callbackURL = `${window.location.origin}/api/auth/callback/neon?after_auth_return_to=${encodeURIComponent(returnTo)}`;
-
-      const res = await fetch(`${neonAuthUrl}/sign-in/social`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Origin: window.location.origin,
-        },
-        body: JSON.stringify({
-          provider,
-          callbackURL,
-        }),
-      });
-
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-      throw new Error(data.message || data.error?.message || `${provider} sign-in response invalid`);
-    } catch (err: any) {
-      try {
-        const { error } = await authClient.signIn.social({
-          provider,
-          callbackURL: `${window.location.origin}${returnTo}`,
-        });
-        if (error) throw error;
-      } catch (fallbackErr: any) {
-        setStatus("error");
-        setMessage({
-          kind: "error",
-          text: fallbackErr?.message || err?.message || `${provider} sign-in failed. Please try again.`,
-        });
-      }
-    }
+    // Direct browser redirect via server-side OAuth initiator
+    window.location.href = `/api/auth/social?provider=${provider}&after_auth_return_to=${encodeURIComponent(returnTo)}`;
   }
 
   /* ─────────── UI ─────────── */
