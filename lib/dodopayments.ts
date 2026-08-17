@@ -33,7 +33,11 @@ export const PLACEMENT_TIERS = {
 export function getDodoClient(): DodoPayments | null {
   const apiKey = process.env.DODO_PAYMENTS_API_KEY;
   if (!apiKey) return null;
-  const env = process.env.DODO_PAYMENTS_ENV === "live" ? "live_mode" : "test_mode";
+  const isLive =
+    process.env.DODO_PAYMENTS_ENV === "live_mode" ||
+    process.env.DODO_PAYMENTS_ENV === "live" ||
+    process.env.DODO_PAYMENTS_ENV === "production";
+  const env: "live_mode" | "test_mode" = isLive ? "live_mode" : "test_mode";
   return new DodoPayments({
     bearerToken: apiKey,
     environment: env,
