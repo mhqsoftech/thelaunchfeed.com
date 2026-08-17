@@ -44,21 +44,21 @@ const ALL_AWARDS: {
   description: string;
 }[] = [
   { id: "launch", name: "Launched on TLF", tag: "Official Launch", description: "Proof of shipment on The Launch Feed" },
-  { id: "daily_1", name: "#1 Product of the Day", tag: "🥇 Apex Daily #1", description: "First-place daily leaderboard finisher" },
-  { id: "daily_2", name: "#2 Product of the Day", tag: "🥈 Radiant Daily #2", description: "Second-place daily leaderboard finisher" },
-  { id: "daily_3", name: "#3 Product of the Day", tag: "🥉 Bronze Daily #3", description: "Third-place daily leaderboard finisher" },
-  { id: "weekly_1", name: "#1 Product of the Week", tag: "⚡ Weekly Leader #1", description: "First-place weekly leaderboard finisher" },
-  { id: "weekly_2", name: "#2 Product of the Week", tag: "⚡ Weekly Finalist #2", description: "Second-place weekly leaderboard finisher" },
-  { id: "weekly_3", name: "#3 Product of the Week", tag: "⚡ Weekly Finalist #3", description: "Third-place weekly leaderboard finisher" },
-  { id: "monthly_1", name: "#1 Product of the Month", tag: "★ Monthly Star #1", description: "Top software tool of the month" },
-  { id: "monthly_2", name: "#2 Product of the Month", tag: "★ Monthly Finalist #2", description: "Second-place monthly leaderboard finisher" },
-  { id: "monthly_3", name: "#3 Product of the Month", tag: "★ Monthly Finalist #3", description: "Third-place monthly leaderboard finisher" },
-  { id: "yearly_1", name: "2026 Yearly Champion", tag: "👑 Yearly Crown #1", description: "Annual leaderboard champion" },
-  { id: "yearly_2", name: "2026 Yearly Finalist #2", tag: "👑 Yearly Crest #2", description: "Annual leaderboard 2nd place" },
-  { id: "yearly_3", name: "2026 Yearly Finalist #3", tag: "👑 Yearly Medal #3", description: "Annual leaderboard 3rd place" },
-  { id: "alltime_1", name: "All-Time #1 GOAT", tag: "🏆 Hall of Fame #1", description: "Cumulative all-time #1 champion" },
-  { id: "alltime_2", name: "All-Time #2 Aegis", tag: "🛡️ Hall of Fame #2", description: "Cumulative all-time 2nd place" },
-  { id: "alltime_3", name: "All-Time #3 Laurel", tag: "🌿 Hall of Fame #3", description: "Cumulative all-time 3rd place" },
+  { id: "daily_1", name: "#1 Product of the Day", tag: "Apex Daily #1", description: "First-place daily leaderboard finisher" },
+  { id: "daily_2", name: "#2 Product of the Day", tag: "Radiant Daily #2", description: "Second-place daily leaderboard finisher" },
+  { id: "daily_3", name: "#3 Product of the Day", tag: "Bronze Daily #3", description: "Third-place daily leaderboard finisher" },
+  { id: "weekly_1", name: "#1 Product of the Week", tag: "Weekly Leader #1", description: "First-place weekly leaderboard finisher" },
+  { id: "weekly_2", name: "#2 Product of the Week", tag: "Weekly Finalist #2", description: "Second-place weekly leaderboard finisher" },
+  { id: "weekly_3", name: "#3 Product of the Week", tag: "Weekly Finalist #3", description: "Third-place weekly leaderboard finisher" },
+  { id: "monthly_1", name: "#1 Product of the Month", tag: "Monthly Star #1", description: "Top software tool of the month" },
+  { id: "monthly_2", name: "#2 Product of the Month", tag: "Monthly Finalist #2", description: "Second-place monthly leaderboard finisher" },
+  { id: "monthly_3", name: "#3 Product of the Month", tag: "Monthly Finalist #3", description: "Third-place monthly leaderboard finisher" },
+  { id: "yearly_1", name: "2026 Yearly Champion", tag: "Yearly Crown #1", description: "Annual leaderboard champion" },
+  { id: "yearly_2", name: "2026 Yearly Finalist #2", tag: "Yearly Crest #2", description: "Annual leaderboard 2nd place" },
+  { id: "yearly_3", name: "2026 Yearly Finalist #3", tag: "Yearly Medal #3", description: "Annual leaderboard 3rd place" },
+  { id: "alltime_1", name: "All-Time #1 GOAT", tag: "Hall of Fame #1", description: "Cumulative all-time #1 champion" },
+  { id: "alltime_2", name: "All-Time #2 Aegis", tag: "Hall of Fame #2", description: "Cumulative all-time 2nd place" },
+  { id: "alltime_3", name: "All-Time #3 Laurel", tag: "Hall of Fame #3", description: "Cumulative all-time 3rd place" },
   { id: "revenue", name: "MRR Telemetry", tag: "Stripe Telemetry", description: "Real-time revenue telemetry proof" },
   { id: "upvote", name: "Community Upvotes", tag: "Upvote Counter", description: "Live upvote telemetry counter" },
 ];
@@ -256,7 +256,7 @@ export function LaunchFeedBadge() {
         </div>
 
         {/* ─── BADGE DISPLAY CARD ─── */}
-        <div className="p-6 border border-hairline bg-surface/20 flex items-center justify-center min-h-[90px] overflow-x-auto">
+        <div className="p-6 border border-hairline bg-surface/20 flex flex-col items-center justify-center min-h-[90px] overflow-x-auto gap-4">
           {/* Real rendered vector SVG from endpoint */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -267,6 +267,22 @@ export function LaunchFeedBadge() {
             height={badgeHeight}
             className="block max-w-full h-auto"
           />
+
+          <div className="flex items-center gap-2 pt-2 border-t border-hairline/60 w-full justify-center">
+            <a
+              href={`/api/badge/${productSlug}?theme=${selectedTheme}&award=${selectedAward}&download=true`}
+              download
+              className="px-3.5 py-1.5 bg-signal text-void text-[10px] font-mono font-bold uppercase tracking-wider hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-xs"
+            >
+              <span>↓ Download SVG Asset</span>
+            </a>
+            <a
+              href={`/badges/${productSlug}`}
+              className="px-3 py-1.5 border border-hairline hover:border-ink bg-void text-ink text-[10px] font-mono font-bold uppercase tracking-wider transition-colors"
+            >
+              <span>View Full Trophy Kit ↗</span>
+            </a>
+          </div>
         </div>
       </div>
 

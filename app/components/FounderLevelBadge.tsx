@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 
 /* ──────────────────────────────────────────────────────────────────────────────
    MINIMALIST GEOMETRIC VECTOR EMBLEMS (Theme Synchronized & High Precision)
@@ -270,10 +271,30 @@ export function FounderLevelBreakdownModal({
   isSelf?: boolean;
   founderName?: string;
 }) {
-  return (
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onClose]);
+
+  if (!mounted) return null;
+
+  const modalNode = (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs cursor-pointer p-3 sm:p-4 overflow-y-auto flex items-start justify-center pt-6 sm:pt-14 animate-in fade-in duration-150"
+      className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md cursor-pointer p-3 sm:p-4 overflow-y-auto flex items-start justify-center pt-6 sm:pt-14 animate-in fade-in duration-150"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -431,4 +452,6 @@ export function FounderLevelBreakdownModal({
       </div>
     </div>
   );
+
+  return createPortal(modalNode, document.body);
 }

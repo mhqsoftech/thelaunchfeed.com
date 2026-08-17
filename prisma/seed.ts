@@ -2,7 +2,11 @@ import "dotenv/config";
 import { PrismaClient, ProductStatus, RankPeriod } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
-const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+const connectionString = (process.env.DATABASE_URL || "").replace(
+  /([?&])sslmode=require\b/g,
+  "$1sslmode=verify-full"
+);
+const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 /* ──────────────────────────────────────────────────────────────────────────────

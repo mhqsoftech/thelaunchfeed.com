@@ -4,6 +4,8 @@ import { getProductBySlug, getSimilarProducts } from "@/lib/queries/products";
 import { listCommentsForSlug } from "@/app/actions/comments";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getAccoladeDetails } from "@/lib/awards";
+import { computeAwardsForProduct } from "@/lib/queries/awards";
 import ProductClientView, { type ViewProduct } from "./ProductClientView";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +130,9 @@ export default async function ProductPage({
   const revenueProvider =
     rawProv.charAt(0).toUpperCase() + rawProv.slice(1).toLowerCase();
 
+  const rawAwards = await computeAwardsForProduct(p);
+  const accolades = getAccoladeDetails(rawAwards, p.slug, { revenueFormatted });
+
   const view: ViewProduct = {
     id: p.id,
     ownerId: p.ownerId,
@@ -155,12 +160,15 @@ export default async function ProductPage({
     dailyRank: p.dailyRank,
     weeklyRank: p.weeklyRank,
     monthlyRank: p.monthlyRank,
+    rawAwards,
+    accolades,
     details: (p.details as any) ?? null,
     revenue: revenueFormatted,
     mrrCents,
     totalRevenueCents,
     revenueProvider,
   };
+
 
   const isOwner = !!(
     user &&

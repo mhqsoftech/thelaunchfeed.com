@@ -408,13 +408,26 @@ export async function GET(
   ${rightPill}
 </svg>`;
 
+  const isDownload =
+    searchParams.get("download") === "true" ||
+    searchParams.get("download") === "1" ||
+    searchParams.get("dl") === "1";
+  const filename = `${slug || "launchfeed"}-${award}-${theme}-badge.svg`;
+
+  const responseHeaders: Record<string, string> = {
+    "Content-Type": "image/svg+xml; charset=utf-8",
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "Access-Control-Allow-Origin": "*",
+  };
+
+  if (isDownload) {
+    responseHeaders["Content-Disposition"] = `attachment; filename="${filename}"`;
+  }
+
   return new NextResponse(svg, {
-    headers: {
-      "Content-Type": "image/svg+xml; charset=utf-8",
-      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-      "Pragma": "no-cache",
-      "Expires": "0",
-      "Access-Control-Allow-Origin": "*",
-    },
+    headers: responseHeaders,
   });
 }
+

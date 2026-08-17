@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { format, getWeek } from "date-fns";
 import { LaunchFeedLogo, LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
+import FeaturedOnFooterBar from "./components/FeaturedOnFooterBar";
 import {
   slugify,
   getProductGradientClass,
@@ -431,8 +432,8 @@ export default function MainLayoutShell({
           </div>
 
           {/* Search bar + Submit button (Centered Prominent Search) */}
-          <div className="w-full xl:w-auto flex-1 max-w-2xl flex items-center gap-2.5 sm:gap-3 shrink-0">
-            <div className="h-10 flex-1 border border-hairline bg-surface px-3 sm:px-4 flex items-center gap-2.5 focus-within:border-ink transition-colors">
+          <div className="w-full xl:w-auto flex-1 max-w-2xl flex items-center gap-2 sm:gap-3 shrink-0">
+            <div className="h-10 min-w-0 flex-1 border border-hairline bg-surface px-2.5 sm:px-4 flex items-center gap-2 focus-within:border-ink transition-colors">
               <kbd className="hidden sm:inline-flex text-ink-faint text-xs font-mono border border-hairline px-1.5 py-0.5 bg-void shrink-0">
                 ⌘K
               </kbd>
@@ -455,8 +456,8 @@ export default function MainLayoutShell({
                     window.dispatchEvent(new CustomEvent("searchQueryChanged", { detail: "" }));
                   }
                 }}
-                placeholder="search products, makers, categories..."
-                className="w-full bg-transparent text-ink font-mono text-xs sm:text-sm placeholder:text-ink-faint focus:outline-none"
+                placeholder="search products, makers..."
+                className="w-full min-w-0 bg-transparent text-ink font-mono text-xs sm:text-sm placeholder:text-ink-faint focus:outline-none truncate"
               />
               {searchQuery && (
                 <button
@@ -473,21 +474,23 @@ export default function MainLayoutShell({
                 </button>
               )}
             </div>
+
+            {/* Submit Button — Completely visible on mobile & desktop */}
             <Link
               href="/submit"
-              className="h-10 px-3 sm:px-5 bg-signal/10 text-signal hover:bg-signal/20 border border-signal/30 font-mono text-xs sm:text-sm font-bold transition-colors shrink-0 cursor-pointer flex items-center gap-2"
+              className="h-10 px-2.5 sm:px-4 bg-signal text-void hover:opacity-90 border border-signal font-mono text-xs sm:text-sm font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-xs"
+              title="Submit a product to The Launch Feed"
             >
-              <span className="w-4 h-4 bg-signal text-void font-mono font-bold text-xs flex items-center justify-center shrink-0">
-                +
-              </span>
-              <span className="hidden sm:inline">Submit Product</span>
+              <span className="font-mono font-bold text-sm leading-none">+</span>
+              <span className="inline sm:hidden font-bold">Submit</span>
+              <span className="hidden sm:inline font-bold">Submit Product</span>
             </Link>
 
             {/* Auth Account Pill / Login Link — Uniform h-10 Height */}
             {userSession ? (
               <Link
                 href="/profile"
-                className="h-10 px-3 border border-hairline bg-surface hover:bg-raised text-ink font-mono text-xs sm:text-sm font-bold transition-colors shrink-0 flex items-center gap-2 cursor-pointer"
+                className="h-10 px-2.5 sm:px-3 border border-hairline bg-surface hover:bg-raised text-ink font-mono text-xs sm:text-sm font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                 title={`View ${userSession.name}'s Profile & Dashboard`}
               >
                 <span className="w-5 h-5 rounded-xs bg-ink text-void text-[10px] font-bold flex items-center justify-center shrink-0 overflow-hidden">
@@ -507,7 +510,7 @@ export default function MainLayoutShell({
             ) : (
               <Link
                 href="/login"
-                className="h-10 px-3.5 border border-hairline bg-void hover:bg-surface text-ink font-mono text-xs sm:text-sm font-bold transition-colors shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="h-10 px-2.5 sm:px-3.5 border border-hairline bg-void hover:bg-surface text-ink font-mono text-xs sm:text-sm font-bold transition-colors shrink-0 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
               >
                 <span>[ Login ]</span>
               </Link>
@@ -1026,6 +1029,9 @@ export default function MainLayoutShell({
                   ))}
                 </div>
               </div>
+
+              {/* Featured On Online Directories Marquee Strip */}
+              <FeaturedOnFooterBar />
 
               {/* Row 3: Bottom Creator Attribution & Theme Controls Bar */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1 text-xs text-ink-faint w-full">

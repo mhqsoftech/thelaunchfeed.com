@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getPublicProfile, getSuggestedFounders } from "@/lib/queries/user";
 import { decryptPaymentApiKey } from "@/lib/crypto";
 import { fetchLiveRevenueFromSDK } from "@/app/lib/revenueTelemetrySDK";
+import { getAccoladeDetails } from "@/lib/awards";
+import { computeAwardsForProducts } from "@/lib/queries/awards";
 import FounderClientView, { type ViewFounder } from "./FounderClientView";
 
 export const dynamic = "force-dynamic";
@@ -154,6 +156,8 @@ export default async function FounderPage({
     }
   }
 
+  const awardsMap = await computeAwardsForProducts(f.products);
+
   const view: ViewFounder = {
     id: f.id,
     username: f.username,
@@ -172,24 +176,36 @@ export default async function FounderPage({
     totalVotes,
     productsCount: f.products.length,
     joinedAt: new Date(f.createdAt).toISOString().slice(0, 10),
-    products: f.products.map((p: any) => ({
-      id: p.id,
-      slug: p.slug,
-      name: p.name,
-      tagline: p.tagline,
-      category: p.category?.name ?? "Uncategorized",
-      logoUrl: p.logoUrl ?? null,
-      websiteUrl: p.websiteUrl ?? null,
-      tags: p.tags ?? [],
-      commentCount: p.commentCount ?? 0,
-      votes: p.voteCount,
-      revenue: p.revenue?.isVerified
-        ? (p.revenue.mrrCents >= 100000
+    products: f.products.map((p: any) => {
+      const productAwards = awardsMap.get(p.id) || ["launch"];
+      const accolades = getAccoladeDetails(productAwards, p.slug);
+      const awardsDisplay = accolades
+        .filter((a) => a.id !== "launch")
+        .map((a) => ({
+          label: a.rankBadge ? `${a.rankBadge} ${a.badgeLabel}` : a.badgeLabel,
+          style: `${a.tone.border} ${a.tone.text} ${a.tone.bg}`,
+        }));
+
+      return {
+        id: p.id,
+        slug: p.slug,
+        name: p.name,
+        tagline: p.tagline,
+        category: p.category?.name ?? "Uncategorized",
+        logoUrl: p.logoUrl ?? null,
+        websiteUrl: p.websiteUrl ?? null,
+        tags: p.tags ?? [],
+        commentCount: p.commentCount ?? 0,
+        votes: p.voteCount,
+        awards: awardsDisplay,
+        revenue: p.revenue?.isVerified
+          ? p.revenue.mrrCents >= 100000
             ? `$${(p.revenue.mrrCents / 100000).toFixed(1)}K / mo`
-            : `$${(p.revenue.mrrCents / 100).toFixed(p.revenue.mrrCents % 100 === 0 ? 0 : 2)} / mo`)
-        : "",
-      launchedAt: new Date(p.launchedAt).toISOString().slice(0, 10),
-    })),
+            : `$${(p.revenue.mrrCents / 100).toFixed(p.revenue.mrrCents % 100 === 0 ? 0 : 2)} / mo`
+          : "",
+        launchedAt: new Date(p.launchedAt).toISOString().slice(0, 10),
+      };
+    }),
   };
 
   const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com";

@@ -2,7 +2,14 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-const connectionString = process.env.DATABASE_URL!;
+function getConnectionString(): string {
+  const raw = process.env.DATABASE_URL || "";
+  // In pg / pg-connection-string v3 preparation, 'sslmode=require' produces a SECURITY WARNING.
+  // Normalizing to 'sslmode=verify-full' silences the warning while maintaining strict verification.
+  return raw.replace(/([?&])sslmode=require\b/g, "$1sslmode=verify-full");
+}
+
+const connectionString = getConnectionString();
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;

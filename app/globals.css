@@ -158,8 +158,27 @@ html[data-theme-transitioning] * {
   will-change: transform;
 }
 
-.marquee-container:hover .marquee-track {
+.directory-marquee-track {
+  display: flex;
+  flex-shrink: 0;
+  animation: marquee 30s linear infinite;
+  will-change: transform;
+  align-items: center;
+}
+
+.marquee-container:hover .marquee-track,
+.marquee-container:hover .directory-marquee-track {
   animation-play-state: paused;
+}
+
+/* Directory Badge Sizing Enforcement */
+.directory-badge-wrapper img,
+.directory-badge-wrapper svg {
+  max-height: 26px !important;
+  width: auto !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  object-fit: contain !important;
 }
 
 /* Scrollbar styling */

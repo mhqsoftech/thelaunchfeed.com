@@ -549,6 +549,7 @@ export const TEMPLATES: EmailTemplate[] = [
         </div>
 
         ${primaryBtn("View embed codes on your launch page", `${BASE_URL}/product/${esc(v.productSlug ?? "")}`)}
+        ${ghostBtn("Download launch badge asset", v.productSlug ? `${BASE_URL}/api/badge/${esc(v.productSlug)}?award=launch&download=true` : `${BASE_URL}/badges`)}
 
         ${divider()}
         ${tips("First-hour maker checklist", [
@@ -569,8 +570,19 @@ export const TEMPLATES: EmailTemplate[] = [
     auto: true,
     subject: (v) =>
       `#${v.rank ?? 3} on the ${v.period ?? "daily"} board — ${v.productName}`,
-    render: (v) =>
-      shell(
+    render: (v) => {
+      const rankNum = v.rank ?? 2;
+      const top3AwardKey =
+        v.period === "weekly"
+          ? `weekly_${rankNum}`
+          : v.period === "monthly"
+          ? `monthly_${rankNum}`
+          : `daily_${rankNum}`;
+      const top3BadgeDownloadUrl = v.productSlug
+        ? `${BASE_URL}/api/badge/${esc(v.productSlug)}?award=${top3AwardKey}&download=true`
+        : `${BASE_URL}/badges`;
+
+      return shell(
         `
         ${tag(`Rank #${v.rank ?? 3}`, SIGNAL)}${tag((v.period ?? "daily").toUpperCase())}
         ${h1(`Top ${v.rank ?? 3} on the ${v.period ?? "daily"} board.`)}
@@ -595,12 +607,14 @@ export const TEMPLATES: EmailTemplate[] = [
         ])}
 
         ${primaryBtn("View your placement", `${BASE_URL}/product/${esc(v.productSlug ?? "")}`)}
+        ${ghostBtn("Download the badge asset", top3BadgeDownloadUrl)}
         ${ghostBtn("See the leaderboard", `${BASE_URL}`)}
 
         ${communityChannelsBlock("Share Your Top-3 Win in the Community")}
       `,
         `You're #${v.rank ?? 3} — keep the momentum for the next few hours.`
-      ),
+      );
+    },
   },
   {
     id: "rank-first",
@@ -609,8 +623,18 @@ export const TEMPLATES: EmailTemplate[] = [
     trigger: "on-rank-first",
     auto: true,
     subject: (v) => `#1 today: ${v.productName}`,
-    render: (v) =>
-      shell(
+    render: (v) => {
+      const firstAwardKey =
+        v.period === "weekly"
+          ? "weekly_1"
+          : v.period === "monthly"
+          ? "monthly_1"
+          : "daily_1";
+      const firstBadgeDownloadUrl = v.productSlug
+        ? `${BASE_URL}/api/badge/${esc(v.productSlug)}?award=${firstAwardKey}&download=true`
+        : `${BASE_URL}/badges`;
+
+      return shell(
         `
         ${tag("#1", SIGNAL)}${tag("Champion")}
         ${h1(`#1 on the ${v.period ?? "daily"} board.`, SIGNAL)}
@@ -634,13 +658,14 @@ export const TEMPLATES: EmailTemplate[] = [
         ])}
 
         ${signalBtn("View your #1 placement", `${BASE_URL}/product/${esc(v.productSlug ?? "")}`)}
+        ${ghostBtn("Download the badge asset", firstBadgeDownloadUrl)}
         ${primaryBtn("Book the featured slot", `${BASE_URL}/profile`)}
-        ${ghostBtn("Download the badge asset", `${BASE_URL}/badges`)}
 
         ${communityChannelsBlock("Celebrate Your #1 Champion Status")}
       `,
         `#1 RANK: ${v.productName} topped the ${v.period ?? "daily"} board.`
-      ),
+      );
+    },
   },
   {
     id: "weekly-digest",
@@ -773,6 +798,7 @@ export const TEMPLATES: EmailTemplate[] = [
         ])}
 
         ${primaryBtn("View verified badge", `${BASE_URL}/product/${esc(v.productSlug ?? "")}`)}
+        ${ghostBtn("Download MRR badge asset", v.productSlug ? `${BASE_URL}/api/badge/${esc(v.productSlug)}?award=revenue&download=true` : `${BASE_URL}/badges`)}
         ${ghostBtn("Adjust display settings", `${BASE_URL}/profile`)}
 
         ${divider()}

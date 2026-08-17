@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LaunchFeedLogo, LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
@@ -103,6 +104,7 @@ import {
 } from "@/app/actions/adminUsers";
 import { ALL_SECTIONS } from "@/lib/sections";
 import BroadcastTab from "./BroadcastTab";
+import DirectoryEmbedsTab from "./DirectoryEmbedsTab";
 import {
   getAdminRevenueData,
   type AdminRevenueData,
@@ -119,6 +121,7 @@ type Tab =
   | "revenue"
   | "featured"
   | "categories"
+  | "embeds"
   | "moderation"
   | "founder"
   | "emails"
@@ -201,6 +204,13 @@ function TabIcon({ id, className = "w-4 h-4 shrink-0" }: { id: Tab; className?: 
           <line x1="7" y1="7" x2="7.01" y2="7" />
         </svg>
       );
+    case "embeds":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+        </svg>
+      );
     case "founder":
       return (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -256,6 +266,7 @@ const TABS: {
   { id: "moderation", label: "Moderation", group: "manage" },
   { id: "featured", label: "Featured & Rotating", group: "manage" },
   { id: "categories", label: "Categories", group: "manage" },
+  { id: "embeds", label: "Directory Embeds", group: "manage" },
   { id: "founder", label: "Founder mode", group: "founder" },
   { id: "broadcast", label: "Social Broadcast", group: "comms" },
   { id: "emails", label: "Compose email", group: "comms" },
@@ -695,6 +706,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
             {tab === "moderation" && <ModerationTab />}
             {tab === "featured" && <FeaturedTab />}
             {tab === "categories" && <CategoriesTab />}
+            {tab === "embeds" && <DirectoryEmbedsTab />}
             {tab === "revenue" && <RevenueTab />}
             {tab === "founder" && <FounderTab session={session} />}
             {tab === "broadcast" && <BroadcastTab />}
@@ -1489,8 +1501,8 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
       </div>
 
       {/* Edit User Modal */}
-      {editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-void/80 backdrop-blur-sm animate-fadeIn">
+      {editingUser && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="border border-hairline bg-surface p-6 max-w-xl w-full space-y-4 max-h-[90vh] overflow-y-auto font-mono text-ink shadow-2xl">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>
@@ -1657,12 +1669,13 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Create User Modal */}
-      {isCreating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-void/80 backdrop-blur-sm animate-fadeIn">
+      {isCreating && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="border border-hairline bg-surface p-6 max-w-xl w-full space-y-4 max-h-[90vh] overflow-y-auto font-mono text-ink shadow-2xl">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>
@@ -1824,12 +1837,13 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Delete User Confirmation Modal */}
-      {deletingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-void/80 backdrop-blur-sm animate-fadeIn">
+      {deletingUser && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
           <div className="border border-rose-500/50 bg-surface p-6 max-w-md w-full space-y-4 font-mono text-ink shadow-2xl">
             <div className="text-xs uppercase font-bold text-rose-400">DANGER: PERMANENT USER DELETION</div>
             <h3 className="text-base font-bold text-ink">Delete user @{deletingUser.username}?</h3>
@@ -1852,7 +1866,8 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

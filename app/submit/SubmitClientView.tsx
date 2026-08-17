@@ -250,6 +250,7 @@ export interface ProductProfileData {
   pricingPartner: string;
   apiKey: string;
   revenueVerified: boolean;
+  tags: string;
   faq1Q: string;
   faq1A: string;
   faq2Q: string;
@@ -288,6 +289,7 @@ const EMPTY_PROFILE: ProductProfileData = {
   pricingPartner: "",
   apiKey: "",
   revenueVerified: false,
+  tags: "",
   faq1Q: "",
   faq1A: "",
   faq2Q: "",
@@ -549,6 +551,7 @@ export default function SubmitClientView({
           tagline: activeForm.tagline || "",
           websiteUrl: activeForm.websiteUrl || "",
           videoUrl: activeForm.videoUrl || undefined,
+          tags: activeForm.tags ? activeForm.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
           description: activeForm.overviewPitch,
           categorySlug,
           makerName: activeForm.makerName || sess.name || "Unknown maker",
@@ -618,7 +621,7 @@ export default function SubmitClientView({
         makerHandle: initialProductData.maker || initialProductData.makerHandle || "@menajulm",
         websiteUrl: initialProductData.websiteUrl || initialProductData.website || `https://${pSlug}.com`,
         videoUrl: initialProductData.videoUrl || "",
-        githubUrl: initialProductData.githubUrl || `https://github.com/menajulm/${pSlug}`,
+        githubUrl: initialProductData.githubUrl || "",
         revenue: initialProductData.revenue || "$14.2K / mo",
         overviewPitch:
           initialProductData.overviewPitch ||
@@ -635,7 +638,7 @@ export default function SubmitClientView({
         enterprisePlan: ent,
         techStack: initialProductData.techStack || "Rust, Next.js 16, Neon Postgres, Tailwind CSS v4, Vercel Edge",
         infraHosting: initialProductData.infraHosting || "Distributed AWS & Vercel Edge Mesh (35 Global Points of Presence)",
-        apiUrl: initialProductData.apiUrl || `https://api.${pSlug}.com/v1/graphql`,
+        apiUrl: initialProductData.apiUrl || "",
         securityStandards: initialProductData.securityStandards || "SOC2 Type II, Passkey Authentication, End-to-End Encryption",
         originStory:
           initialProductData.originStory ||
@@ -652,6 +655,7 @@ export default function SubmitClientView({
         pricingPartner: initialProductData.pricingPartner || "stripe",
         apiKey: initialProductData.apiKey || "",
         revenueVerified: Boolean(initialProductData.revenueVerified || initialProductData.revenue),
+        tags: Array.isArray(initialProductData.tags) ? initialProductData.tags.join(", ") : (initialProductData.tags as any) || "",
         faq1Q: q1,
         faq1A: a1,
         faq2Q: q2,
@@ -1169,6 +1173,7 @@ export default function SubmitClientView({
           description: formData.overviewPitch,
           websiteUrl: formData.websiteUrl || "",
           videoUrl: formData.videoUrl || "",
+          tags: formData.tags ? formData.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
           categorySlug,
           logoUrl: thumbnailAvif || "",
           screenshots: galleryAvif.filter(Boolean),
@@ -1191,6 +1196,7 @@ export default function SubmitClientView({
         tagline: formData.tagline || "",
         websiteUrl: formData.websiteUrl || "",
         videoUrl: formData.videoUrl || undefined,
+        tags: formData.tags ? formData.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
         description: formData.overviewPitch,
         categorySlug,
         makerName: formData.makerName || sess.name || "Unknown maker",
@@ -1915,6 +1921,28 @@ export default function SubmitClientView({
                   />
                 </div>
 
+                {/* Product Tags / Keywords */}
+                <div className="space-y-1.5 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-ink-dim uppercase">
+                      Product Search Tags &amp; Keywords (Optional)
+                    </label>
+                    <span className="text-[10px] text-ink-faint font-mono">
+                      COMMA SEPARATED · UP TO 5
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={formData.tags}
+                    onChange={(e) => handleInputChange("tags", e.target.value)}
+                    placeholder="e.g. workspace, notes, collaboration, ai, productivity"
+                    className="w-full px-3 py-2 border border-hairline bg-void text-xs font-mono text-ink focus:outline-none focus:border-ink"
+                  />
+                  <p className="text-[10px] text-ink-faint font-mono pt-0.5">
+                    Add optional search keywords or topic tags. These appear as clean tags in the action row on your live product page and improve search discoverability.
+                  </p>
+                </div>
+
                 {/* Product Thumbnail / Image Upload (Auto-Converted to AVIF) */}
                 <div className="space-y-2 sm:col-span-2 border border-hairline bg-surface/30 p-3 sm:p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
@@ -2093,6 +2121,31 @@ export default function SubmitClientView({
                   />
                   <p className="text-[10px] text-ink-faint font-mono pt-1 break-words">
                     Provide a YouTube, Loom, Vimeo, or direct video link. It will automatically render in an interactive, responsive full-width video player on your product page.
+                  </p>
+                </div>
+
+                {/* Product Source Code / GitHub Repository URL */}
+                <div className="space-y-1.5 sm:col-span-2 border border-hairline bg-surface/30 p-3 sm:p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
+                    <label className="text-xs font-bold text-ink uppercase flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <span>Source Code / GitHub Repository URL</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-dim uppercase font-bold shrink-0">
+                        OPTIONAL · OPEN SOURCE
+                      </span>
+                    </label>
+                    <span className="text-[10px] text-ink-faint font-mono shrink-0">
+                      GITHUB / GITLAB / CODE REPOSITORY
+                    </span>
+                  </div>
+                  <input
+                    type="url"
+                    value={formData.githubUrl}
+                    onChange={(e) => handleInputChange("githubUrl", e.target.value)}
+                    placeholder="e.g. https://github.com/your-username/your-repository"
+                    className="w-full px-3 py-2 border border-hairline bg-void text-xs font-mono text-ink focus:outline-none focus:border-ink"
+                  />
+                  <p className="text-[10px] text-ink-faint font-mono pt-1 break-words">
+                    If your software is open source or has a public codebase repository, enter the URL here. A direct repository link button will be featured on your live product page and architecture breakdown.
                   </p>
                 </div>
               </div>
@@ -2326,6 +2379,19 @@ export default function SubmitClientView({
                     value={formData.infraHosting}
                     onChange={(e) => handleInputChange("infraHosting", e.target.value)}
                     placeholder="Distributed AWS & Vercel Edge Mesh"
+                    className="w-full px-3 py-2 border border-hairline bg-void text-xs font-mono text-ink focus:outline-none focus:border-ink"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-ink-dim uppercase">
+                    Source Code Repository URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.githubUrl}
+                    onChange={(e) => handleInputChange("githubUrl", e.target.value)}
+                    placeholder="https://github.com/your-username/your-repo"
                     className="w-full px-3 py-2 border border-hairline bg-void text-xs font-mono text-ink focus:outline-none focus:border-ink"
                   />
                 </div>
@@ -3218,6 +3284,13 @@ export default function SubmitClientView({
                       <p className="text-ink-dim mt-0.5">{formData.securityStandards || "SOC2 Type II & Passkey Auth"}</p>
                     </div>
                   </div>
+
+                  {formData.githubUrl && (
+                    <div className="pt-2 border-t border-hairline">
+                      <h4 className="font-bold text-ink uppercase text-[11px]">Source Code Repository</h4>
+                      <p className="text-signal font-mono text-[11px] mt-0.5">{formData.githubUrl}</p>
+                    </div>
+                  )}
 
                   {formData.apiUrl && (
                     <div className="pt-2 border-t border-hairline">

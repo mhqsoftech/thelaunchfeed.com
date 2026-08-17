@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import MainLayoutShell from "@/app/MainLayoutShell";
@@ -9,6 +10,7 @@ import ProductComments from "@/app/components/ProductComments";
 import EmbeddableAwardWidget, { type EmbedAwardId } from "@/app/components/EmbeddableAwardWidget";
 import { slugify, getStoredSession, saveSession, UserSession, formatProductWebsiteUrl } from "@/app/data";
 import { toggleVote, toggleBookmark } from "@/app/actions/interactions";
+import { getAccoladeDetails, type AccoladeItem, type ProductAward } from "@/lib/awards";
 
 function isValidHttpUrl(rawUrl?: string | null): boolean {
   if (!rawUrl || typeof rawUrl !== "string") return false;
@@ -76,6 +78,8 @@ export type ViewProduct = {
   weeklyRank?: number | null;
   monthlyRank?: number | null;
   awards?: Array<{ label: string; style: string }>;
+  rawAwards?: ProductAward[];
+  accolades?: AccoladeItem[];
   details?: {
     overviewPitch?: string;
     features?: string[];
@@ -278,6 +282,11 @@ export default function ProductClientView({
 
   const eligibleAwards = React.useMemo<EmbedAwardId[]>(() => {
     const list: EmbedAwardId[] = ["launch"];
+    if (product.rawAwards) {
+      for (const a of product.rawAwards) {
+        list.push(a as EmbedAwardId);
+      }
+    }
     if (product.dailyRank === 1) { list.push("daily_1"); list.push("pod"); }
     if (product.dailyRank === 2) list.push("daily_2");
     if (product.dailyRank === 3) list.push("daily_3");
@@ -295,7 +304,41 @@ export default function ProductClientView({
     if (product.revenue && product.revenue.trim().length > 0) list.push("revenue");
     if (product.votes >= 10) list.push("upvote");
     return Array.from(new Set(list));
-  }, [product.dailyRank, product.weeklyRank, product.monthlyRank, product.votes, product.revenue]);
+  }, [product.rawAwards, product.dailyRank, product.weeklyRank, product.monthlyRank, product.votes, product.revenue]);
+
+  const displayAccolades: AccoladeItem[] = React.useMemo(() => {
+    if (product.accolades && product.accolades.length > 0) {
+      return product.accolades;
+    }
+    const awardsList: ProductAward[] = product.rawAwards ? [...product.rawAwards] : ["launch"];
+    if (product.dailyRank === 1) awardsList.push("daily_1");
+    if (product.dailyRank === 2) awardsList.push("daily_2");
+    if (product.dailyRank === 3) awardsList.push("daily_3");
+    if (product.weeklyRank === 1) awardsList.push("weekly_1");
+    if (product.weeklyRank === 2) awardsList.push("weekly_2");
+    if (product.weeklyRank === 3) awardsList.push("weekly_3");
+    if (product.monthlyRank === 1) awardsList.push("monthly_1");
+    if (product.monthlyRank === 2) awardsList.push("monthly_2");
+    if (product.monthlyRank === 3) awardsList.push("monthly_3");
+    if (product.revenue) awardsList.push("revenue");
+    if (product.votes >= 50) awardsList.push("upvote");
+    return getAccoladeDetails(awardsList, product.slug, { revenueFormatted: product.revenue });
+  }, [
+    product.accolades,
+    product.rawAwards,
+    product.dailyRank,
+    product.weeklyRank,
+    product.monthlyRank,
+    product.revenue,
+    product.votes,
+    product.slug,
+  ]);
+
+  const wonAccolades = React.useMemo(
+    () => displayAccolades.filter((a) => a.id !== "launch"),
+    [displayAccolades]
+  );
+  const topAccolade = wonAccolades[0] || null;
 
   useEffect(() => {
     document.title = `${baseProduct.name} - The Launch Feed`;
@@ -460,17 +503,39 @@ export default function ProductClientView({
               </div>
 
               <div className="space-y-1.5 min-w-0 flex-1">
-                {/* Category & Telemetry Badges (Always visible on mobile & desktop) */}
+                {/* Category & Won Awards Badges (Always visible on mobile & desktop) */}
                 <div className="flex items-center gap-2 flex-wrap pb-0.5">
                   <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-dim uppercase bg-surface/60 font-bold tracking-wider">
                     {product.category}
                   </span>
-                  {product.tags && product.tags.length > 0 && product.tags.slice(0, 5).map((tag, tIdx) => (
-                    <span key={tIdx} className="text-[10px] font-mono px-1.5 py-0.5 border border-hairline/60 text-ink-faint uppercase bg-void">
-                      #{tag}
-                    </span>
+
+                  {/* All Won Accolades / Awards for this product */}
+                  {wonAccolades.map((acc, aIdx) => (
+                    isFounder ? (
+                      <a
+                        key={aIdx}
+                        href={acc.downloadUrl}
+                        download
+                        title={`Official Award: ${acc.title} — Click to download vector badge asset`}
+                        className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors ${acc.tone.border} ${acc.tone.text} ${acc.tone.bg}`}
+                      >
+                        <span>{acc.shortTag}</span>
+                        <span className="text-[9px] opacity-70 leading-none">↓</span>
+                      </a>
+                    ) : (
+                      <Link
+                        key={aIdx}
+                        href={`/badges/${product.slug}?award=${acc.badgeAwardParam}`}
+                        title={`Official Award: ${acc.title}`}
+                        className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase tracking-wider flex items-center gap-1 transition-colors ${acc.tone.border} ${acc.tone.text} ${acc.tone.bg}`}
+                      >
+                        <span>{acc.shortTag}</span>
+                      </Link>
+                    )
                   ))}
-                  {mrrText && (
+
+                  {/* Verified MRR pill if not already included in wonAccolades */}
+                  {mrrText && !wonAccolades.some((a) => a.id === "revenue") && (
                     <span className="text-[10px] font-mono px-2 py-0.5 border border-signal/40 bg-void text-signal uppercase font-bold flex items-center gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-signal shrink-0 animate-pulse" />
                       Verified MRR {mrrText}
@@ -559,35 +624,6 @@ export default function ProductClientView({
             </div>
           </div>
 
-          {/* Product Accolades Section */}
-          {(() => {
-            const earnedAwards: Array<{ label: string; style: string }> = product.awards ? [...product.awards] : [];
-            if (product.dailyRank === 1) {
-              earnedAwards.push({ label: "#1 PRODUCT OF THE DAY", style: "border-signal/50 text-signal bg-void" });
-            }
-            if (product.weeklyRank === 1) {
-              earnedAwards.push({ label: "WEEKLY #1 LEADER", style: "border-ink text-ink bg-surface" });
-            }
-            if (product.monthlyRank === 1) {
-              earnedAwards.push({ label: "MONTHLY #1 LEADER", style: "border-hairline text-ink-dim bg-surface/60" });
-            }
-
-            if (earnedAwards.length === 0) return null;
-
-            return (
-              <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-hairline/60">
-                {earnedAwards.map((award, aIdx) => (
-                  <div
-                    key={aIdx}
-                    className={`px-2.5 py-1 border text-[10px] sm:text-[11px] font-mono font-bold flex items-center gap-1.5 shrink-0 ${award.style}`}
-                  >
-                    <span>{award.label}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-
           {/* Action Row */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-hairline">
             <div className="flex items-center gap-2.5 flex-wrap">
@@ -662,6 +698,20 @@ export default function ProductClientView({
                 <span className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform text-ink-dim group-hover:text-ink">↗</span>
               </button>
             </div>
+
+            {/* Product Tags in Action Row Right Corner */}
+            {product.tags && product.tags.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end">
+                {product.tags.slice(0, 6).map((tag, tIdx) => (
+                  <span
+                    key={tIdx}
+                    className="text-[10px] font-mono px-1.5 py-0.5 border border-hairline/60 text-ink-faint uppercase bg-surface/30 hover:border-ink-dim hover:text-ink-dim transition-colors"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -1209,10 +1259,10 @@ export default function ProductClientView({
       </div>
 
       {/* Lightbox Preview Modal */}
-      {selectedImage && (
+      {selectedImage && typeof document !== "undefined" && createPortal(
         <div
           onClick={() => setSelectedImage(null)}
-          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
+          className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 cursor-pointer"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1246,7 +1296,8 @@ export default function ProductClientView({
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Similar Products in Category Section */}

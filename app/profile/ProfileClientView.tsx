@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import MainLayoutShell from "@/app/MainLayoutShell";
@@ -2086,9 +2087,9 @@ export default function ProfileClientView({
       </div>
 
       {/* Minimal Read-Only API Key Confirmation Popup Modal */}
-      {showApiKeyModal && (
-        <div className="fixed inset-0 z-50 bg-void/85 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-md border border-signal bg-void p-5 sm:p-6 space-y-4 font-mono text-ink">
+      {showApiKeyModal && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md border border-signal bg-void p-5 sm:p-6 space-y-4 font-mono text-ink shadow-2xl">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-signal animate-ping" />
@@ -2169,7 +2170,8 @@ export default function ProfileClientView({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </MainLayoutShell>
   );

@@ -32,7 +32,15 @@ export async function GET() {
   const weekStart = new Date(Date.now() - 7 * 86400 * 1000);
   const monthStart = new Date(Date.now() - 30 * 86400 * 1000);
 
-  const [featured, rotating, weeklyProducts, monthlyProducts, categories, topFounders] = await Promise.all([
+  const [
+    featured,
+    rotating,
+    weeklyProducts,
+    monthlyProducts,
+    categories,
+    topFounders,
+    directoryEmbeds,
+  ] = await Promise.all([
     getPublicSlots("FEATURED"),
     getPublicSlots("ROTATING"),
     // Top products this week (left rail)
@@ -71,6 +79,16 @@ export async function GET() {
     getCategoriesWithCounts().catch(() => []),
     // Top 10 builders/founders for right rail
     getTopFounders(10).catch(() => []),
+    // Directory Embeds for footer marquee
+    prisma.appSetting
+      .findUnique({ where: { key: "site.directory_embeds" } })
+      .then((row) => {
+        if (!row || !Array.isArray(row.value)) return [];
+        return (row.value as any[])
+          .filter((item) => item && item.enabled !== false && typeof item.embedHtml === "string")
+          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      })
+      .catch(() => []),
   ]);
 
   const shapeProduct = (p: any) => ({
@@ -117,6 +135,7 @@ export async function GET() {
     monthlyProducts: monthlyProducts.map(shapeProduct),
     categories: mappedCategories,
     topFounders: (topFounders || []).slice(0, 10),
+    directoryEmbeds,
   };
 
   layoutServerCache = { timestamp: Date.now(), data: responseData };
