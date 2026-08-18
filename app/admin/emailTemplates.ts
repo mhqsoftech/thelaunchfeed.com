@@ -71,7 +71,7 @@ const VERIFIED = "#00D97E";
 
 const WHATSAPP_URL = "https://chat.whatsapp.com/HxTenCRhtHa9PIviuQNl9U";
 const TELEGRAM_URL = "https://t.me/thelaunchfeed";
-const X_URL = "https://x.com/thelaunchfeed";
+const X_URL = "https://bsky.app/profile/thelaunchfeed.bsky.social";
 
 /* ─────────── primitives & icons ─────────── */
 
@@ -92,7 +92,8 @@ function telegramSvg(color = INK) {
 }
 
 function xTwitterSvg(color = INK) {
-  return `<svg width="11" height="11" viewBox="0 0 24 24" fill="${color}" style="display:inline-block;vertical-align:-1.5px;margin-right:5px;"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`;
+  // Bluesky logo — replaces X/Twitter as our primary auto-broadcast channel.
+  return `<svg width="11" height="11" viewBox="0 0 600 530" fill="${color}" style="display:inline-block;vertical-align:-1.5px;margin-right:5px;"><path d="M135.72 44.03C202.216 93.951 273.74 195.17 300 249.49c26.26-54.316 97.782-155.54 164.28-205.463C512.26 8.024 590 -19.44 590 69.24c0 17.7-10.15 148.79-16.11 170.07-20.68 73.94-96.14 92.86-163.23 81.42 117.3 19.95 147.16 86.06 82.72 152.16-122.34 125.55-175.83-31.51-189.53-71.76-2.51-7.38-3.68-10.83-3.85-7.88-.17-2.95-1.34.5-3.85 7.88-13.7 40.26-67.19 197.31-189.53 71.76-64.44-66.1-34.58-132.21 82.72-152.16-67.09 11.44-142.55-7.48-163.22-81.42C20.15 217.99 10 86.9 10 69.24c0-88.68 77.74-61.216 125.72-25.21z"/></svg>`;
 }
 
 function pulseDot(color = SIGNAL) {
@@ -125,7 +126,7 @@ function shell(inner: string, preheader = "") {
               Official Channels:
               <a href="${WHATSAPP_URL}" target="_blank" style="color:${INK};font-weight:700;text-decoration:none;margin-left:4px;">${whatsappSvg(INK)}WhatsApp</a> ·
               <a href="${TELEGRAM_URL}" target="_blank" style="color:${INK};font-weight:700;text-decoration:none;margin-left:4px;">${telegramSvg(INK)}Telegram</a> ·
-              <a href="${X_URL}" target="_blank" style="color:${INK};font-weight:700;text-decoration:none;margin-left:4px;">${xTwitterSvg(INK)}@thelaunchfeed</a>
+              <a href="${X_URL}" target="_blank" style="color:${INK};font-weight:700;text-decoration:none;margin-left:4px;">${xTwitterSvg(INK)}@thelaunchfeed.bsky.social</a>
             </td>
           </tr>
         </table>
@@ -218,7 +219,7 @@ function communityChannelsBlock(title = "Join Official Channels For Live Updates
         </td>
         <td style="padding:3px 0;" valign="middle">
           <a href="${X_URL}" target="_blank" style="display:inline-block;padding:8px 12px;background:#ffffff;border:1px solid ${HAIRLINE};color:#0a0a0a;text-decoration:none;font-size:11px;font-weight:700;border-radius:3px;">
-            ${xTwitterSvg("#0a0a0a")}Follow @thelaunchfeed ↗
+            ${xTwitterSvg("#0a0a0a")}Follow @thelaunchfeed.bsky.social ↗
           </a>
         </td>
       </tr>

@@ -114,7 +114,7 @@ export async function GET() {
   }
 
   lines.push(``, `## Official Broadcast & Telemetry Channels`);
-  lines.push(`- 𝕏 (Twitter): https://x.com/thelaunchfeed`);
+  lines.push(`- Bluesky: https://bsky.app/profile/thelaunchfeed.bsky.social`);
   lines.push(`- Telegram: https://t.me/thelaunchfeed`);
   lines.push(`- WhatsApp Community: https://chat.whatsapp.com/HxTenCRhtHa9PIviuQNl9U`);
   lines.push(`- Submit Launch: ${siteUrl}/submit`);

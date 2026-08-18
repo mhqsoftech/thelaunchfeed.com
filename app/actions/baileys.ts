@@ -17,13 +17,24 @@ export async function getBaileysStatusAction() {
 
 export async function initBaileysAction() {
   await requireAdmin();
-  const res = await initBaileysSocket();
-  return {
-    status: res.status,
-    qrCodeDataUrl: res.qrCodeDataUrl,
-    userInfo: res.userInfo,
-    lastError: res.lastError,
-  };
+  try {
+    const res = await initBaileysSocket();
+    return {
+      status: res.status,
+      qrCodeDataUrl: res.qrCodeDataUrl,
+      userInfo: res.userInfo,
+      lastError: res.lastError,
+    };
+  } catch (err: any) {
+    return {
+      status: "DISCONNECTED" as const,
+      qrCodeDataUrl: null,
+      userInfo: null,
+      lastError: err?.message
+        ? `Failed to initialize Baileys: ${err.message}`
+        : "Failed to initialize Baileys (unknown error). Check server logs.",
+    };
+  }
 }
 
 export async function disconnectBaileysAction() {

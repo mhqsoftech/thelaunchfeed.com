@@ -33,7 +33,22 @@ if (!globalForBaileys.baileysSession) {
   globalForBaileys.baileysSession = baileysState;
 }
 
-const AUTH_DIR = path.join(process.cwd(), ".baileys_auth");
+// Serverless hosts (Vercel, AWS Lambda, Netlify Functions) have an ephemeral,
+// read-only filesystem outside /tmp and cannot hold a long-lived WebSocket
+// across invocations. Baileys needs both — persistent auth files AND a resident
+// process — so it fundamentally cannot run there. We detect the environment
+// and refuse to init with a clear error so the admin UI surfaces the reason
+// instead of a cryptic React/EROFS crash.
+const IS_SERVERLESS = Boolean(
+  process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.NETLIFY ||
+    process.env.LAMBDA_TASK_ROOT
+);
+
+const AUTH_DIR = IS_SERVERLESS
+  ? path.join("/tmp", ".baileys_auth")
+  : path.join(process.cwd(), ".baileys_auth");
 
 function ensureAuthDir() {
   if (!fs.existsSync(AUTH_DIR)) {
@@ -45,6 +60,15 @@ function ensureAuthDir() {
  * Initializes or returns the existing Baileys socket connection
  */
 export async function initBaileysSocket(): Promise<BaileysSessionState> {
+  if (IS_SERVERLESS) {
+    baileysState.status = "DISCONNECTED";
+    baileysState.qrCodeDataUrl = null;
+    baileysState.qrRaw = null;
+    baileysState.lastError =
+      "Baileys cannot run on serverless (Vercel/Lambda). The WhatsApp Web protocol needs a persistent WebSocket + writable auth storage. Use the Green-API gateway fields below for production, or self-host the WhatsApp broadcaster on a long-running node (Render/Railway/VPS).";
+    return baileysState;
+  }
+
   // If already connected, return
   if (baileysState.socket && baileysState.status === "CONNECTED") {
     return baileysState;

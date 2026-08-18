@@ -103,6 +103,9 @@ export default function BroadcastTab() {
   const [testingWebhook, setTestingWebhook] = useState(false);
   const [feedbackWebhook, setFeedbackWebhook] = useState<{ ok: boolean; msg: string } | null>(null);
 
+  const [testingBsky, setTestingBsky] = useState(false);
+  const [feedbackBsky, setFeedbackBsky] = useState<{ ok: boolean; msg: string } | null>(null);
+
   const [baileysInfo, setBaileysInfo] = useState<{
     status: "DISCONNECTED" | "CONNECTING" | "SCAN_QR" | "CONNECTED";
     qrCodeDataUrl: string | null;
@@ -214,7 +217,7 @@ export default function BroadcastTab() {
     }
   };
 
-  const handleTestChannel = async (channel: "x" | "telegram" | "whatsapp" | "webhook") => {
+  const handleTestChannel = async (channel: "x" | "telegram" | "whatsapp" | "bluesky" | "webhook") => {
     if (channel === "x") {
       setTestingX(true);
       setFeedbackX(null);
@@ -233,6 +236,12 @@ export default function BroadcastTab() {
       const res = await testBroadcastAction("whatsapp");
       setFeedbackWa({ ok: res.success, msg: res.message });
       setTestingWa(false);
+    } else if (channel === "bluesky") {
+      setTestingBsky(true);
+      setFeedbackBsky(null);
+      const res = await testBroadcastAction("bluesky");
+      setFeedbackBsky({ ok: res.success, msg: res.message });
+      setTestingBsky(false);
     } else if (channel === "webhook") {
       setTestingWebhook(true);
       setFeedbackWebhook(null);
@@ -285,8 +294,8 @@ export default function BroadcastTab() {
 
       {/* 3 Channel Configuration Columns / Cards */}
       <form onSubmit={handleSave} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* 1. Free X (Twitter) Auto-Poster via IFTTT & Webhook */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+          {/* 1. X (Twitter) — Native API v2 (free tier is minimal) + optional webhook fallback */}
           <div className="border border-hairline bg-surface/30 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="flex items-center justify-between border-b border-hairline pb-2.5">
@@ -294,20 +303,99 @@ export default function BroadcastTab() {
                   <div className="w-6 h-6 bg-ink text-void rounded-xs flex items-center justify-center p-1">
                     <XBrandLogo className="w-3.5 h-3.5" />
                   </div>
-                  <span className="font-bold text-xs uppercase text-ink">X / Twitter (IFTTT)</span>
+                  <span className="font-bold text-xs uppercase text-ink">X / Twitter API v2</span>
                 </div>
                 <span
                   className={`text-[9px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
-                    config.webhook?.enabled
+                    config.x.enabled
                       ? "border-signal text-signal bg-void"
                       : "border-hairline text-ink-faint bg-surface"
                   }`}
                 >
-                  {config.webhook?.enabled ? "ACTIVE (IFTTT)" : "DISABLED"}
+                  {config.x.enabled ? "ACTIVE (X API)" : "DISABLED"}
                 </span>
               </div>
 
-              {/* Enable Switch */}
+              <label className="flex items-center gap-2 text-xs font-bold text-ink cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={config.x.enabled}
+                  onChange={(e) =>
+                    setConfig({ ...config, x: { ...config.x, enabled: e.target.checked } })
+                  }
+                  className="rounded-xs accent-[#00D97E]"
+                />
+                <span>Enable Direct Auto-Post to X (paid API tier required for reliable cadence)</span>
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-ink-faint">API Key</label>
+                  <input
+                    type="password"
+                    value={config.x.apiKey || ""}
+                    onChange={(e) => setConfig({ ...config, x: { ...config.x, apiKey: e.target.value } })}
+                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-ink-faint">API Secret</label>
+                  <input
+                    type="password"
+                    value={config.x.apiSecret || ""}
+                    onChange={(e) => setConfig({ ...config, x: { ...config.x, apiSecret: e.target.value } })}
+                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-ink-faint">Access Token</label>
+                  <input
+                    type="password"
+                    value={config.x.accessToken || ""}
+                    onChange={(e) => setConfig({ ...config, x: { ...config.x, accessToken: e.target.value } })}
+                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-ink-faint">Access Secret</label>
+                  <input
+                    type="password"
+                    value={config.x.accessTokenSecret || ""}
+                    onChange={(e) => setConfig({ ...config, x: { ...config.x, accessTokenSecret: e.target.value } })}
+                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-ink-dim font-sans leading-tight">
+                Generate at <a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noreferrer" className="underline">developer.x.com</a> → Project → App → Keys and tokens. App permissions must be <strong>Read and Write</strong>. Since X removed most of the free-tier write allowance, use the <strong>Bluesky</strong> channel for zero-cost auto-broadcast, or fall back to the <strong>manual "Post to X" intent link</strong> shown in the launch log for one-tap posting.
+              </p>
+
+              <div className="pt-2 border-t border-hairline">
+                <button
+                  type="button"
+                  onClick={() => handleTestChannel("x")}
+                  disabled={testingX || !config.x.apiKey || !config.x.accessToken}
+                  className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+                >
+                  <SendIcon className="w-3.5 h-3.5 text-signal" />
+                  <span>{testingX ? "Posting Test Tweet..." : "Test Post to X"}</span>
+                </button>
+                {feedbackX && (
+                  <div
+                    className={`mt-2 p-2.5 border text-[11px] font-mono leading-tight ${
+                      feedbackX.ok ? "border-signal text-signal bg-signal/5" : "border-red-500 text-red-500 bg-red-500/5"
+                    }`}
+                  >
+                    {feedbackX.msg}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-hairline pt-3 mt-3">
+                <div className="text-[10px] uppercase font-bold text-ink-faint mb-1">Alternative X path: Make.com / Buffer / n8n / Zapier Webhook</div>
+                <p className="text-[10px] text-ink-dim font-sans leading-tight mb-2">
+                  Independent of the X API block above — enable <strong>either</strong> or <strong>both</strong>. Every launch + winner event is POSTed as JSON (fields: <code>productName</code>, <code>tagline</code>, <code>productUrl</code>, <code>makerName</code>, <code>text</code>, <code>tags</code>, <code>event</code>) — map them inside your Make.com scenario or Buffer inbound and forward to X.
+                </p>
               <label className="flex items-center gap-2 text-xs font-bold text-ink cursor-pointer select-none">
                 <input
                   type="checkbox"
@@ -323,15 +411,11 @@ export default function BroadcastTab() {
                   }
                   className="rounded-xs accent-[#00D97E]"
                 />
-                <span>Enable Free Auto-Post to X (IFTTT / Webhook)</span>
+                <span>Enable webhook path (mirror every launch + winner event)</span>
               </label>
 
-              {/* IFTTT Webhook URL Input */}
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-ink-faint flex items-center justify-between">
-                  <span>IFTTT / Custom Webhook URL</span>
-                  <span className="text-[9px] text-signal font-normal">$0 / Mo Free</span>
-                </label>
+              <div className="space-y-1 mt-2">
+                <label className="text-[10px] uppercase font-bold text-ink-faint">Custom Webhook URL</label>
                 <input
                   type="url"
                   value={config.webhook?.webhookUrl || ""}
@@ -344,49 +428,13 @@ export default function BroadcastTab() {
                       },
                     })
                   }
-                  placeholder="https://maker.ifttt.com/trigger/new_launch/json/with/key/..."
+                  placeholder="https://hook.eu2.make.com/... or Buffer inbound / n8n / Zapier endpoint"
                   className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
                 />
                 <p className="text-[10px] text-ink-dim font-sans leading-tight pt-0.5">
-                  Sends formatted tweet payload (`value1`, `value2`, `value3`) to your IFTTT Webhooks Maker Applet.
+                  POSTs the full JSON launch payload. RSS feed at <code>/feed.xml</code> is also available for any polling automation as a zero-auth fallback.
                 </p>
               </div>
-
-              {/* 1-Click IFTTT RSS Setup Guide */}
-              <div className="p-2.5 border border-hairline bg-surface/50 space-y-2 rounded-xs">
-                <div className="text-[10px] uppercase font-bold text-ink flex items-center justify-between">
-                  <span>Zero-Config: Free IFTTT RSS Applet</span>
-                  <span className="text-[9px] text-signal font-mono font-normal">100% Free</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="text"
-                    readOnly
-                    value={`${typeof window !== "undefined" ? window.location.origin : "https://thelaunchfeed.com"}/feed.xml`}
-                    className="w-full px-2 py-1 border border-hairline bg-void text-[11px] font-mono text-ink-dim"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const url = `${typeof window !== "undefined" ? window.location.origin : "https://thelaunchfeed.com"}/feed.xml`;
-                      navigator.clipboard.writeText(url);
-                      setCopiedRss(true);
-                      setTimeout(() => setCopiedRss(false), 2000);
-                    }}
-                    className={`px-2.5 py-1 text-[10px] border shrink-0 font-bold font-mono transition-colors cursor-pointer ${
-                      copiedRss
-                        ? "border-signal text-signal bg-signal/10"
-                        : "border-hairline bg-surface hover:bg-raised text-ink"
-                    }`}
-                  >
-                    {copiedRss ? "COPIED ✓" : "COPY"}
-                  </button>
-                </div>
-                <div className="text-[10px] text-ink-dim space-y-0.5 font-sans leading-tight border-t border-hairline/60 pt-1.5">
-                  <p><strong>1.</strong> In IFTTT.com &rarr; <em>Create Applet</em></p>
-                  <p><strong>2.</strong> <em>If This:</em> RSS Feed &rarr; <em>New feed item</em> (paste URL above)</p>
-                  <p><strong>3.</strong> <em>Then That:</em> Twitter / X &rarr; <em>Post a tweet</em> (<code>{"{{EntryTitle}} — {{EntryUrl}}"}</code>)</p>
-                </div>
               </div>
             </div>
 
@@ -398,7 +446,7 @@ export default function BroadcastTab() {
                 className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
               >
                 <SendIcon className="w-3.5 h-3.5 text-signal" />
-                <span>{testingWebhook ? "Sending Test Ping..." : "Test IFTTT / Webhook"}</span>
+                <span>{testingWebhook ? "Sending Test Ping..." : "Test Webhook (Make.com / Buffer)"}</span>
               </button>
               {feedbackWebhook && (
                 <div
@@ -764,6 +812,117 @@ export default function BroadcastTab() {
               )}
             </div>
           </div>
+
+          {/* 4. Bluesky (AT Protocol) — genuinely free X alternative */}
+          <div className="border border-hairline bg-surface/20 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
+            <div className="space-y-3.5">
+              <div className="flex items-center justify-between border-b border-hairline pb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-[#0085FF] text-white rounded-xs flex items-center justify-center p-1 font-bold text-[11px] font-mono">
+                    B
+                  </div>
+                  <span className="font-bold text-xs uppercase text-ink">Bluesky (AT Proto)</span>
+                </div>
+                <span
+                  className={`text-[9px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
+                    config.bluesky?.enabled
+                      ? "border-signal text-signal bg-void"
+                      : "border-hairline text-ink-faint bg-surface"
+                  }`}
+                >
+                  {config.bluesky?.enabled ? "ACTIVE" : "DISABLED"}
+                </span>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs font-bold text-ink cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={config.bluesky?.enabled ?? false}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      bluesky: {
+                        enabled: e.target.checked,
+                        handle: config.bluesky?.handle || "",
+                        appPassword: config.bluesky?.appPassword || "",
+                        service: config.bluesky?.service || "https://bsky.social",
+                      },
+                    })
+                  }
+                  className="rounded-xs accent-[#00D97E]"
+                />
+                <span>Enable Auto-Broadcast to Bluesky (100% free · no rate tier)</span>
+              </label>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-ink-faint">Handle</label>
+                <input
+                  type="text"
+                  value={config.bluesky?.handle || ""}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      bluesky: {
+                        enabled: config.bluesky?.enabled ?? false,
+                        handle: e.target.value,
+                        appPassword: config.bluesky?.appPassword || "",
+                        service: config.bluesky?.service || "https://bsky.social",
+                      },
+                    })
+                  }
+                  placeholder="thelaunchfeed.bsky.social"
+                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] uppercase font-bold text-ink-faint">App Password</label>
+                <input
+                  type="password"
+                  value={config.bluesky?.appPassword || ""}
+                  onChange={(e) =>
+                    setConfig({
+                      ...config,
+                      bluesky: {
+                        enabled: config.bluesky?.enabled ?? false,
+                        handle: config.bluesky?.handle || "",
+                        appPassword: e.target.value,
+                        service: config.bluesky?.service || "https://bsky.social",
+                      },
+                    })
+                  }
+                  placeholder="xxxx-xxxx-xxxx-xxxx"
+                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                />
+                <p className="text-[10px] text-ink-dim font-sans leading-tight pt-0.5">
+                  Generate at <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noreferrer" className="underline">bsky.app/settings/app-passwords</a>. This is NOT your main password — App Passwords can be revoked without affecting your account. No API tier gating; posts land within seconds.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-hairline space-y-2">
+              <button
+                type="button"
+                onClick={() => handleTestChannel("bluesky")}
+                disabled={testingBsky || !config.bluesky?.handle || !config.bluesky?.appPassword}
+                className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                <SendIcon className="w-3.5 h-3.5 text-signal" />
+                <span>{testingBsky ? "Posting to Bluesky..." : "Test Bluesky Post"}</span>
+              </button>
+              {feedbackBsky && (
+                <div
+                  className={`p-2.5 border text-[11px] font-mono leading-tight ${
+                    feedbackBsky.ok
+                      ? "border-signal text-signal bg-signal/5"
+                      : "border-red-500 text-red-500 bg-red-500/5"
+                  }`}
+                >
+                  {feedbackBsky.msg}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Action Save Bar */}
@@ -864,6 +1023,21 @@ export default function BroadcastTab() {
                   >
                     <WhatsAppBrandLogo className="w-2.5 h-2.5" />
                     <span>{log.results.whatsapp?.success ? "SENT" : log.results.whatsapp ? "ERR" : "OFF"}</span>
+                  </span>
+
+                  {/* Bluesky Status */}
+                  <span
+                    className={`text-[9px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
+                      log.results.bluesky?.success
+                        ? "border-signal text-signal bg-void"
+                        : log.results.bluesky === undefined
+                        ? "border-hairline text-ink-faint bg-surface opacity-60"
+                        : "border-red-500 text-red-500 bg-void"
+                    }`}
+                    title={log.results.bluesky?.message || "Not configured"}
+                  >
+                    <span>BSKY:</span>
+                    <span>{log.results.bluesky?.success ? "SENT" : log.results.bluesky ? "ERR" : "OFF"}</span>
                   </span>
 
                   {/* Free Webhook Status */}

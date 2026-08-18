@@ -16,8 +16,8 @@ const FEATURES = [
     num: "02",
     tag: "SOCIAL DISTRIBUTION",
     title: "Automated Multi-Channel Social Broadcast",
-    desc: "Every product launch and Top 3 podium winner (#1, #2, #3) is automatically broadcasted across WhatsApp, X (Twitter), and Telegram to active founders, tech operators, and builders.",
-    metrics: "WhatsApp Community · 𝕏 Viral Feed · Telegram VIP Telemetry",
+    desc: "Every product launch and Top 3 podium winner (#1, #2, #3) is automatically broadcasted across WhatsApp, Bluesky, and Telegram to active founders, tech operators, and builders.",
+    metrics: "WhatsApp Community · Bluesky Viral Feed · Telegram VIP Telemetry",
     badge: "SOCIAL NETWORK",
   },
   {
@@ -166,11 +166,11 @@ const FAQS = [
   },
   {
     q: "How does automated social broadcasting work for my product?",
-    a: "The instant your product goes live at 6:00 AM IST, our broadcast engine dispatches formatted announcements across our verified X (Twitter) feed, WhatsApp community, and Telegram VIP channel with your product tagline, maker handles, and direct spec links.",
+    a: "The instant your product goes live at 6:00 AM IST, our broadcast engine dispatches formatted announcements across our verified Bluesky feed (@thelaunchfeed.bsky.social), WhatsApp community, and Telegram VIP channel with your product tagline, maker handles, and direct spec links.",
   },
   {
     q: "How are Top 3 podium winners featured and rewarded?",
-    a: "At the close of each 24-hour cycle (and weekly/monthly cycles), the 1st, 2nd, and 3rd placed products are snapshotted into the hall of fame. Winners receive dedicated celebratory broadcasts on WhatsApp, X, and Telegram, automated founder email trophies, and unlock bespoke embeddable vector SVG award badges.",
+    a: "At the close of each 24-hour cycle (and weekly/monthly cycles), the 1st, 2nd, and 3rd placed products are snapshotted into the hall of fame. Winners receive dedicated celebratory broadcasts on WhatsApp, Bluesky, and Telegram, automated founder email trophies, and unlock bespoke embeddable vector SVG award badges.",
   },
   {
     q: "What makes The Launch Feed different from legacy launch platforms?",
@@ -203,6 +203,14 @@ function XTwitterIcon({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+function BlueskyIcon({ className = "w-4 h-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 600 530" fill="currentColor" aria-hidden="true">
+      <path d="M135.72 44.03C202.216 93.951 273.74 195.17 300 249.49c26.26-54.316 97.782-155.54 164.28-205.463C512.26 8.024 590 -19.44 590 69.24c0 17.7-10.15 148.79-16.11 170.07-20.68 73.94-96.14 92.86-163.23 81.42 117.3 19.95 147.16 86.06 82.72 152.16-122.34 125.55-175.83-31.51-189.53-71.76-2.51-7.38-3.68-10.83-3.85-7.88-.17-2.95-1.34.5-3.85 7.88-13.7 40.26-67.19 197.31-189.53 71.76-64.44-66.1-34.58-132.21 82.72-152.16-67.09 11.44-142.55-7.48-163.22-81.42C20.15 217.99 10 86.9 10 69.24c0-88.68 77.74-61.216 125.72-25.21z" />
     </svg>
   );
 }
@@ -388,13 +396,13 @@ export function HomeEditorialSection({
               <span className="truncate">Join WhatsApp Community</span>
             </a>
             <a
-              href="https://x.com/thelaunchfeed"
+              href="https://bsky.app/profile/thelaunchfeed.bsky.social"
               target="_blank"
               rel="noreferrer"
-              className="w-full px-3.5 py-2.5 text-xs font-mono font-bold uppercase border border-hairline bg-surface/80 hover:bg-surface text-ink hover:text-signal transition-colors flex items-center justify-center gap-2 rounded-xs text-center"
+              className="w-full px-3.5 py-2.5 text-xs font-mono font-bold uppercase border border-hairline bg-surface/80 hover:bg-surface text-ink hover:text-[#0085FF] transition-colors flex items-center justify-center gap-2 rounded-xs text-center"
             >
-              <XTwitterIcon className="w-3.5 h-3.5 text-ink shrink-0" />
-              <span className="truncate">Follow @thelaunchfeed</span>
+              <BlueskyIcon className="w-3.5 h-3.5 text-[#0085FF] shrink-0" />
+              <span className="truncate">Follow on Bluesky</span>
             </a>
             <a
               href="https://t.me/thelaunchfeed"
@@ -451,15 +459,15 @@ export function HomeEditorialSection({
             </div>
           </div>
 
-          {/* Channel 2: X (Twitter) */}
+          {/* Channel 2: Bluesky */}
           <div className="border border-hairline bg-surface/30 p-3.5 sm:p-4 space-y-3 flex flex-col justify-between rounded-xs">
             <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono font-bold text-ink flex items-center gap-1.5">
-                  <XTwitterIcon className="w-4 h-4 text-ink" />
-                  <span>𝕏 / Twitter Feed</span>
+                  <BlueskyIcon className="w-4 h-4 text-[#0085FF]" />
+                  <span>Bluesky Feed</span>
                 </span>
-                <span className="text-[10px] font-mono text-ink-dim px-1.5 py-0.5 border border-hairline bg-surface/50">
+                <span className="text-[10px] font-mono text-[#0085FF]/90 px-1.5 py-0.5 border border-[#0085FF]/30 bg-surface/50">
                   VIRAL REACH
                 </span>
               </div>
@@ -480,13 +488,13 @@ export function HomeEditorialSection({
             </div>
             <div className="pt-2">
               <a
-                href="https://x.com/thelaunchfeed"
+                href="https://bsky.app/profile/thelaunchfeed.bsky.social"
                 target="_blank"
                 rel="noreferrer"
-                className="w-full text-center py-2 text-xs font-mono font-bold uppercase border border-hairline bg-surface hover:bg-raised text-ink hover:text-signal transition-colors flex items-center justify-center gap-1.5 rounded-xs"
+                className="w-full text-center py-2 text-xs font-mono font-bold uppercase border border-hairline bg-surface hover:bg-raised text-ink hover:text-[#0085FF] transition-colors flex items-center justify-center gap-1.5 rounded-xs"
               >
-                <XTwitterIcon className="w-3.5 h-3.5" />
-                <span>Follow @thelaunchfeed on 𝕏</span>
+                <BlueskyIcon className="w-3.5 h-3.5 text-[#0085FF]" />
+                <span>Follow @thelaunchfeed.bsky.social</span>
               </a>
             </div>
           </div>

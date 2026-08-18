@@ -9,6 +9,7 @@ import {
   sendXBroadcast,
   sendTelegramBroadcast,
   sendWhatsAppBroadcast,
+  sendBlueskyBroadcast,
   sendWebhookBroadcast,
   broadcastProductLaunch,
   type BroadcastConfig,
@@ -34,7 +35,7 @@ export async function getBroadcastLogsAction(): Promise<BroadcastLogItem[]> {
 }
 
 export async function testBroadcastAction(
-  channel: "x" | "telegram" | "whatsapp" | "webhook"
+  channel: "x" | "telegram" | "whatsapp" | "bluesky" | "webhook"
 ): Promise<{ success: boolean; message: string }> {
   await requireAdmin();
   const config = await getBroadcastConfig();
@@ -54,6 +55,12 @@ export async function testBroadcastAction(
   if (channel === "whatsapp") {
     const text = `🧪 *Test verification from The Launch Feed Auto-Publisher* (${new Date().toLocaleTimeString()}). Connectivity verified successfully!\n\n${testUrl}`;
     return sendWhatsAppBroadcast(text, config.whatsapp);
+  }
+
+  if (channel === "bluesky") {
+    const text = `🧪 Test from The Launch Feed (${new Date().toLocaleTimeString()}) — Bluesky broadcaster online.\n${testUrl}`;
+    if (!config.bluesky) return { success: false, message: "Bluesky config missing" };
+    return sendBlueskyBroadcast(text, config.bluesky);
   }
 
   if (channel === "webhook") {

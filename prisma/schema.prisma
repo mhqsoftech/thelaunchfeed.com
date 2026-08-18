@@ -36,6 +36,7 @@ model User {
   savedProductIds String[] @default([])
 
   role      UserRole @default(MAKER)
+  isSeed    Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

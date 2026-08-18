@@ -17,13 +17,21 @@ export interface BroadcastChannelConfig {
 
 export interface WebhookBroadcastConfig {
   enabled: boolean;
-  webhookUrl: string; // e.g. https://hook.eu2.make.com/... or Zapier/IFTTT webhook
+  webhookUrl: string; // e.g. https://hook.eu2.make.com/... or Buffer inbound / Zapier / n8n
+}
+
+export interface BlueskyBroadcastConfig {
+  enabled: boolean;
+  handle: string;      // e.g. thelaunchfeed.bsky.social
+  appPassword: string; // generated at https://bsky.app/settings/app-passwords
+  service?: string;    // defaults to https://bsky.social
 }
 
 export interface BroadcastConfig {
   x: BroadcastChannelConfig;
   telegram: BroadcastChannelConfig;
   whatsapp: BroadcastChannelConfig;
+  bluesky?: BlueskyBroadcastConfig;
   webhook?: WebhookBroadcastConfig;
 }
 
@@ -48,6 +56,12 @@ export const DEFAULT_BROADCAST_CONFIG: BroadcastConfig = {
     accessToken: "",
     phoneNumberId: "",
   },
+  bluesky: {
+    enabled: false,
+    handle: "",
+    appPassword: "",
+    service: "https://bsky.social",
+  },
   webhook: {
     enabled: false,
     webhookUrl: "",
@@ -67,6 +81,7 @@ export interface BroadcastLogItem {
     x?: { success: boolean; message: string; url?: string };
     telegram?: { success: boolean; message: string; url?: string };
     whatsapp?: { success: boolean; message: string; url?: string };
+    bluesky?: { success: boolean; message: string; url?: string };
     webhook?: { success: boolean; message: string };
   };
 }
@@ -86,6 +101,7 @@ export async function getBroadcastConfig(): Promise<BroadcastConfig> {
         x: { ...DEFAULT_BROADCAST_CONFIG.x, ...((row.value as any).x || {}) },
         telegram: { ...DEFAULT_BROADCAST_CONFIG.telegram, ...((row.value as any).telegram || {}) },
         whatsapp: { ...DEFAULT_BROADCAST_CONFIG.whatsapp, ...((row.value as any).whatsapp || {}) },
+        bluesky: { ...DEFAULT_BROADCAST_CONFIG.bluesky!, ...((row.value as any).bluesky || {}) },
         webhook: { ...DEFAULT_BROADCAST_CONFIG.webhook, ...((row.value as any).webhook || {}) },
       };
     }
@@ -233,6 +249,100 @@ export async function sendXBroadcast(
     return {
       success: false,
       message: `X network error: ${err.message || String(err)}`,
+    };
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   CHANNEL 1b: BLUESKY (AT PROTOCOL) — genuinely free, no API tier gating
+   Auth via App Password (bsky.app → Settings → App Passwords). No rate limits
+   that matter for launch cadence (~5,000 writes/hour per account).
+────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Detects URLs in `text` and returns AT-Protocol facets with the byte offsets
+ * (Bluesky counts UTF-8 bytes, not characters) so links become tappable.
+ */
+function buildBlueskyLinkFacets(text: string) {
+  const facets: Array<Record<string, any>> = [];
+  const encoder = new TextEncoder();
+  const urlRegex = /https?:\/\/[^\s)]+/g;
+  let m: RegExpExecArray | null;
+  while ((m = urlRegex.exec(text)) !== null) {
+    const byteStart = encoder.encode(text.slice(0, m.index)).length;
+    const byteEnd = byteStart + encoder.encode(m[0]).length;
+    facets.push({
+      index: { byteStart, byteEnd },
+      features: [{ $type: "app.bsky.richtext.facet#link", uri: m[0] }],
+    });
+  }
+  return facets;
+}
+
+export async function sendBlueskyBroadcast(
+  text: string,
+  config: BlueskyBroadcastConfig
+): Promise<{ success: boolean; message: string; url?: string }> {
+  if (!config.handle || !config.appPassword) {
+    return {
+      success: false,
+      message: "Missing Bluesky handle or App Password. Generate one at https://bsky.app/settings/app-passwords.",
+    };
+  }
+
+  const service = (config.service || "https://bsky.social").replace(/\/$/, "");
+  const identifier = config.handle.trim().replace(/^@/, "");
+
+  try {
+    const sessionRes = await fetch(`${service}/xrpc/com.atproto.server.createSession`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier, password: config.appPassword.trim() }),
+    });
+    const session = await sessionRes.json().catch(() => ({} as any));
+    if (!sessionRes.ok || !session.accessJwt || !session.did) {
+      return {
+        success: false,
+        message: `Bluesky auth failed (${sessionRes.status}): ${session.message || session.error || "invalid handle or app password"}`,
+      };
+    }
+
+    // Bluesky post cap is 300 graphemes; trim conservatively.
+    const trimmed = text.length > 300 ? text.slice(0, 297) + "…" : text;
+
+    const postRes = await fetch(`${service}/xrpc/com.atproto.repo.createRecord`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.accessJwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        repo: session.did,
+        collection: "app.bsky.feed.post",
+        record: {
+          $type: "app.bsky.feed.post",
+          text: trimmed,
+          facets: buildBlueskyLinkFacets(trimmed),
+          createdAt: new Date().toISOString(),
+        },
+      }),
+    });
+    const posted = await postRes.json().catch(() => ({} as any));
+    if (!postRes.ok || !posted.uri) {
+      return {
+        success: false,
+        message: `Bluesky post failed (${postRes.status}): ${posted.message || posted.error || JSON.stringify(posted)}`,
+      };
+    }
+
+    // Convert at:// URI → public bsky.app URL for the log.
+    const rkey = String(posted.uri).split("/").pop() || "";
+    const url = `https://bsky.app/profile/${identifier}/post/${rkey}`;
+    return { success: true, message: `Posted to Bluesky as @${identifier}`, url };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: `Bluesky network error: ${err.message || String(err)}`,
     };
   }
 }
@@ -392,36 +502,33 @@ export async function sendWebhookBroadcast(
   if (!config?.webhookUrl) {
     return {
       success: false,
-      message: "Missing IFTTT / Custom Webhook URL.",
+      message: "Missing webhook URL (Make.com / Buffer / n8n / Zapier).",
     };
   }
 
   const endpoint = config.webhookUrl.trim();
 
-  // Format payload for standard webhooks and IFTTT Maker Webhooks (value1, value2, value3)
-  const iftttPayload = {
-    ...payload,
-    value1: payload.text || `${payload.productName}: ${payload.tagline}`,
-    value2: payload.productUrl || "",
-    value3: payload.makerName || "",
-  };
+  // Rich JSON payload — Make.com, Buffer's inbound webhook, Zapier "Catch Hook",
+  // and n8n's Webhook node all parse arbitrary JSON out of the box.
+  const body = JSON.stringify(payload);
 
   try {
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(iftttPayload),
+      body,
     });
 
     if (res.ok) {
       return {
         success: true,
-        message: `Successfully delivered event to IFTTT / Webhook (${res.status})`,
+        message: `Delivered to webhook (HTTP ${res.status}). In your Make.com scenario / Buffer inbound / n8n workflow, map fields from the JSON body (productName, tagline, productUrl, makerName, text, tags, event).`,
       };
     } else {
+      const text = await res.text().catch(() => "");
       return {
         success: false,
-        message: `IFTTT / Webhook returned HTTP ${res.status}`,
+        message: `Webhook returned HTTP ${res.status}${text ? `: ${text.slice(0, 160)}` : ""}`,
       };
     }
   } catch (err: any) {
@@ -484,7 +591,13 @@ export async function broadcastProductLaunch(
     results.whatsapp = await sendWhatsAppBroadcast(waText, config.whatsapp);
   }
 
-  // 4. Free Custom Webhook (Make.com / Zapier / IFTTT -> X Auto-Poster)
+  // 4. Bluesky (native AT Protocol) — free, no rate-tier gating
+  if (config.bluesky?.enabled) {
+    const bskyText = `🚀 New launch: ${product.name} — ${product.tagline}\nBy ${makerDisplay}\n${productUrl}\n${hashtags}`.trim();
+    results.bluesky = await sendBlueskyBroadcast(bskyText, config.bluesky);
+  }
+
+  // 5. Free Custom Webhook (Make.com / Zapier / n8n)
   if (config.webhook?.enabled && config.webhook.webhookUrl) {
     const webhookPayload = {
       event: "product.launched",
@@ -584,7 +697,16 @@ export async function broadcastLeaderboardWinners(
     results.whatsapp = await sendWhatsAppBroadcast(waText.trim(), config.whatsapp);
   }
 
-  // 4. Webhook
+  // 4. Bluesky (native AT Protocol)
+  if (config.bluesky?.enabled) {
+    let bText = `🏆 Top winners — ${periodTitle}\n\n`;
+    if (w1) bText += `🥇 ${w1.name} (${w1.voteCount})\n${siteBase}/product/${w1.slug}\n`;
+    if (w2) bText += `🥈 ${w2.name} — ${siteBase}/product/${w2.slug}\n`;
+    if (w3) bText += `🥉 ${w3.name} — ${siteBase}/product/${w3.slug}\n`;
+    results.bluesky = await sendBlueskyBroadcast(bText.trim(), config.bluesky);
+  }
+
+  // 5. Webhook
   if (config.webhook?.enabled && config.webhook.webhookUrl) {
     const webhookPayload = {
       event: "leaderboard.winners",

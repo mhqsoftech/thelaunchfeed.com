@@ -158,6 +158,19 @@ export function getMonthlyCycleRange(from: Date = new Date()): CycleRange {
 }
 
 /**
+ * Calculates the previously completed Monthly Cycle Range.
+ */
+export function getPreviousMonthlyCycleRange(from: Date = new Date()): CycleRange {
+  const current = getMonthlyCycleRange(from);
+  const end = new Date(current.start.getTime());
+  const startYear = end.getUTCFullYear();
+  const startMonth = end.getUTCMonth() - 1;
+  const start = new Date(Date.UTC(startYear, startMonth, 1, 0, 30, 0, 0));
+  const key = `${start.getUTCFullYear()}-${String(start.getUTCMonth() + 1).padStart(2, "0")}`;
+  return { start, end, key, label: `Monthly (${key})` };
+}
+
+/**
  * Calculates the active Yearly Cycle Range aligned to Jan 1st 6:00 AM IST (00:30 UTC).
  */
 export function getYearlyCycleRange(from: Date = new Date()): CycleRange {

@@ -858,15 +858,15 @@ export default function MainLayoutShell({
                   {/* Official Social Icons */}
                   <div className="flex items-center gap-2 pt-1 text-ink-dim">
                     <a
-                      href="https://x.com/thelaunchfeed"
+                      href="https://bsky.app/profile/thelaunchfeed.bsky.social"
                       target="_blank"
                       rel="noreferrer"
                       className="p-1.5 border border-hairline bg-surface hover:text-ink hover:border-signal/40 transition-colors"
-                      title="Follow on 𝕏"
-                      aria-label="Follow on 𝕏"
+                      title="Follow @thelaunchfeed.bsky.social on Bluesky"
+                      aria-label="Follow on Bluesky"
                     >
-                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 600 530" aria-hidden="true">
+                        <path d="M135.72 44.03C202.216 93.951 273.74 195.17 300 249.49c26.26-54.316 97.782-155.54 164.28-205.463C512.26 8.024 590 -19.44 590 69.24c0 17.7-10.15 148.79-16.11 170.07-20.68 73.94-96.14 92.86-163.23 81.42 117.3 19.95 147.16 86.06 82.72 152.16-122.34 125.55-175.83-31.51-189.53-71.76-2.51-7.38-3.68-10.83-3.85-7.88-.17-2.95-1.34.5-3.85 7.88-13.7 40.26-67.19 197.31-189.53 71.76-64.44-66.1-34.58-132.21 82.72-152.16-67.09 11.44-142.55-7.48-163.22-81.42C20.15 217.99 10 86.9 10 69.24c0-88.68 77.74-61.216 125.72-25.21z" />
                       </svg>
                     </a>
                     <a

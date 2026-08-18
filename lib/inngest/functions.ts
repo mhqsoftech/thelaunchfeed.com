@@ -27,6 +27,16 @@ export async function sendAndLog(input: {
   vars?: TemplateVars;
   trigger?: string;
 }) {
+  // Skip seed accounts — they never receive emails, even when their products rank.
+  try {
+    const recipient = input.toUserId
+      ? await prisma.user.findUnique({ where: { id: input.toUserId }, select: { isSeed: true } })
+      : await prisma.user.findUnique({ where: { email: input.to }, select: { isSeed: true } });
+    if (recipient?.isSeed) {
+      return { id: "skipped-seed", delivered: false, skipped: true };
+    }
+  } catch {}
+
   const tpl = getTemplate(input.templateId as any);
   const subject = tpl.subject(input.vars || {});
   const html = tpl.render(input.vars || {});
@@ -275,30 +285,50 @@ export const onProductLaunched = inngest.createFunction(
       }
     });
 
-    const users = await step.run("load-users", () =>
-      prisma.user.findMany({ select: { id: true, email: true } })
-    );
-
     const vars: TemplateVars = {
       productName: product.name,
       productSlug: product.slug,
       userName: product.owner.name || product.owner.username,
     };
 
-    await step.sendEvent(
-      "fan-out",
-      users.map((u) => ({
-        name: "email.send.requested" as const,
+    // 1. Founder-first: dedicated launch notification to the maker (unless seed).
+    if (!product.owner.isSeed) {
+      await step.sendEvent("notify-founder", {
+        name: "email.send.requested",
         data: {
           templateId: "product-launched",
-          to: u.email,
-          toUserId: u.id,
+          to: product.owner.email,
+          toUserId: product.owner.id,
           trigger: "on-launch",
           vars,
         },
-      }))
+      });
+    }
+
+    // 2. Broadcast to every real user (excluding seeds and the founder we already emailed).
+    const users = await step.run("load-users", () =>
+      prisma.user.findMany({
+        where: { isSeed: false, id: { not: product.owner.id } },
+        select: { id: true, email: true },
+      })
     );
-    return { queued: users.length };
+
+    if (users.length > 0) {
+      await step.sendEvent(
+        "fan-out",
+        users.map((u) => ({
+          name: "email.send.requested" as const,
+          data: {
+            templateId: "product-launched",
+            to: u.email,
+            toUserId: u.id,
+            trigger: "on-launch",
+            vars,
+          },
+        }))
+      );
+    }
+    return { queued: users.length + 1 };
   }
 );
 
@@ -345,6 +375,7 @@ import {
   getWeeklyCycleRange,
   getPreviousWeeklyCycleRange,
   getMonthlyCycleRange,
+  getPreviousMonthlyCycleRange,
 } from "@/lib/schedule";
 import { broadcastLeaderboardWinners } from "@/lib/broadcast";
 
@@ -418,6 +449,7 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
     const now = new Date();
     const prevDaily = getPreviousDailyCycleRange(now);
     const prevWeekly = getPreviousWeeklyCycleRange(now);
+    const prevMonthly = getPreviousMonthlyCycleRange(now);
 
     // ── A. DAILY CYCLE COMPLETION ──
     const dailyProcessed = await step.run("check-prev-daily", async () => {
@@ -574,7 +606,83 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
       return { completed: true, count: winners.length };
     });
 
-    return { daily: dailyProcessed, weekly: weeklyProcessed };
+    // ── C. MONTHLY CYCLE COMPLETION ──
+    const monthlyProcessed = await step.run("check-prev-monthly", async () => {
+      const existing = await prisma.rankSnapshot.findFirst({
+        where: { period: "MONTHLY", periodKey: prevMonthly.key },
+      });
+      if (existing) return { alreadyDone: true };
+
+      const winners = await prisma.product.findMany({
+        where: { status: "LIVE", launchedAt: { gte: prevMonthly.start, lt: prevMonthly.end } },
+        orderBy: [{ voteCount: "desc" }, { launchedAt: "desc" }],
+        take: 10,
+        include: { owner: true },
+      });
+
+      if (winners.length === 0) return { alreadyDone: true, count: 0 };
+
+      for (let i = 0; i < winners.length; i++) {
+        const p = winners[i];
+        const rank = i + 1;
+        await prisma.rankSnapshot.upsert({
+          where: {
+            productId_period_periodKey: {
+              productId: p.id,
+              period: "MONTHLY",
+              periodKey: prevMonthly.key,
+            },
+          },
+          create: {
+            productId: p.id,
+            period: "MONTHLY",
+            periodKey: prevMonthly.key,
+            rank,
+            score: p.voteCount,
+            voteCount: p.voteCount,
+          },
+          update: { rank, score: p.voteCount, voteCount: p.voteCount },
+        });
+
+        if (rank <= 3 && !p.owner.isSeed) {
+          const isFirst = rank === 1;
+          await sendAndLog({
+            templateId: isFirst ? "rank-first" : "rank-top3",
+            to: p.owner.email,
+            toUserId: p.owner.id,
+            trigger: isFirst ? "on-rank-first" : "on-rank-change",
+            vars: {
+              productName: p.name,
+              productSlug: p.slug,
+              userName: p.owner.name || p.owner.username,
+              rank,
+              period: "monthly",
+            },
+          });
+        }
+      }
+
+      const top3 = winners.slice(0, 3).map((w, idx) => ({
+        rank: idx + 1,
+        id: w.id,
+        name: w.name,
+        slug: w.slug,
+        tagline: w.tagline,
+        voteCount: w.voteCount,
+        makerName: w.owner.name || w.owner.username,
+        makerHandle: w.owner.username ? `@${w.owner.username}` : undefined,
+      }));
+
+      await broadcastLeaderboardWinners({
+        period: "monthly",
+        periodTitle: `Monthly (${prevMonthly.key})`,
+        winners: top3,
+      });
+
+      return { completed: true, count: winners.length };
+    });
+
+    return { daily: dailyProcessed, weekly: weeklyProcessed, monthly: monthlyProcessed };
   }
 );
 

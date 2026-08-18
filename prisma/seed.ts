@@ -871,7 +871,7 @@ const PRODUCTS: ProductSeed[] = [
     description: "Perplexity replaces traditional search with interactive conversational summaries backed by real-time citations, Pro Search reasoning, and structured multi-source research dossiers.",
     categorySlug: "ai",
     websiteUrl: "https://perplexity.ai",
-    logoUrl: "https://unavatar.io/perplexity.ai",
+    logoUrl: "https://unavatar.io/perplexity.ai?fallback=https://cdn.simpleicons.org/perplexity/20808D",
     founderUsername: "aravindsrinivas",
     tags: ["ai", "search", "research", "productivity", "knowledge"],
     launchHoursAgo: 1.2,
@@ -879,7 +879,9 @@ const PRODUCTS: ProductSeed[] = [
     screenshots: [
       "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80",
     ],
-    videoUrl: "https://www.youtube.com/watch?v=F0Gq2X8yU1Q",
+    // Prior demo id (F0Gq2X8yU1Q) was removed from YouTube. Aravind Srinivas on
+    // the Lex Fridman podcast (ep #434) is an evergreen Perplexity deep-dive.
+    videoUrl: "https://www.youtube.com/watch?v=e-gwvmhyU7A",
     comments: [
       { authorUsername: "ivanzhao", text: "Perplexity Pro has replaced 90% of my default web queries. The citation accuracy is unbeatable." },
     ],
@@ -1393,6 +1395,7 @@ async function main() {
         image: f.image,
         isProfilePublic: true,
         showRevenuePublic: false,
+        isSeed: true,
       },
       create: {
         username: f.username,
@@ -1406,6 +1409,7 @@ async function main() {
         image: f.image,
         isProfilePublic: true,
         showRevenuePublic: false,
+        isSeed: true,
       },
     });
     founderMap.set(f.username, user.id);
