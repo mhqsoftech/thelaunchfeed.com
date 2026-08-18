@@ -114,12 +114,34 @@ export default async function FounderPage({
 
   // Any verified revenue is shown publicly — verification is the opt-in.
   {
+    // Prefer per-connection aggregates so multiple providers are counted independently.
+    const activeConns = (f.revenueConnections || []).filter(
+      (c: any) => c.status === "ACTIVE" && (c.mrrCents || 0) > 0
+    );
+
+    if (activeConns.length > 0) {
+      verifiedProviders = activeConns.map((c: any) => {
+        const provKey = c.provider as string;
+        const name = provKey.charAt(0).toUpperCase() + provKey.slice(1).toLowerCase();
+        return {
+          name,
+          mrrCents: c.mrrCents || 0,
+          totalRevenueCents: c.totalRevenueCents || 0,
+        };
+      });
+      verifiedMrrCents = verifiedProviders.reduce((s, p) => s + p.mrrCents, 0);
+      verifiedTotalRevenueCents = verifiedProviders.reduce((s, p) => s + p.totalRevenueCents, 0);
+    }
+
+    // Fallback: sum per-product verified rows if connection aggregates aren't populated yet.
     const verifiedRevenues = f.products
       .map((p: any) => p.revenue)
       .filter((r: any): r is NonNullable<typeof r> => !!r && r.isVerified);
 
-    verifiedMrrCents = verifiedRevenues.reduce((sum: number, r: any) => sum + (r.mrrCents || 0), 0);
-    verifiedTotalRevenueCents = verifiedRevenues.reduce((sum: number, r: any) => sum + (r.totalRevenueCents || 0), 0);
+    if (verifiedMrrCents === 0) {
+      verifiedMrrCents = verifiedRevenues.reduce((sum: number, r: any) => sum + (r.mrrCents || 0), 0);
+      verifiedTotalRevenueCents = verifiedRevenues.reduce((sum: number, r: any) => sum + (r.totalRevenueCents || 0), 0);
+    }
 
     if (verifiedMrrCents > 0) {
       if (verifiedMrrCents >= 100000) {
@@ -130,8 +152,9 @@ export default async function FounderPage({
       }
     }
 
-    // Build per-provider breakdown by joining verified product revenues with their connection's provider
-    if (f.revenueConnections && f.revenueConnections.length > 0) {
+    // If we still have no per-provider aggregate (e.g. legacy rows), fall back to
+    // per-product ProductRevenue grouped by their connection.
+    if (verifiedProviders.length === 0 && f.revenueConnections && f.revenueConnections.length > 0) {
       const connById = new Map<string, string>();
       for (const c of f.revenueConnections) connById.set(c.id, c.provider);
       const byProvider = new Map<string, { mrrCents: number; totalRevenueCents: number }>();

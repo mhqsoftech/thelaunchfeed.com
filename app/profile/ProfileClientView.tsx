@@ -14,7 +14,7 @@ import {
 } from "@/app/data";
 import { authClient } from "@/lib/auth-client";
 import { updateProfile, listMyProducts, type MyProduct } from "@/app/actions/profile";
-import { savePaymentApiKey, getPaymentApiKeys } from "@/app/actions/revenue";
+import { savePaymentApiKey, getPaymentApiKeys, deletePaymentApiKey } from "@/app/actions/revenue";
 import { resubmitSubmission } from "@/app/actions/submissions";
 import { listCategories } from "@/app/actions/categories";
 import {
@@ -137,6 +137,42 @@ export default function ProfileClientView({
   const [syncingPayments, setSyncingPayments] = useState(false);
   const [paymentsSuccess, setPaymentsSuccess] = useState(false);
   const [telemetryLog, setTelemetryLog] = useState("");
+  type ConnectedProvider = {
+    id: string;
+    provider: string;
+    apiKeyMasked: string;
+    mrrCents: number;
+    mrrFormatted: string;
+    lastSyncedAt?: string;
+  };
+  const [connectedProviders, setConnectedProviders] = useState<ConnectedProvider[]>([]);
+  const [deletingConnId, setDeletingConnId] = useState<string | null>(null);
+
+  const refreshConnectedProviders = async () => {
+    try {
+      const keys = await getPaymentApiKeys();
+      setConnectedProviders(
+        (keys || []).map((k: any) => ({
+          id: k.id,
+          provider: k.provider,
+          apiKeyMasked: k.apiKeyMasked,
+          mrrCents: k.mrrCents || 0,
+          mrrFormatted: k.mrrFormatted || "",
+          lastSyncedAt: k.lastSyncedAt,
+        }))
+      );
+    } catch {
+      // no-op
+    }
+  };
+
+  const combinedMrrCents = connectedProviders.reduce((s, p) => s + (p.mrrCents || 0), 0);
+  const combinedMrrFormatted =
+    combinedMrrCents >= 100000
+      ? `$${(combinedMrrCents / 100000).toFixed(1)}K / mo`
+      : combinedMrrCents > 0
+      ? `$${(combinedMrrCents / 100).toFixed(combinedMrrCents % 100 === 0 ? 0 : 2)} / mo`
+      : "";
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [activeEmbedProductId, setActiveEmbedProductId] = useState<number | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -301,9 +337,21 @@ export default function ProfileClientView({
           if (latest.apiKey) {
             setStripeApiKey(latest.apiKey);
           }
-          if (latest.revenues && latest.revenues.length > 0) {
+          if ((latest as any).mrrFormatted) {
+            setRevenue((latest as any).mrrFormatted);
+          } else if (latest.revenues && latest.revenues.length > 0) {
             setRevenue(latest.revenues[0].mrrFormatted);
           }
+          setConnectedProviders(
+            keys.map((k: any) => ({
+              id: k.id,
+              provider: k.provider,
+              apiKeyMasked: k.apiKeyMasked,
+              mrrCents: k.mrrCents || 0,
+              mrrFormatted: k.mrrFormatted || "",
+              lastSyncedAt: k.lastSyncedAt,
+            }))
+          );
         }
       } catch {
         // user might not be logged in or has no saved keys yet
@@ -1933,13 +1981,76 @@ export default function ProfileClientView({
                       </span>
                     </div>
                     <p className="text-xs text-ink-dim leading-relaxed">
-                      Select your revenue gateway to execute a read-only
-                      telemetry handshake via{" "}
-                      <code className="text-ink font-bold bg-void px-1 py-0.5 border border-hairline">
-                        revenueTelemetrySDK
-                      </code>
-                      .
+                      Connect one or more payment providers. Your public founder
+                      profile shows the <span className="text-ink font-bold">combined MRR</span>{" "}
+                      across all connected providers; the revenue chart plots a
+                      separate colored line per provider.
                     </p>
+
+                    {/* Connected providers list — supports multiple gateways per founder */}
+                    {connectedProviders.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-bold text-ink uppercase">
+                            Connected Providers ({connectedProviders.length})
+                          </label>
+                          {combinedMrrFormatted && (
+                            <span className="text-[10px] font-mono px-2 py-0.5 border border-signal/40 bg-void text-signal uppercase font-bold">
+                              Combined MRR: {combinedMrrFormatted}
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-1.5">
+                          {connectedProviders.map((c) => {
+                            const provKey = c.provider.toLowerCase();
+                            const provMeta = REVENUE_PROVIDERS.find((p) => p.id === provKey);
+                            return (
+                              <div
+                                key={c.id}
+                                className="flex items-center justify-between gap-2 border border-hairline bg-void px-3 py-2"
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <PaymentProviderLogo id={provKey} className="w-4 h-4 shrink-0" />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-mono font-bold text-ink truncate">
+                                      {provMeta?.name || c.provider}
+                                    </div>
+                                    <div className="text-[10px] font-mono text-ink-faint truncate">
+                                      {c.apiKeyMasked}
+                                      {c.lastSyncedAt && (
+                                        <> · synced {new Date(c.lastSyncedAt).toLocaleDateString()}</>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[11px] font-mono font-bold text-signal">
+                                    {c.mrrFormatted || "$0 / mo"}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    disabled={deletingConnId === c.id}
+                                    onClick={async () => {
+                                      if (!confirm(`Disconnect ${provMeta?.name || c.provider}? Its MRR will no longer count on your public profile.`)) return;
+                                      setDeletingConnId(c.id);
+                                      try {
+                                        const res = await deletePaymentApiKey(c.id);
+                                        if (res.success) await refreshConnectedProviders();
+                                      } finally {
+                                        setDeletingConnId(null);
+                                      }
+                                    }}
+                                    className="text-[10px] font-mono px-2 py-1 border border-hairline text-ink-dim hover:text-signal hover:border-signal transition-colors cursor-pointer disabled:opacity-40"
+                                  >
+                                    {deletingConnId === c.id ? "…" : "Remove"}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
 
                     {/* Provider Grid */}
                     <div className="space-y-1.5">
@@ -2149,12 +2260,14 @@ export default function ProfileClientView({
                       apiKey: stripeApiKey,
                     });
                     if (res.success) {
-                      setRevenue(res.mrrFormatted);
-                      setStripeApiKey(res.apiKey);
                       setTelemetryLog(
                         `${res.telemetryLog}\n\n[ENCRYPTION CONFIRMED] Stored at rest as AES-256-GCM encrypted payload in RevenueConnection DB.`
                       );
                       setPaymentsSuccess(true);
+                      await refreshConnectedProviders();
+                      // Clear key field so the founder can add another provider next
+                      setStripeApiKey("");
+                      setRevenue(res.mrrFormatted);
                       setTimeout(() => setPaymentsSuccess(false), 4000);
                     }
                   } catch (err) {

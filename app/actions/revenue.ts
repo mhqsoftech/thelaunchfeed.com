@@ -83,6 +83,18 @@ export async function savePaymentApiKey(input: SaveKeyInput) {
   const mrrCents = telemetryResult.mrrCents;
   const totalRevenueCents = telemetryResult.totalRevenueCents;
 
+  // Persist the per-connection aggregate so multiple providers coexist without
+  // clobbering each other via the ProductRevenue (productId-unique) rows.
+  await prisma.revenueConnection.update({
+    where: { id: connection.id },
+    data: {
+      mrrCents,
+      arrCents: mrrCents * 12,
+      totalRevenueCents,
+      currency: "usd",
+    },
+  });
+
   // If a productId is provided, link or update ProductRevenue
   if (parsed.productId) {
     await prisma.productRevenue.upsert({
@@ -109,30 +121,24 @@ export async function savePaymentApiKey(input: SaveKeyInput) {
       },
     });
   } else {
-    // If saving in settings tab, find user's products and attach verified revenue connection
+    // Settings-tab flow: for products that don't yet have a ProductRevenue row,
+    // seed one against this connection so the product page shows verified MRR.
+    // Do NOT overwrite an existing ProductRevenue tied to a different connection —
+    // otherwise adding a second provider would silently reassign the first
+    // provider's product revenue rows.
     const userProducts = await prisma.product.findMany({
-      where: { ownerId: user.id },
+      where: { ownerId: user.id, revenue: null },
       select: { id: true },
     });
     for (const p of userProducts) {
-      await prisma.productRevenue.upsert({
-        where: { productId: p.id },
-        create: {
+      await prisma.productRevenue.create({
+        data: {
           productId: p.id,
           connectionId: connection.id,
           mrrCents,
           arrCents: mrrCents * 12,
           totalRevenueCents,
           currency: "usd",
-          isVerified: true,
-          verifiedAt: new Date(),
-          syncedAt: new Date(),
-        },
-        update: {
-          connectionId: connection.id,
-          mrrCents,
-          arrCents: mrrCents * 12,
-          totalRevenueCents,
           isVerified: true,
           verifiedAt: new Date(),
           syncedAt: new Date(),
@@ -184,6 +190,12 @@ export async function getPaymentApiKeys() {
   return connections.map((conn) => {
     // Decrypt the stored access token to retrieve the original API key
     const decryptedKey = decryptPaymentApiKey(conn.accessToken);
+    const mrrCents = conn.mrrCents || conn.revenues.reduce((s, r) => s + (r.mrrCents || 0), 0);
+
+    const fmt = (cents: number) =>
+      cents >= 100000
+        ? `$${(cents / 100000).toFixed(1)}K / mo`
+        : `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)} / mo`;
 
     return {
       id: conn.id,
@@ -192,21 +204,35 @@ export async function getPaymentApiKeys() {
       status: conn.status,
       lastSyncedAt: conn.lastSyncedAt?.toISOString(),
       createdAt: conn.createdAt.toISOString(),
-      // Decrypted API key and masked version for display
       apiKey: decryptedKey,
       apiKeyMasked: decryptedKey.length > 8
         ? `${decryptedKey.slice(0, 6)}...${decryptedKey.slice(-4)}`
         : decryptedKey,
+      mrrCents,
+      totalRevenueCents: conn.totalRevenueCents,
+      mrrFormatted: mrrCents > 0 ? fmt(mrrCents) : "",
       revenues: conn.revenues.map((r) => ({
         id: r.id,
         productId: r.productId,
         productName: r.product?.name,
         mrrCents: r.mrrCents,
-        mrrFormatted: `$${(r.mrrCents / 100000).toFixed(1)}K / mo`,
+        mrrFormatted: fmt(r.mrrCents),
         isVerified: r.isVerified,
       })),
     };
   });
+}
+
+export async function deletePaymentApiKey(connectionId: string) {
+  const user = await requireUser();
+  const conn = await prisma.revenueConnection.findFirst({
+    where: { id: connectionId, userId: user.id },
+  });
+  if (!conn) return { success: false, error: "Connection not found" };
+  await prisma.revenueConnection.delete({ where: { id: conn.id } });
+  if (user.username) revalidatePath(`/founder/${user.username}`);
+  revalidatePath("/profile");
+  return { success: true };
 }
 
 export async function getPaymentApiKey(provider: string) {

@@ -359,6 +359,14 @@ model RevenueConnection {
   lastSyncError     String?          @db.Text
   createdAt         DateTime         @default(now())
 
+  // Per-connection revenue aggregate — so a founder can wire up multiple providers
+  // (e.g. Stripe + Dodo + Paddle) and each one keeps its own MRR without clobbering.
+  mrrCents          Int              @default(0)
+  arrCents          Int              @default(0)
+  totalRevenueCents Int              @default(0)
+  currency          String           @default("usd")
+  momGrowthPct      Float?
+
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   revenues ProductRevenue[]
 
