@@ -197,18 +197,20 @@ export default function ContactClientView() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 sm:py-12 px-4 space-y-8 font-mono text-ink">
+    <div className="max-w-4xl mx-auto py-5 sm:py-10 px-3.5 sm:px-6 space-y-6 sm:space-y-8 font-mono text-ink">
       <h1 className="sr-only">Contact The Launch Feed</h1>
       {/* Top Navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised hover:border-signal/60 text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs"
+          className="inline-flex items-center gap-2 px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs"
         >
           <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
-          <span>Back to The Launch Feed</span>
+          <span>Back to Leaderboard</span>
         </Link>
-        <div className="text-xs text-ink-faint hidden sm:flex items-center gap-2.5">
+        <div className="text-xs text-ink-dim flex items-center gap-2 flex-wrap">
+          <Link href="/about" className="hover:text-ink transition-colors">About</Link>
+          <span>&middot;</span>
           <Link href="/terms" className="hover:text-ink transition-colors">Terms</Link>
           <span>&middot;</span>
           <Link href="/privacy" className="hover:text-ink transition-colors">Privacy</Link>
@@ -218,20 +220,20 @@ export default function ContactClientView() {
       </div>
 
       {/* Header */}
-      <div className="border border-hairline p-6 sm:p-8 bg-surface/30 space-y-3">
+      <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 rounded-xs">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="hover:opacity-90 transition-opacity">
             <LaunchFeedBrandLogo height={28} />
           </Link>
         </div>
-        <p className="text-sm text-ink-dim font-sans leading-relaxed max-w-2xl">
+        <p className="text-xs sm:text-sm text-ink-dim font-sans leading-relaxed max-w-2xl">
           Have a question about your product launch, featured placements, or need developer assistance? Send us a direct message below or reach out via our official communication channels.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         {/* Left 2 Cols: Interactive Contact Form */}
-        <div className="lg:col-span-2 border border-hairline p-6 bg-void space-y-6">
+        <div className="lg:col-span-2 border border-hairline p-4 sm:p-6 bg-void space-y-5 sm:space-y-6 rounded-xs">
           <div className="border-b border-hairline pb-3">
             <h2 className="text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-signal" />
@@ -478,17 +480,19 @@ export default function ContactClientView() {
       <div className="border-t border-hairline pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-4 py-2 border border-hairline bg-surface hover:bg-raised hover:border-signal/60 text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs w-full sm:w-auto justify-center"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs w-full sm:w-auto justify-center"
         >
           <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
-          <span>Back to The Launch Feed</span>
+          <span>Back to Leaderboard</span>
         </Link>
-        <div className="flex items-center gap-3 text-xs text-ink-dim">
-          <Link href="/terms" className="hover:text-signal transition-colors">Terms of Service</Link>
+        <div className="flex items-center gap-3 text-xs text-ink-dim flex-wrap justify-center">
+          <Link href="/about" className="hover:text-signal transition-colors">About</Link>
           <span>&middot;</span>
-          <Link href="/privacy" className="hover:text-signal transition-colors">Privacy Policy</Link>
+          <Link href="/terms" className="hover:text-signal transition-colors">Terms</Link>
           <span>&middot;</span>
-          <Link href="/about" className="hover:text-signal transition-colors">About Platform</Link>
+          <Link href="/privacy" className="hover:text-signal transition-colors">Privacy</Link>
+          <span>&middot;</span>
+          <Link href="/badges" className="hover:text-signal transition-colors">Badges</Link>
         </div>
       </div>
     </div>

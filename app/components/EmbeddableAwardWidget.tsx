@@ -247,7 +247,7 @@ export function LaunchFeedBadge() {
       <div className="space-y-2">
         <div className="flex items-center justify-between text-[11px] font-bold text-ink uppercase tracking-wider">
           <span className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-signal shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-signal shrink-0 animate-pulse" />
             <span>Badge Preview</span>
           </span>
           <span className="text-[10px] text-ink-dim font-mono font-normal">
@@ -256,7 +256,7 @@ export function LaunchFeedBadge() {
         </div>
 
         {/* ─── BADGE DISPLAY CARD ─── */}
-        <div className="p-6 border border-hairline bg-surface/20 flex flex-col items-center justify-center min-h-[90px] overflow-x-auto gap-4">
+        <div className="p-4 sm:p-6 border border-hairline bg-surface/20 flex flex-col items-center justify-center min-h-[90px] overflow-hidden gap-3 sm:gap-4 rounded-xs">
           {/* Real rendered vector SVG from endpoint */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -265,20 +265,20 @@ export function LaunchFeedBadge() {
             alt={`${productName} Badge Preview`}
             width={badgeWidth}
             height={badgeHeight}
-            className="block max-w-full h-auto"
+            className="block max-w-full w-auto h-auto max-h-[52px] object-contain drop-shadow-sm"
           />
 
-          <div className="flex items-center gap-2 pt-2 border-t border-hairline/60 w-full justify-center">
+          <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-hairline/60 w-full justify-center">
             <a
               href={`/api/badge/${productSlug}?theme=${selectedTheme}&award=${selectedAward}&download=true`}
               download
-              className="px-3.5 py-1.5 bg-signal text-void text-[10px] font-mono font-bold uppercase tracking-wider hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-xs"
+              className="w-full sm:w-auto px-3.5 py-1.5 bg-signal text-void text-[10px] font-mono font-bold uppercase tracking-wider hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 shadow-xs rounded-xs"
             >
               <span>↓ Download SVG Asset</span>
             </a>
             <a
               href={`/badges/${productSlug}`}
-              className="px-3 py-1.5 border border-hairline hover:border-ink bg-void text-ink text-[10px] font-mono font-bold uppercase tracking-wider transition-colors"
+              className="w-full sm:w-auto px-3 py-1.5 border border-hairline hover:border-ink bg-void text-ink text-[10px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center justify-center rounded-xs"
             >
               <span>View Full Trophy Kit ↗</span>
             </a>
@@ -288,50 +288,52 @@ export function LaunchFeedBadge() {
 
       {/* Code Format Selector & Copy Snippet Box */}
       <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-hairline pb-2">
           <label className="text-[11px] font-bold text-ink uppercase tracking-wider">
             3. Copy Embed Code
           </label>
-          <div className="flex items-center gap-1">
+          <div className="grid grid-cols-4 sm:flex items-center gap-1">
             {(["html", "markdown", "react", "url"] as const).map((fmt) => (
               <button
                 key={fmt}
                 type="button"
                 onClick={() => setSelectedFormat(fmt)}
-                className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer ${
+                className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-xs ${
                   selectedFormat === fmt
                     ? "border-signal bg-signal text-void"
                     : "border-hairline bg-surface text-ink-dim hover:text-ink"
                 }`}
               >
-                {fmt === "url" ? "Direct URL" : fmt}
+                {fmt === "url" ? "URL" : fmt}
               </button>
             ))}
           </div>
         </div>
 
         {/* Code Snippet Box */}
-        <div className="relative">
+        <div className="space-y-2">
           <textarea
             readOnly
             value={currentCode}
             rows={selectedFormat === "react" ? 5 : 4}
-            className="w-full border border-hairline bg-void p-3 text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed"
+            className="w-full border border-hairline bg-surface/30 p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-xs"
           />
 
-          <button
-            type="button"
-            onClick={() => handleCopy(currentCode, selectedFormat)}
-            className="absolute top-2.5 right-2.5 px-3 py-1.5 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center gap-1.5 shadow-md"
-          >
-            {copiedFormat === selectedFormat ? (
-              <span className="text-signal font-bold flex items-center gap-1">
-                ✓ Copied {selectedFormat.toUpperCase()}!
-              </span>
-            ) : (
-              <span>Copy {selectedFormat.toUpperCase()}</span>
-            )}
-          </button>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => handleCopy(currentCode, selectedFormat)}
+              className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-xs"
+            >
+              {copiedFormat === selectedFormat ? (
+                <span className="text-signal font-bold flex items-center gap-1">
+                  ✓ Copied {selectedFormat.toUpperCase()}!
+                </span>
+              ) : (
+                <span>Copy {selectedFormat.toUpperCase()} Code</span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -169,6 +169,7 @@ export default function BadgesClientView({
   productName,
 }: BadgesClientViewProps) {
   const [productInput, setProductInput] = useState(initialProduct || "my-product");
+  const [activeCategory, setActiveCategory] = useState<string>("all");
 
   // Filter available tiers to ONLY those earned by the product if eligibleAwardIds are specified
   const availableTiers = React.useMemo(() => {
@@ -182,6 +183,29 @@ export default function BadgesClientView({
     const filtered = BADGE_TIERS.filter((t) => set.has(t.id));
     return filtered.length > 0 ? filtered : BADGE_TIERS.filter((t) => t.id === "launch");
   }, [eligibleAwardIds]);
+
+  // Secondary filter for category tabs when browsing all badges
+  const displayedTiers = React.useMemo(() => {
+    if (activeCategory === "all" || isProductSpecific) {
+      return availableTiers;
+    }
+    if (activeCategory === "daily") {
+      return availableTiers.filter((t) => t.category === "daily");
+    }
+    if (activeCategory === "weekly") {
+      return availableTiers.filter((t) => t.category === "weekly");
+    }
+    if (activeCategory === "monthly") {
+      return availableTiers.filter((t) => t.category === "monthly");
+    }
+    if (activeCategory === "champions") {
+      return availableTiers.filter((t) => t.category === "yearly" || t.category === "alltime");
+    }
+    if (activeCategory === "telemetry") {
+      return availableTiers.filter((t) => t.category === "telemetry" || t.category === "launch");
+    }
+    return availableTiers;
+  }, [availableTiers, activeCategory, isProductSpecific]);
 
   const [selectedAward, setSelectedAward] = useState(() => {
     if (availableTiers.some((b) => b.id === initialAward)) {
@@ -254,34 +278,35 @@ export function LaunchFeedBadge() {
   const currentTier = availableTiers.find((b) => b.id === selectedAward) || availableTiers[0] || BADGE_TIERS[0];
 
   return (
-    <main className="min-h-screen bg-canvas text-ink font-mono px-4 sm:px-6 lg:px-8 py-8 sm:py-12 max-w-6xl mx-auto space-y-8">
+    <main className="min-h-screen bg-void text-ink font-mono px-3 sm:px-6 lg:px-8 py-4 sm:py-10 max-w-6xl mx-auto space-y-5 sm:space-y-8 w-full overflow-x-hidden">
       {/* Breadcrumb Navigation */}
-      <div className="flex items-center gap-2 text-xs text-ink-dim border-b border-hairline pb-4 flex-wrap">
-        <Link href="/" className="hover:text-ink transition-colors">
-          ← Back to Leaderboards
+      <div className="w-full min-w-0 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-ink-dim border-b border-hairline pb-3 sm:pb-4 flex-wrap">
+        <Link href="/" className="hover:text-ink transition-colors flex items-center gap-1 shrink-0">
+          <span>←</span>
+          <span>Leaderboards</span>
         </Link>
         {isProductSpecific && (
           <>
             <span>/</span>
-            <Link href={`/product/${cleanSlug}`} className="hover:text-signal transition-colors font-bold text-ink">
+            <Link href={`/product/${cleanSlug}`} className="hover:text-signal transition-colors font-bold text-ink truncate max-w-[140px] sm:max-w-[240px] md:max-w-none">
               {productName || cleanSlug}
             </Link>
           </>
         )}
         <span>/</span>
-        <span className="text-ink font-bold">Official Embed Badges &amp; Trophies</span>
+        <span className="text-ink font-bold truncate">Official Embed Badges</span>
       </div>
 
       {/* Hero Header */}
-      <div className="border border-hairline bg-surface/30 p-6 sm:p-8 space-y-4">
-        <div className="flex items-center gap-3 flex-wrap justify-between">
-          <div className="flex items-center gap-3">
+      <div className="w-full border border-hairline bg-surface/30 p-3.5 sm:p-7 space-y-3 sm:space-y-4 rounded-xs min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <LaunchFeedLogo size={28} />
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-signal">
+            <div className="min-w-0 flex-1">
+              <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-signal truncate">
                 {isProductSpecific ? "Verified Product Accolades" : "Vector Telemetry Assets"}
               </div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-ink">
+              <h1 className="text-base sm:text-2xl lg:text-3xl font-bold text-ink truncate">
                 {isProductSpecific
                   ? `${productName || productInput} Awards & Trophies`
                   : "Official Award Badges & Trophies"}
@@ -292,7 +317,7 @@ export function LaunchFeedBadge() {
           {isProductSpecific && (
             <Link
               href={`/product/${cleanSlug}`}
-              className="px-3.5 py-1.5 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-xs uppercase transition-colors"
+              className="w-full sm:w-auto text-center px-3.5 py-2 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-xs uppercase transition-colors shrink-0 rounded-xs"
             >
               View Live Product Page ↗
             </Link>
@@ -307,20 +332,20 @@ export function LaunchFeedBadge() {
 
         {/* Product Slug / Name Display */}
         {!isProductSpecific && (
-          <div className="pt-2 max-w-md">
-            <label className="block text-[11px] font-bold uppercase text-ink-dim mb-1">
+          <div className="pt-1 max-w-md space-y-1 w-full min-w-0">
+            <label className="block text-[10px] sm:text-[11px] font-bold uppercase text-ink-dim">
               Your Product Name or Slug:
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
               <input
                 type="text"
                 value={productInput}
                 onChange={(e) => setProductInput(e.target.value)}
                 placeholder="e.g. my-awesome-tool"
-                className="flex-1 px-3 py-2 border border-hairline bg-void text-ink text-xs font-mono font-bold focus:border-signal outline-none"
+                className="w-full sm:flex-1 px-3 py-2 border border-hairline bg-surface text-ink text-xs font-mono font-bold focus:border-signal outline-none rounded-xs min-w-0"
               />
-              <span className="text-[10px] text-ink-faint shrink-0">
-                Slug: <code className="text-signal font-bold">{cleanSlug}</code>
+              <span className="text-[10px] text-ink-faint shrink-0 truncate max-w-full">
+                Slug: <code className="text-signal font-bold bg-surface px-1.5 py-0.5 border border-hairline rounded-xs">{cleanSlug}</code>
               </span>
             </div>
           </div>
@@ -328,27 +353,54 @@ export function LaunchFeedBadge() {
       </div>
 
       {/* Main Interactive Stage */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 min-w-0">
         {/* Left: Badge Tier Selector */}
-        <div className="lg:col-span-5 space-y-3">
+        <div className="lg:col-span-5 space-y-2.5 sm:space-y-3 min-w-0">
           <div className="text-xs font-bold uppercase tracking-wider text-ink flex items-center justify-between border-b border-hairline pb-2">
             <span>{isProductSpecific ? "1. Select Earned Award" : "1. Select Award Badge Tier"}</span>
             <span className={`text-[10px] font-bold ${isProductSpecific ? "text-signal" : "text-ink-dim"}`}>
-              {availableTiers.length} {availableTiers.length === 1 ? "Award" : "Awards"} {isProductSpecific && "Eligible"}
+              {displayedTiers.length} {displayedTiers.length === 1 ? "Award" : "Awards"} {isProductSpecific && "Eligible"}
             </span>
           </div>
 
-          <div className="space-y-1.5 max-h-[540px] overflow-y-auto pr-1">
-            {availableTiers.map((tier) => {
+          {/* Category Filter Pills (When browsing all tiers) */}
+          {!isProductSpecific && (
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-1 text-[10px] font-mono">
+              {[
+                { id: "all", label: "All" },
+                { id: "daily", label: "Daily" },
+                { id: "weekly", label: "Weekly" },
+                { id: "monthly", label: "Monthly" },
+                { id: "champions", label: "Champions" },
+                { id: "telemetry", label: "MRR & Votes" },
+              ].map((cat) => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setActiveCategory(cat.id)}
+                  className={`px-2 py-1 uppercase font-bold border shrink-0 transition-colors rounded-xs cursor-pointer ${
+                    activeCategory === cat.id
+                      ? "border-signal bg-signal text-void"
+                      : "border-hairline bg-surface/30 text-ink-dim hover:text-ink hover:bg-surface"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-1.5 max-h-[280px] sm:max-h-[500px] overflow-y-auto no-scrollbar pr-0.5 sm:pr-1">
+            {displayedTiers.map((tier) => {
               const isSelected = selectedAward === tier.id;
               return (
                 <button
                   key={tier.id}
                   type="button"
                   onClick={() => setSelectedAward(tier.id)}
-                  className={`w-full p-3 border text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  className={`w-full p-2 sm:p-2.5 border text-left transition-all cursor-pointer flex items-center justify-between gap-2 rounded-xs min-w-0 ${
                     isSelected
-                      ? "border-signal bg-void text-ink shadow-sm"
+                      ? "border-signal bg-surface text-ink shadow-xs"
                       : "border-hairline bg-surface/20 text-ink-dim hover:bg-surface/60 hover:text-ink"
                   }`}
                 >
@@ -359,7 +411,7 @@ export function LaunchFeedBadge() {
                     <div className="text-[10px] text-ink-dim truncate mt-0.5">{tier.description}</div>
                   </div>
                   <span
-                    className={`text-[9px] font-bold px-2 py-0.5 border uppercase shrink-0 ${
+                    className={`text-[9px] font-bold px-1.5 py-0.5 border uppercase shrink-0 whitespace-nowrap rounded-xs ${
                       isSelected
                         ? "border-signal text-signal bg-signal/10"
                         : "border-hairline text-ink-dim bg-surface"
@@ -374,9 +426,9 @@ export function LaunchFeedBadge() {
         </div>
 
         {/* Right: Live Preview & Generator */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-4 sm:space-y-6 min-w-0">
           {/* Theme Selector */}
-          <div className="space-y-2">
+          <div className="space-y-2 min-w-0">
             <div className="text-xs font-bold uppercase tracking-wider text-ink flex items-center justify-between border-b border-hairline pb-2">
               <span>2. Select Color Theme</span>
               <span className="text-[10px] text-ink-dim">{selectedTheme.toUpperCase()}</span>
@@ -387,14 +439,14 @@ export function LaunchFeedBadge() {
                   key={th.id}
                   type="button"
                   onClick={() => setSelectedTheme(th.id)}
-                  className={`p-2.5 border text-left text-xs font-bold transition-all cursor-pointer ${
+                  className={`p-2 sm:p-2.5 border text-left text-xs font-bold transition-all cursor-pointer rounded-xs min-w-0 ${
                     selectedTheme === th.id
-                      ? "border-signal bg-void text-ink shadow-xs"
+                      ? "border-signal bg-surface text-ink shadow-xs"
                       : "border-hairline bg-surface/30 text-ink-dim hover:bg-surface hover:text-ink"
                   }`}
                 >
-                  <div>{th.label}</div>
-                  <div className="text-[9px] uppercase font-normal text-ink-dim mt-0.5">
+                  <div className="truncate">{th.label}</div>
+                  <div className="text-[9px] uppercase font-normal text-ink-dim mt-0.5 truncate">
                     {th.id}
                   </div>
                 </button>
@@ -403,18 +455,18 @@ export function LaunchFeedBadge() {
           </div>
 
           {/* Live Preview Display Card */}
-          <div className="border border-hairline bg-surface/20 p-6 space-y-4">
+          <div className="w-full border border-hairline bg-surface/20 p-3.5 sm:p-6 space-y-3 sm:space-y-4 rounded-xs min-w-0">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold uppercase text-ink flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
                 <span>Live Vector Preview</span>
               </div>
-              <span className="text-[10px] text-ink-dim">
+              <span className="text-[10px] text-ink-dim font-mono">
                 {badgeWidth} &times; {badgeHeight} SVG
               </span>
             </div>
 
-            <div className="p-8 border border-hairline bg-void flex items-center justify-center min-h-[110px] overflow-x-auto">
+            <div className="w-full p-3 sm:p-8 border border-hairline bg-void flex items-center justify-center min-h-[84px] sm:min-h-[120px] overflow-hidden rounded-xs">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={`${cleanSlug}-${selectedTheme}-${selectedAward}`}
@@ -422,16 +474,16 @@ export function LaunchFeedBadge() {
                 alt={`${productInput} Badge Preview`}
                 width={badgeWidth}
                 height={badgeHeight}
-                className="max-w-full h-auto drop-shadow-sm"
+                className="max-w-full w-auto h-auto max-h-[48px] sm:max-h-[56px] object-contain drop-shadow-sm transition-all"
               />
             </div>
 
             {/* Instant Actions Row */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-hairline/60">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-3 border-t border-hairline/60 w-full">
               <a
                 href={downloadUrl}
                 download
-                className="px-4 py-2 bg-signal text-void font-bold text-xs uppercase flex items-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+                className="w-full sm:w-auto px-3.5 py-2 bg-signal text-void font-bold text-xs uppercase flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs rounded-xs"
               >
                 <span>↓ Download SVG Asset</span>
               </a>
@@ -440,62 +492,84 @@ export function LaunchFeedBadge() {
                 href={badgeImgUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="px-3.5 py-2 border border-hairline hover:border-ink bg-void text-ink font-bold text-xs uppercase flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-3.5 py-2 border border-hairline hover:border-ink bg-surface hover:bg-raised text-ink font-bold text-xs uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer rounded-xs"
               >
                 <span>Open Vector URL ↗</span>
               </a>
 
-              <span className="text-[10px] text-ink-dim ml-auto">
+              <span className="text-[10px] sm:text-xs text-ink-dim text-center sm:text-right sm:ml-auto pt-1 sm:pt-0 truncate max-w-full">
                 Badge: <strong className="text-ink">{currentTier.name}</strong>
               </span>
             </div>
           </div>
 
           {/* Embed Code Generator */}
-          <div className="border border-hairline bg-void p-5 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="w-full border border-hairline bg-void p-3.5 sm:p-5 space-y-3 rounded-xs min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-hairline pb-2.5">
               <label className="text-xs font-bold text-ink uppercase tracking-wider">
                 3. Copy Embed Snippet
               </label>
-              <div className="flex items-center gap-1">
+              <div className="grid grid-cols-4 sm:flex items-center gap-1 w-full sm:w-auto">
                 {(["html", "markdown", "react", "url"] as const).map((fmt) => (
                   <button
                     key={fmt}
                     type="button"
                     onClick={() => setFormat(fmt)}
-                    className={`px-2.5 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer ${
+                    className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-xs truncate ${
                       format === fmt
                         ? "border-signal bg-signal text-void"
                         : "border-hairline bg-surface text-ink-dim hover:text-ink"
                     }`}
                   >
-                    {fmt === "url" ? "Direct URL" : fmt}
+                    {fmt === "url" ? "URL" : fmt}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="relative">
+            <div className="space-y-2">
               <textarea
                 readOnly
                 value={currentSnippet}
                 rows={format === "react" ? 6 : 4}
-                className="w-full border border-hairline bg-surface/30 p-3 text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed"
+                className="w-full border border-hairline bg-surface/30 p-2.5 sm:p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-xs break-all sm:break-normal"
               />
 
-              <button
-                type="button"
-                onClick={() => handleCopy(currentSnippet, format)}
-                className="absolute top-2.5 right-2.5 px-3 py-1.5 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center gap-1.5 shadow-md"
-              >
-                {copied === format ? (
-                  <span className="text-signal font-bold">✓ Copied!</span>
-                ) : (
-                  <span>Copy {format.toUpperCase()}</span>
-                )}
-              </button>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleCopy(currentSnippet, format)}
+                  className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-xs"
+                >
+                  {copied === format ? (
+                    <span className="text-signal font-bold">✓ Copied {format.toUpperCase()}!</span>
+                  ) : (
+                    <span>Copy {format.toUpperCase()} Code</span>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Bottom Footer Navigation */}
+      <div className="border-t border-hairline pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-dim font-mono">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs w-full sm:w-auto justify-center"
+        >
+          <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
+          <span>Back to Leaderboards</span>
+        </Link>
+        <div className="flex items-center gap-3 text-xs flex-wrap justify-center">
+          <Link href="/about" className="hover:text-signal transition-colors">About</Link>
+          <span>&middot;</span>
+          <Link href="/terms" className="hover:text-signal transition-colors">Terms</Link>
+          <span>&middot;</span>
+          <Link href="/privacy" className="hover:text-signal transition-colors">Privacy</Link>
+          <span>&middot;</span>
+          <Link href="/contact" className="hover:text-signal transition-colors">Contact</Link>
         </div>
       </div>
     </main>

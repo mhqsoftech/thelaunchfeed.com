@@ -1123,22 +1123,25 @@ export default function SubmitClientView({
         logoCandidates?: string[];
       };
 
-      const feat = [...d.features];
+      const rawFeatures = Array.isArray(d?.features) ? d.features : [];
+      const feat = [...rawFeatures];
       while (feat.length < 3) feat.push("");
 
-      const tiers = (d.pricingTiers.length
-        ? d.pricingTiers
+      const rawTiers = Array.isArray(d?.pricingTiers) ? d.pricingTiers : [];
+      const tiers = (rawTiers.length
+        ? rawTiers
         : [
             { name: "Free", price: "", specs: "" },
             { name: "Pro", price: "", specs: "" },
           ]
       ).map((t) => ({
-        name: t.name ?? "",
-        price: t.price ?? "",
-        specs: t.specs ?? "",
+        name: t?.name ?? "",
+        price: t?.price ?? "",
+        specs: t?.specs ?? "",
       }));
 
-      const faqPairs = d.faqs.length ? d.faqs : [{ q: "", a: "" }];
+      const rawFaqs = Array.isArray(d?.faqs) ? d.faqs : [];
+      const faqPairs = rawFaqs.length ? rawFaqs : [{ q: "", a: "" }];
 
       setFormData((prev) => ({
         ...prev,

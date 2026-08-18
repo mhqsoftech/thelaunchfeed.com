@@ -5,7 +5,7 @@ import { detectFromHtml, mergeFingerprints, fingerprintSummary, type TechFingerp
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 const MODEL = "gpt-4o-mini";
 const MAX_INPUT_CHARS = 90_000;
-const MAX_OUTPUT_TOKENS = 4000;
+const MAX_OUTPUT_TOKENS = 12_000;
 
 export type ExtractedProduct = {
   name: string;
@@ -60,7 +60,7 @@ const SCHEMA: JsonSchema = {
     features: {
       type: "array",
       items: { type: "string" },
-      maxItems: 10,
+      maxItems: 8,
       description: "Concrete product capabilities pulled from features/product/docs pages or README. One sentence each. Empty array if none are stated.",
     },
     targetAudience: { type: "string", description: "Who the product is for, ONLY as stated in the source (e.g. 'built for X'). Empty if not stated." },
@@ -92,7 +92,7 @@ const SCHEMA: JsonSchema = {
     pricingPartner: { type: "string", description: "Payment provider. Use ONLY items from the PAYMENTS entry in the DETECTED TECHNOLOGIES block, or providers explicitly named in checkout links / terms page. Empty otherwise." },
     faqs: {
       type: "array",
-      maxItems: 10,
+      maxItems: 6,
       items: {
         type: "object",
         additionalProperties: false,
@@ -232,6 +232,181 @@ STYLE:
 - Paraphrase rather than copying long verbatim passages, but preserve factual specificity.
 - category MUST be one enum value.`;
 
+/**
+ * Cleans and repairs malformed or truncated JSON from LLM generation.
+ */
+export function repairAndParseJson<T = any>(raw: string): T {
+  if (!raw || typeof raw !== "string") {
+    throw new Error("Empty or non-string JSON input");
+  }
+
+  let text = raw.trim();
+
+  // Strip markdown code fences if wrapped in ```json ... ``` or ``` ... ```
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+
+  // Sanitize literal unescaped control characters / newlines inside quotes
+  const sanitized = sanitizeJsonString(text);
+
+  // Fast path: try standard JSON.parse on sanitized text
+  try {
+    return JSON.parse(sanitized) as T;
+  } catch {
+    // Attempt state-machine repair for truncated / malformed JSON
+    try {
+      const repaired = repairTruncatedJson(sanitized);
+      return JSON.parse(repaired) as T;
+    } catch {
+      // Aggressive repair fallback
+      const aggressive = aggressiveJsonRepair(sanitized);
+      return JSON.parse(aggressive) as T;
+    }
+  }
+}
+
+/**
+ * Escapes literal newlines, tabs, and carriage returns inside string quotes.
+ */
+function sanitizeJsonString(jsonStr: string): string {
+  let out = "";
+  let inString = false;
+  let isEscaped = false;
+
+  for (let i = 0; i < jsonStr.length; i++) {
+    const ch = jsonStr[i];
+    if (inString) {
+      if (isEscaped) {
+        isEscaped = false;
+        out += ch;
+      } else if (ch === "\\") {
+        isEscaped = true;
+        out += ch;
+      } else if (ch === '"') {
+        inString = false;
+        out += ch;
+      } else if (ch === "\n") {
+        out += "\\n";
+      } else if (ch === "\r") {
+        out += "\\r";
+      } else if (ch === "\t") {
+        out += "\\t";
+      } else {
+        out += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inString = true;
+      }
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/**
+ * State-machine repair for truncated JSON.
+ * Fixes unclosed strings, dangling keys/colons/commas, and closes unclosed arrays/objects.
+ */
+function repairTruncatedJson(jsonStr: string): string {
+  let s = jsonStr.trim();
+  if (!s) return "{}";
+
+  if (s.startsWith("```")) {
+    s = s.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  }
+
+  const firstBrace = s.indexOf("{");
+  const firstBracket = s.indexOf("[");
+  if (firstBrace === -1 && firstBracket === -1) return "{}";
+
+  let startIdx = 0;
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    startIdx = firstBrace;
+  } else if (firstBracket !== -1) {
+    startIdx = firstBracket;
+  }
+  s = s.slice(startIdx);
+
+  // Check if string was left open
+  let inString = false;
+  let isEscaped = false;
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inString) {
+      if (isEscaped) isEscaped = false;
+      else if (ch === "\\") isEscaped = true;
+      else if (ch === '"') inString = false;
+    } else {
+      if (ch === '"') inString = true;
+    }
+  }
+
+  if (inString) {
+    if (s.endsWith("\\") && !s.endsWith("\\\\")) s = s.slice(0, -1);
+    s += '"';
+  }
+
+  function getStack(str: string): ("{" | "[")[] {
+    const stack: ("{" | "[")[] = [];
+    let inS = false;
+    let isE = false;
+    for (let i = 0; i < str.length; i++) {
+      const ch = str[i];
+      if (inS) {
+        if (isE) isE = false;
+        else if (ch === "\\") isE = true;
+        else if (ch === '"') inS = false;
+      } else {
+        if (ch === '"') inS = true;
+        else if (ch === "{") stack.push("{");
+        else if (ch === "}") {
+          if (stack.length && stack[stack.length - 1] === "{") stack.pop();
+        } else if (ch === "[") stack.push("[");
+        else if (ch === "]") {
+          if (stack.length && stack[stack.length - 1] === "[") stack.pop();
+        }
+      }
+    }
+    return stack;
+  }
+
+  let cleaned = s.trim();
+  while (true) {
+    const prev = cleaned;
+    cleaned = cleaned.replace(/,\s*$/, "").replace(/:\s*$/, "");
+    const stack = getStack(cleaned);
+    const top = stack[stack.length - 1];
+    if (top === "{") {
+      const objectDanglingKeyMatch = cleaned.match(/(?:\{|,)\s*"[^"]+"\s*$/);
+      if (objectDanglingKeyMatch && typeof objectDanglingKeyMatch.index === "number") {
+        cleaned = cleaned.slice(0, objectDanglingKeyMatch.index + (objectDanglingKeyMatch[0].startsWith(",") ? 0 : 1));
+      }
+    }
+    cleaned = cleaned.replace(/,\s*$/, "");
+    if (cleaned === prev) break;
+  }
+
+  const finalStack = getStack(cleaned);
+  while (finalStack.length > 0) {
+    const top = finalStack.pop();
+    if (top === "{") cleaned += "}";
+    else if (top === "[") cleaned += "]";
+  }
+
+  return cleaned;
+}
+
+function aggressiveJsonRepair(s: string): string {
+  let repaired = repairTruncatedJson(s);
+  const lastBrace = repaired.lastIndexOf("}");
+  if (lastBrace !== -1) {
+    repaired = repaired.slice(0, lastBrace + 1);
+  }
+  return repaired;
+}
+
 export async function extractProduct(
   inputUrl: string,
   crawl: CrawlResult | null,
@@ -280,6 +455,7 @@ export async function extractProduct(
       model: MODEL,
       temperature: 0.1,
       max_tokens: MAX_OUTPUT_TOKENS,
+      max_completion_tokens: MAX_OUTPUT_TOKENS,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMsg },
@@ -296,11 +472,11 @@ export async function extractProduct(
     throw new Error(`OpenAI ${res.status}: ${text.slice(0, 400)}`);
   }
 
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenAI returned no content");
 
-  const parsed = JSON.parse(content) as Omit<ExtractedProduct, "ogImage" | "favicon" | "socials">;
+  const parsed = repairAndParseJson<Partial<ExtractedProduct>>(content);
 
   const ogImage = crawl?.primary?.ogImage ?? "";
   const favicon = crawl?.primary?.favicon ?? "";
@@ -336,11 +512,12 @@ export async function extractProduct(
   const prodName = parsed.name || "This product";
   const prodCat = parsed.category || "software";
 
-  let faqs = (parsed.faqs || [])
+  const rawFaqs = Array.isArray(parsed.faqs) ? parsed.faqs : [];
+  let faqs = rawFaqs
     .filter((f) => f && typeof f.q === "string" && f.q.trim().length > 0)
     .map((f) => ({
       q: f.q.trim(),
-      a: f.a && f.a.trim().length > 0 ? f.a.trim() : "",
+      a: f.a && typeof f.a === "string" && f.a.trim().length > 0 ? f.a.trim() : "",
     }));
 
   faqs = faqs.map((f) => {
@@ -361,7 +538,9 @@ export async function extractProduct(
       };
     }
     if (/price|pricing|cost|plan|free|trial/i.test(f.q)) {
-      const tierSummary = parsed.pricingTiers?.map((t) => `${t.name} (${t.price || "Free"})`).join(", ");
+      const tierSummary = Array.isArray(parsed.pricingTiers)
+        ? parsed.pricingTiers.map((t) => `${t.name} (${t.price || "Free"})`).join(", ")
+        : "";
       return {
         q: f.q,
         a: tierSummary
@@ -369,9 +548,10 @@ export async function extractProduct(
           : `${prodName} offers flexible tier options for modern teams. Check the official website for current details.`,
       };
     }
+    const firstFeature = Array.isArray(parsed.features) && parsed.features[0] ? parsed.features[0] : "specialized capabilities";
     return {
       q: f.q,
-      a: `${prodName} provides ${parsed.features?.[0] || "specialized capabilities"} designed for ${parsed.targetAudience || "modern users"}. ${taglineSnippet}`.trim(),
+      a: `${prodName} provides ${firstFeature} designed for ${parsed.targetAudience || "modern users"}. ${taglineSnippet}`.trim(),
     };
   });
 
@@ -383,7 +563,7 @@ export async function extractProduct(
       },
       {
         q: `What are the primary capabilities and features of ${prodName}?`,
-        a: parsed.features?.length
+        a: Array.isArray(parsed.features) && parsed.features.length
           ? `${prodName} provides core capabilities including: ${parsed.features.slice(0, 3).join("; ")}.`
           : `${prodName} provides streamlined tools designed for ${parsed.targetAudience || "engineering and creator teams"}.`,
       },
@@ -400,8 +580,6 @@ export async function extractProduct(
     ];
   }
 
-  parsed.faqs = faqs;
-
   // Support email resolution: fallback to scraped emails or domain-derived email if model returned empty
   let supportEmail = (parsed.supportEmail || "").trim();
   const foundEmails = Array.from(new Set((crawl?.pages ?? []).flatMap((p) => p.emails ?? [])));
@@ -416,7 +594,50 @@ export async function extractProduct(
     supportEmail = `support@${cleanHost}`;
   }
 
-  parsed.supportEmail = supportEmail;
+  const features = Array.isArray(parsed.features)
+    ? parsed.features.filter((f) => typeof f === "string" && f.trim().length > 0)
+    : [];
 
-  return { ...parsed, websiteUrl, githubUrl, ogImage, favicon, appleTouchIcon, logoCandidates, socials };
+  const pricingTiers = Array.isArray(parsed.pricingTiers)
+    ? parsed.pricingTiers
+        .filter((t) => t && typeof t === "object")
+        .map((t) => ({
+          name: t.name || "",
+          price: t.price || "",
+          specs: t.specs || "",
+        }))
+    : [];
+
+  return {
+    name: parsed.name || "",
+    tagline: parsed.tagline || "",
+    category: parsed.category || "",
+    makerName: parsed.makerName || "",
+    makerHandle: parsed.makerHandle || "",
+    websiteUrl,
+    githubUrl,
+    revenue: parsed.revenue || "",
+    overviewPitch: parsed.overviewPitch || "",
+    features,
+    targetAudience: parsed.targetAudience || "",
+    pricingTiers,
+    techStack: parsed.techStack || "",
+    infraHosting: parsed.infraHosting || "",
+    apiUrl: parsed.apiUrl || "",
+    securityStandards: parsed.securityStandards || "",
+    originStory: parsed.originStory || "",
+    makerThesis: parsed.makerThesis || "",
+    latestVersion: parsed.latestVersion || "",
+    latestChangelog: parsed.latestChangelog || "",
+    roadmapQ3: parsed.roadmapQ3 || "",
+    roadmapQ4: parsed.roadmapQ4 || "",
+    pricingPartner: parsed.pricingPartner || "",
+    faqs,
+    supportEmail,
+    ogImage,
+    favicon,
+    appleTouchIcon,
+    logoCandidates,
+    socials,
+  };
 }
