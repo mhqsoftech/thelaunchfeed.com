@@ -112,9 +112,8 @@ export default async function FounderPage({
   let verifiedProviderName = "Stripe";
   let verifiedProviders: Array<{ name: string; mrrCents: number; totalRevenueCents: number }> = [];
 
-  // Skip assumed/mock revenue from founder pages.
-  // Only display revenue if the user explicitly opted-in to public revenue verification
-  if (f.showRevenuePublic) {
+  // Any verified revenue is shown publicly — verification is the opt-in.
+  {
     const verifiedRevenues = f.products
       .map((p: any) => p.revenue)
       .filter((r: any): r is NonNullable<typeof r> => !!r && r.isVerified);
