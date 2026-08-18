@@ -7,12 +7,6 @@ import {
   getBroadcastLogsAction,
   testBroadcastAction,
 } from "@/app/actions/broadcast";
-import {
-  getBaileysStatusAction,
-  initBaileysAction,
-  disconnectBaileysAction,
-  getBaileysGroupsAction,
-} from "@/app/actions/baileys";
 import { type BroadcastConfig, type BroadcastLogItem } from "@/lib/broadcast";
 import { LaunchFeedLoader } from "@/components/ui/LaunchFeedLoader";
 
@@ -72,17 +66,6 @@ function RefreshIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
   );
 }
 
-function RadarScanIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2a10 10 0 1 0 10 10" />
-      <path d="M12 6a6 6 0 1 0 6 6" />
-      <path d="M12 10a2 2 0 1 0 2 2" />
-      <line x1="12" y1="12" x2="19" y2="5" />
-    </svg>
-  );
-}
-
 export default function BroadcastTab() {
   const [config, setConfig] = useState<BroadcastConfig | null>(null);
   const [logs, setLogs] = useState<BroadcastLogItem[]>([]);
@@ -106,27 +89,6 @@ export default function BroadcastTab() {
   const [testingBsky, setTestingBsky] = useState(false);
   const [feedbackBsky, setFeedbackBsky] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  const [baileysInfo, setBaileysInfo] = useState<{
-    status: "DISCONNECTED" | "CONNECTING" | "SCAN_QR" | "CONNECTED";
-    qrCodeDataUrl: string | null;
-    userInfo: { id: string; name?: string } | null;
-    lastError: string | null;
-  }>({
-    status: "DISCONNECTED",
-    qrCodeDataUrl: null,
-    userInfo: null,
-    lastError: null,
-  });
-  const [baileysLoading, setBaileysLoading] = useState(false);
-  const [copiedRss, setCopiedRss] = useState(false);
-
-  const fetchBaileysStatus = async () => {
-    try {
-      const st = await getBaileysStatusAction();
-      setBaileysInfo(st);
-    } catch {}
-  };
-
   const loadData = async () => {
     try {
       const [cfg, lg] = await Promise.all([
@@ -135,7 +97,6 @@ export default function BroadcastTab() {
       ]);
       setConfig(cfg);
       setLogs(lg);
-      fetchBaileysStatus();
     } catch (e) {
       console.error("Failed to load broadcast config:", e);
     } finally {
@@ -147,60 +108,6 @@ export default function BroadcastTab() {
     loadData();
   }, []);
 
-  // Poll when in SCAN_QR or CONNECTING mode
-  useEffect(() => {
-    if (baileysInfo.status === "SCAN_QR" || baileysInfo.status === "CONNECTING") {
-      const interval = setInterval(fetchBaileysStatus, 2500);
-      return () => clearInterval(interval);
-    }
-  }, [baileysInfo.status]);
-
-  const handleStartBaileys = async () => {
-    setBaileysLoading(true);
-    try {
-      const res = await initBaileysAction();
-      setBaileysInfo(res);
-    } catch (e: any) {
-      alert("Failed to initialize Baileys: " + (e.message || String(e)));
-    } finally {
-      setBaileysLoading(false);
-    }
-  };
-
-  const [groupsList, setGroupsList] = useState<Array<{ id: string; name: string }>>([]);
-  const [fetchingGroups, setFetchingGroups] = useState(false);
-  const [groupsFetchError, setGroupsFetchError] = useState<string | null>(null);
-
-  const handleFetchGroups = async () => {
-    setFetchingGroups(true);
-    setGroupsFetchError(null);
-    try {
-      const list = await getBaileysGroupsAction();
-      setGroupsList(list);
-      if (list.length === 0) {
-        setGroupsFetchError("No WhatsApp groups found on this account. Create or join your community group first.");
-      }
-    } catch (e: any) {
-      setGroupsFetchError(e.message || String(e));
-    } finally {
-      setFetchingGroups(false);
-    }
-  };
-
-  const handleDisconnectBaileys = async () => {
-    if (!confirm("Are you sure you want to disconnect your WhatsApp session?")) return;
-    setBaileysLoading(true);
-    try {
-      await disconnectBaileysAction();
-      await fetchBaileysStatus();
-      setGroupsList([]);
-    } catch (e: any) {
-      alert("Disconnect error: " + (e.message || String(e)));
-    } finally {
-      setBaileysLoading(false);
-    }
-  };
-
   const handleSave = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!config) return;
@@ -208,8 +115,8 @@ export default function BroadcastTab() {
     setSaveStatus(null);
     try {
       await saveBroadcastConfigAction(config);
-      setSaveStatus("Multi-channel broadcast configuration saved successfully.");
-      setTimeout(() => setSaveStatus(null), 4000);
+      setSaveStatus(`Broadcast configuration saved · ${new Date().toLocaleTimeString()}`);
+      setTimeout(() => setSaveStatus(null), 8000);
     } catch (err: any) {
       setSaveStatus(`Error saving settings: ${err.message || String(err)}`);
     } finally {
@@ -278,19 +185,6 @@ export default function BroadcastTab() {
           Configure API credentials and public channel endpoints for <strong>X (Twitter)</strong>, <strong>Telegram</strong>, and <strong>WhatsApp</strong>. When any product is published at the 6:00 AM IST (00:30 UTC) release slot or launched manually, it is automatically broadcasted with rich 360° product specs and direct backlinks.
         </p>
       </div>
-
-      {saveStatus && (
-        <div
-          className={`p-3 border text-xs font-mono font-bold flex items-center justify-between ${
-            saveStatus.startsWith("Error")
-              ? "border-red-500 bg-red-500/10 text-red-500"
-              : "border-signal bg-signal/10 text-signal"
-          }`}
-        >
-          <span>{saveStatus}</span>
-          <span className="text-[10px] uppercase opacity-75">CONFIG SYNCHRONIZED</span>
-        </div>
-      )}
 
       {/* 3 Channel Configuration Columns / Cards */}
       <form onSubmit={handleSave} className="space-y-6">
@@ -584,7 +478,7 @@ export default function BroadcastTab() {
             </div>
           </div>
 
-          {/* 3. WhatsApp Channel (Powered by Baileys Multi-Device Engine) */}
+          {/* 3. WhatsApp Channel — Green-API gateway */}
           <div className="border border-hairline bg-surface/20 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="flex items-center justify-between border-b border-hairline pb-2.5">
@@ -592,24 +486,16 @@ export default function BroadcastTab() {
                   <div className="w-6 h-6 bg-[#25D366] text-white rounded-xs flex items-center justify-center p-1">
                     <WhatsAppBrandLogo className="w-3.5 h-3.5" />
                   </div>
-                  <span className="font-bold text-xs uppercase text-ink">WhatsApp (Baileys)</span>
+                  <span className="font-bold text-xs uppercase text-ink">WhatsApp (Green-API)</span>
                 </div>
                 <span
                   className={`text-[9px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
-                    baileysInfo.status === "CONNECTED"
+                    config.whatsapp.enabled && (config.whatsapp.instanceId || config.whatsapp.phoneNumberId) && (config.whatsapp.apiToken || config.whatsapp.accessToken)
                       ? "border-signal text-signal bg-void"
-                      : baileysInfo.status === "SCAN_QR" || baileysInfo.status === "CONNECTING"
-                      ? "border-amber-500 text-amber-500 bg-amber-500/10 animate-pulse"
                       : "border-hairline text-ink-faint bg-surface"
                   }`}
                 >
-                  {baileysInfo.status === "CONNECTED"
-                    ? "CONNECTED"
-                    : baileysInfo.status === "SCAN_QR"
-                    ? "SCAN QR"
-                    : baileysInfo.status === "CONNECTING"
-                    ? "CONNECTING..."
-                    : "DISCONNECTED"}
+                  {config.whatsapp.enabled ? "ACTIVE" : "DISABLED"}
                 </span>
               </div>
 
@@ -629,131 +515,15 @@ export default function BroadcastTab() {
                 <span>Enable Auto-Broadcast to WhatsApp</span>
               </label>
 
-              {/* Baileys Connection Management Box */}
-              <div className="p-3 border border-hairline bg-surface/40 space-y-2.5 rounded-xs">
-                <div className="text-[10px] uppercase font-bold text-ink flex items-center justify-between">
-                  <span>Direct WhatsApp Web Session</span>
-                  <span className="text-[9px] text-signal font-mono font-normal">100% Free · Baileys</span>
-                </div>
-
-                {baileysInfo.status === "CONNECTED" ? (
-                  <div className="space-y-2">
-                    <div className="p-2 border border-signal/40 bg-signal/5 text-xs text-signal font-mono flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className="w-2 h-2 rounded-full bg-signal shrink-0" />
-                        <span className="truncate font-bold">
-                          {baileysInfo.userInfo?.id || "WhatsApp Active"}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-ink-dim uppercase">Linked</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleDisconnectBaileys}
-                      disabled={baileysLoading}
-                      className="w-full py-1 px-2 border border-hairline bg-surface hover:bg-raised text-[10px] text-ink-dim hover:text-red-400 font-bold transition-colors cursor-pointer"
-                    >
-                      {baileysLoading ? "Disconnecting..." : "Disconnect WhatsApp Session"}
-                    </button>
-                  </div>
-                ) : baileysInfo.status === "SCAN_QR" && baileysInfo.qrCodeDataUrl ? (
-                  <div className="space-y-2 text-center p-2 bg-void border border-hairline">
-                    <div className="text-[10px] text-amber-500 font-bold uppercase tracking-wide">
-                      Scan with WhatsApp
-                    </div>
-                    <div className="flex justify-center py-1">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={baileysInfo.qrCodeDataUrl}
-                        alt="WhatsApp Baileys QR Code"
-                        className="w-44 h-44 border border-hairline bg-white p-1"
-                      />
-                    </div>
-                    <p className="text-[10px] text-ink-dim leading-tight">
-                      Open WhatsApp on phone &rarr; Settings &rarr; Linked Devices &rarr; Link a Device.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleStartBaileys}
-                      disabled={baileysLoading}
-                      className="text-[10px] underline text-ink-faint hover:text-ink cursor-pointer pt-1"
-                    >
-                      Refresh QR Code
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-[10px] text-ink-dim leading-tight font-sans">
-                      Connect your WhatsApp directly to auto-send launch alerts without any third-party fees.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleStartBaileys}
-                      disabled={baileysLoading}
-                      className="w-full py-2 px-3 bg-ink text-void hover:bg-ink/90 text-xs font-bold font-mono transition-colors cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <span>{baileysLoading ? "Generating QR Code..." : "Connect WhatsApp (Scan QR)"}</span>
-                    </button>
-                    {baileysInfo.lastError && (
-                      <div className="text-[10px] text-red-400 font-mono">
-                        {baileysInfo.lastError}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
 
               {/* Community Group / Chat ID */}
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] uppercase font-bold text-ink-faint">
-                    Community Group Chat ID
-                  </label>
-                  {baileysInfo.status === "CONNECTED" && (
-                    <button
-                      type="button"
-                      onClick={handleFetchGroups}
-                      disabled={fetchingGroups}
-                      className="text-[10px] font-mono text-signal hover:text-signal/90 bg-signal/10 hover:bg-signal/15 px-2 py-0.5 border border-signal/40 cursor-pointer disabled:opacity-50 flex items-center gap-1.5 font-bold transition-all rounded-xs"
-                    >
-                      <RadarScanIcon className={`w-3 h-3 ${fetchingGroups ? "animate-spin" : ""}`} />
-                      <span>{fetchingGroups ? "Scanning Groups..." : "Auto-Detect Group ID"}</span>
-                    </button>
-                  )}
-                </div>
-
-                {groupsList.length > 0 && (
-                  <div className="p-2 border border-signal/30 bg-signal/5 space-y-1.5 rounded-xs">
-                    <div className="text-[10px] uppercase font-bold text-signal">
-                      Select Your WhatsApp Group:
-                    </div>
-                    <select
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setConfig({
-                            ...config,
-                            whatsapp: { ...config.whatsapp, chatId: e.target.value },
-                          });
-                        }
-                      }}
-                      value={config.whatsapp.chatId || ""}
-                      className="w-full px-2 py-1 border border-hairline bg-void text-xs text-ink font-mono focus:outline-none"
-                    >
-                      <option value="">-- Choose from your WhatsApp Groups --</option>
-                      {groupsList.map((g) => (
-                        <option key={g.id} value={g.id}>
-                          {g.name} ({g.id})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                {groupsFetchError && (
-                  <div className="text-[10px] text-red-400 font-mono">
-                    {groupsFetchError}
-                  </div>
-                )}
+                <label className="text-[10px] uppercase font-bold text-ink-faint">
+                  Community Group Chat ID
+                </label>
+                <p className="text-[10px] text-ink-dim font-sans leading-tight">
+                  In Green-API dashboard → your Instance → <em>Get Groups Ids</em>, or paste the raw <code>...@g.us</code> string of the group WhatsApp published to that account.
+                </p>
 
                 <input
                   type="text"
@@ -786,6 +556,56 @@ export default function BroadcastTab() {
                   placeholder="https://chat.whatsapp.com/HxTenCRhtHa9PIviuQNl9U"
                   className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
                 />
+              </div>
+
+              {/* Green-API Production Gateway */}
+              <div className="p-3 border border-hairline bg-surface/40 space-y-2.5 rounded-xs">
+                <div className="text-[10px] uppercase font-bold text-ink flex items-center justify-between">
+                  <span>Production Gateway: Green-API</span>
+                  <a
+                    href="https://green-api.com/en/pricing/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[9px] text-signal font-mono font-normal underline"
+                  >
+                    Free tier: 3-day trial then $0 dev plan
+                  </a>
+                </div>
+                <p className="text-[10px] text-ink-dim leading-tight font-sans">
+                  Sign up at <a href="https://console.green-api.com/" target="_blank" rel="noreferrer" className="underline">console.green-api.com</a>, create an Instance, scan the QR on their dashboard once (needs a real WhatsApp on your phone), then paste the two credentials below. Free tier covers ~1000 outgoing messages/month.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-ink-faint">Instance ID</label>
+                    <input
+                      type="text"
+                      value={config.whatsapp.instanceId || config.whatsapp.phoneNumberId || ""}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          whatsapp: { ...config.whatsapp, instanceId: e.target.value },
+                        })
+                      }
+                      placeholder="e.g. 7105123456"
+                      className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase font-bold text-ink-faint">API Token</label>
+                    <input
+                      type="password"
+                      value={config.whatsapp.apiToken || config.whatsapp.accessToken || ""}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          whatsapp: { ...config.whatsapp, apiToken: e.target.value },
+                        })
+                      }
+                      placeholder="e.g. f2391a5565e3..."
+                      className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -926,18 +746,44 @@ export default function BroadcastTab() {
         </div>
 
         {/* Action Save Bar */}
-        <div className="flex items-center justify-between border-t border-hairline pt-4 flex-wrap gap-3">
-          <div className="text-[11px] text-ink-dim font-mono">
-            Credentials and channel links are stored in the database.
+        <div className="border-t border-hairline pt-4 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="text-[11px] text-ink-dim font-mono">
+              Credentials and channel links are stored in the database.
+            </div>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 bg-signal text-void font-mono text-xs font-bold hover:bg-signal/90 transition-colors cursor-pointer disabled:opacity-40 shadow-sm flex items-center gap-2"
+            >
+              <SaveIcon className="w-3.5 h-3.5" />
+              <span>{saving ? "Saving Configuration..." : "Save Broadcast Configuration"}</span>
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 bg-signal text-void font-mono text-xs font-bold hover:bg-signal/90 transition-colors cursor-pointer disabled:opacity-40 shadow-sm flex items-center gap-2"
-          >
-            <SaveIcon className="w-3.5 h-3.5" />
-            <span>{saving ? "Saving Configuration..." : "Save Broadcast Configuration"}</span>
-          </button>
+
+          {saveStatus && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={`p-3 border text-xs font-mono font-bold flex items-center justify-between gap-3 ${
+                saveStatus.startsWith("Error")
+                  ? "border-red-500 bg-red-500/10 text-red-500"
+                  : "border-signal bg-signal/10 text-signal"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                {!saveStatus.startsWith("Error") && (
+                  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                )}
+                <span>{saveStatus}</span>
+              </span>
+              <span className="text-[10px] uppercase opacity-75 shrink-0">
+                {saveStatus.startsWith("Error") ? "SAVE FAILED" : "CONFIG SYNCHRONIZED"}
+              </span>
+            </div>
+          )}
         </div>
       </form>
 
@@ -966,7 +812,7 @@ export default function BroadcastTab() {
             No broadcast events recorded yet. Configure credentials above and test a broadcast or publish a product.
           </div>
         ) : (
-          <div className="divide-y divide-hairline border border-hairline overflow-x-auto">
+          <div className="divide-y divide-hairline border border-hairline overflow-y-auto overflow-x-auto max-h-[420px]">
             {logs.map((log) => (
               <div key={log.id} className="p-3 sm:p-4 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface/20">
                 <div className="space-y-1 min-w-0">

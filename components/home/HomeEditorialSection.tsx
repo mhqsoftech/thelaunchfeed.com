@@ -543,6 +543,33 @@ export function HomeEditorialSection({
           </div>
         </div>
 
+        {/* Full-width X (Twitter) profile strip */}
+        <a
+          href="https://x.com/thelaunchfeed"
+          target="_blank"
+          rel="noreferrer"
+          className="group w-full border border-hairline bg-surface/30 hover:bg-surface/50 p-3.5 sm:p-4 rounded-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 bg-ink text-void rounded-xs flex items-center justify-center shrink-0">
+              <XTwitterIcon className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-mono font-bold text-ink flex items-center gap-1.5">
+                <span>𝕏 / Twitter Profile</span>
+                <span className="text-[9px] font-mono text-ink-faint px-1.5 py-0.5 border border-hairline bg-void">MIRROR</span>
+              </div>
+              <div className="text-[11px] text-ink-dim font-sans leading-tight truncate">
+                Every daily drop &amp; podium win is also cross-posted to <span className="font-mono text-ink">@thelaunchfeed</span> on X — follow for the classic feed.
+              </div>
+            </div>
+          </div>
+          <span className="text-[11px] font-mono font-bold uppercase text-ink border border-hairline bg-void group-hover:border-ink px-3 py-1.5 rounded-xs shrink-0 flex items-center gap-1.5">
+            <XTwitterIcon className="w-3 h-3" />
+            <span>Follow @thelaunchfeed</span>
+          </span>
+        </a>
+
         {/* 3-Step Social Broadcast Protocol */}
         <div className="border-t border-hairline pt-4 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4 text-xs font-mono">
           <div className="flex items-start gap-2.5">

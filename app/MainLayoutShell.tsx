@@ -858,6 +858,18 @@ export default function MainLayoutShell({
                   {/* Official Social Icons */}
                   <div className="flex items-center gap-2 pt-1 text-ink-dim">
                     <a
+                      href="https://x.com/thelaunchfeed"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-1.5 border border-hairline bg-surface hover:text-ink hover:border-signal/40 transition-colors"
+                      title="Follow @thelaunchfeed on 𝕏 (Twitter)"
+                      aria-label="Follow on 𝕏 (Twitter)"
+                    >
+                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                    </a>
+                    <a
                       href="https://bsky.app/profile/thelaunchfeed.bsky.social"
                       target="_blank"
                       rel="noreferrer"
