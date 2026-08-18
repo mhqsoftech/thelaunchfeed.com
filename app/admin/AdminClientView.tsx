@@ -105,6 +105,8 @@ import {
 import { ALL_SECTIONS } from "@/lib/sections";
 import BroadcastTab from "./BroadcastTab";
 import DirectoryEmbedsTab from "./DirectoryEmbedsTab";
+import IndexingTab from "./IndexingTab";
+import OutreachTab from "./OutreachTab";
 import {
   getAdminRevenueData,
   type AdminRevenueData,
@@ -122,6 +124,8 @@ type Tab =
   | "featured"
   | "categories"
   | "embeds"
+  | "indexing"
+  | "outreach"
   | "moderation"
   | "founder"
   | "emails"
@@ -211,6 +215,22 @@ function TabIcon({ id, className = "w-4 h-4 shrink-0" }: { id: Tab; className?: 
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
       );
+    case "indexing":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="2" y1="12" x2="22" y2="12" />
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+        </svg>
+      );
+    case "outreach":
+      return (
+        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <polyline points="16 11 18 13 22 9" />
+        </svg>
+      );
     case "founder":
       return (
         <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
@@ -267,6 +287,8 @@ const TABS: {
   { id: "featured", label: "Featured & Rotating", group: "manage" },
   { id: "categories", label: "Categories", group: "manage" },
   { id: "embeds", label: "Directory Embeds", group: "manage" },
+  { id: "indexing", label: "Web Indexing", group: "manage" },
+  { id: "outreach", label: "Directory Outreach", group: "manage" },
   { id: "founder", label: "Founder mode", group: "founder" },
   { id: "broadcast", label: "Social Broadcast", group: "comms" },
   { id: "emails", label: "Compose email", group: "comms" },
@@ -707,6 +729,8 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
             {tab === "featured" && <FeaturedTab />}
             {tab === "categories" && <CategoriesTab />}
             {tab === "embeds" && <DirectoryEmbedsTab />}
+            {tab === "indexing" && <IndexingTab />}
+            {tab === "outreach" && <OutreachTab />}
             {tab === "revenue" && <RevenueTab />}
             {tab === "founder" && <FounderTab session={session} />}
             {tab === "broadcast" && <BroadcastTab />}

@@ -285,6 +285,27 @@ export const onProductLaunched = inngest.createFunction(
       }
     });
 
+    // Automated Web Search Indexing (Google Indexing API & IndexNow)
+    await step.run("web-indexing-submission", async () => {
+      try {
+        const { submitBatch } = await import("@/lib/indexing");
+        const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+        const urlsToIndex = [
+          `${appUrl}/product/${encodeURIComponent(product.slug)}`,
+          `${appUrl}/`,
+        ];
+        if (product.category?.slug) {
+          urlsToIndex.push(`${appUrl}/category/${encodeURIComponent(product.category.slug)}`);
+        }
+        if (product.owner?.username && product.owner.isProfilePublic) {
+          urlsToIndex.push(`${appUrl}/founder/${encodeURIComponent(product.owner.username.replace(/^@/, "").trim())}`);
+        }
+        await submitBatch(urlsToIndex, { type: "URL_UPDATED" });
+      } catch (err) {
+        console.error("[web-indexing] failed for launched product:", err);
+      }
+    });
+
     const vars: TemplateVars = {
       productName: product.name,
       productSlug: product.slug,
@@ -706,6 +727,101 @@ async function ensureUniqueSlug(base: string): Promise<string> {
   return `${base}-${Date.now().toString(36)}`;
 }
 
+/* ─────────── web search indexing ─────────── */
+
+/**
+ * Handles asynchronous batch submission requests for web indexing
+ */
+export const onIndexingSubmitRequested = inngest.createFunction(
+  { id: "indexing-submit-requested", name: "Submit URLs to Web Search Indexing APIs" },
+  { event: "indexing.submit.requested" },
+  async ({ event, step }) => {
+    const { urls, type } = event.data;
+    if (!urls || urls.length === 0) return { skipped: true };
+
+    const result = await step.run("submit-batch", async () => {
+      const { submitBatch } = await import("@/lib/indexing");
+      return await submitBatch(urls, { type });
+    });
+
+    return result;
+  }
+);
+
+/**
+ * Periodic automated web indexing sync — runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
+ * Gathers latest edited & created URLs (products, founders, categories, core pages)
+ * and submits up to remaining daily quota (max 200 URLs/day) to Google & IndexNow.
+ */
+export const periodicIndexingSync = inngest.createFunction(
+  { id: "periodic-web-indexing-sync", name: "Periodic Web Search Indexing Sync" },
+  { cron: "0 */6 * * *" },
+  async ({ step }) => {
+    const summary = await step.run("sync-urls", async () => {
+      const { syncDeployUrls } = await import("@/lib/indexing");
+      return await syncDeployUrls(200);
+    });
+
+    return summary;
+  }
+);
+
+/**
+ * Periodic automated directory outreach dispatch — runs every 4 hours
+ * Dispatches outreach to unemailed leads if auto-outreach is enabled by admin.
+ */
+export const periodicDirectoryOutreachSync = inngest.createFunction(
+  { id: "periodic-directory-outreach-sync", name: "Periodic Directory Outreach Dispatch" },
+  { cron: "0 */4 * * *" },
+  async ({ step }) => {
+    const result = await step.run("dispatch-auto-outreach", async () => {
+      const { triggerAutoOutreachBatchAction } = await import("@/app/actions/leads");
+      return await triggerAutoOutreachBatchAction();
+    });
+
+    return result;
+  }
+);
+
+/**
+ * Periodic automated directory lead crawler — runs on schedule (checks hourly against configured scheduledTime)
+ * Automatically crawls all saved directories and saves new unique leads into PostgreSQL.
+ */
+export const periodicDailyDirectoryCrawler = inngest.createFunction(
+  { id: "periodic-daily-directory-crawler", name: "Scheduled Daily Directory Crawler" },
+  { cron: "0 * * * *" },
+  async ({ step }) => {
+    const result = await step.run("crawl-saved-directories", async () => {
+      const { prisma } = await import("@/lib/db");
+      const setting = await prisma.appSetting.findUnique({
+        where: { key: "auto_crawler_config" },
+      });
+      const config = setting?.value as any;
+
+      if (!config || !config.enabled) {
+        return { skipped: true, reason: "Auto-crawler is disabled in settings." };
+      }
+
+      // Check scheduled hour (e.g. "09:00" -> hour 9)
+      const currentHour = new Date().getUTCHours();
+      const targetHour = parseInt((config.scheduledTime || "09:00").split(":")[0], 10);
+
+      // If within target hour (or if forced), run the crawl sweep
+      if (currentHour === targetHour) {
+        const { runDailyDirectoryCrawlBatchAction } = await import("@/app/actions/leads");
+        return await runDailyDirectoryCrawlBatchAction(config.selectedDirectoryIds);
+      }
+
+      return {
+        skipped: true,
+        reason: `Current hour (${currentHour} UTC) does not match scheduled hour (${targetHour} UTC).`,
+      };
+    });
+
+    return result;
+  }
+);
+
 /* ─────────── registry ─────────── */
 
 export const functions = [
@@ -716,5 +832,10 @@ export const functions = [
   onProductLaunched,
   onCommentPosted,
   evaluateLeaderboardCycles,
+  onIndexingSubmitRequested,
+  periodicIndexingSync,
+  periodicDirectoryOutreachSync,
+  periodicDailyDirectoryCrawler,
 ];
+
 

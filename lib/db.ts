@@ -21,7 +21,8 @@ function createPrismaClient() {
     connectionString,
     max: 10,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 30000,
+    keepAlive: true,
   });
 
   pool.on("error", (err) => {
@@ -34,11 +35,39 @@ function createPrismaClient() {
   return { client, pool };
 }
 
-if (!globalForPrisma.prisma) {
-  const { client, pool } = createPrismaClient();
-  globalForPrisma.prisma = client;
-  globalForPrisma.pool = pool;
+export type DirectoryLeadDelegate = {
+  findMany: (args?: any) => Promise<any[]>;
+  findUnique: (args: any) => Promise<any | null>;
+  findFirst: (args?: any) => Promise<any | null>;
+  create: (args: any) => Promise<any>;
+  update: (args: any) => Promise<any>;
+  delete: (args: any) => Promise<any>;
+  deleteMany: (args?: any) => Promise<any>;
+  count: (args?: any) => Promise<number>;
+  groupBy: (args: any) => Promise<any[]>;
+  upsert: (args: any) => Promise<any>;
+};
+
+export type FullPrismaClient = PrismaClient & {
+  directoryLead: DirectoryLeadDelegate;
+};
+
+export function getDb(): PrismaClient {
+  const current = globalForPrisma.prisma;
+  if (!current || typeof (current as any).directoryLead?.findMany !== "function") {
+    const { client, pool } = createPrismaClient();
+    globalForPrisma.prisma = client;
+    globalForPrisma.pool = pool;
+    return client;
+  }
+  return current;
 }
 
-export const prisma = globalForPrisma.prisma!;
+export const prisma: FullPrismaClient = new Proxy({} as FullPrismaClient, {
+  get(_target, prop) {
+    const client = getDb();
+    const val = (client as any)[prop];
+    return typeof val === "function" ? val.bind(client) : val;
+  },
+});
 

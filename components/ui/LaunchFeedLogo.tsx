@@ -37,14 +37,14 @@ export function LaunchFeedBrandLogo({
   return (
     <span className={`inline-flex items-center shrink-0 leading-none ${className}`}>
       {/* Dark Theme Logo (Void / Thermal / Default) */}
-      <img
+      <img width="64" height="64"
         src="/thelaunchfeed-logo.png"
         alt={alt}
         style={{ height: `${height}px`, width: "auto" }}
         className="tlf-brand-logo-dark object-contain select-none pointer-events-none"
       />
       {/* Light Theme Logo */}
-      <img
+      <img width="64" height="64"
         src="/thelaunchfeed-logo-light.png"
         alt={alt}
         style={{ height: `${height}px`, width: "auto" }}

@@ -45,7 +45,7 @@ const imageString = z
 
 const CreateSchema = z.object({
   name: z.string().min(1).max(200),
-  tagline: z.string().min(1).max(250),
+  tagline: z.string().min(1).max(250).or(z.literal("")),
   websiteUrl: z.string().optional().or(z.literal("")),
   description: z.string().optional(),
   categorySlug: z.string().optional(),
@@ -56,6 +56,7 @@ const CreateSchema = z.object({
   videoUrl: z.string().optional().or(z.literal("")),
   tags: z.array(z.string().max(60)).max(20).optional(),
   details: z.record(z.string(), z.unknown()).optional(),
+  asDraft: z.boolean().optional(),
 });
 
 export type CreateSubmissionInput = z.infer<typeof CreateSchema>;
@@ -169,13 +170,14 @@ export async function resolveCategory(raw: string | undefined | null) {
 export async function createSubmission(input: CreateSubmissionInput): Promise<Submission> {
   const user = await requireUser();
   const parsed = CreateSchema.parse(input);
+  const isDraft = parsed.asDraft === true;
 
   // Idempotency: Prevent duplicate submissions if triggered twice in quick succession by same user
   const recentDuplicate = await prisma.submission.findFirst({
     where: {
       ownerId: user.id,
       name: { equals: parsed.name, mode: "insensitive" },
-      status: "SCHEDULED",
+      status: isDraft ? "DRAFT" : "SCHEDULED",
       createdAt: { gte: new Date(Date.now() - 30_000) },
     },
   });
@@ -183,11 +185,13 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     return recentDuplicate;
   }
 
-  // Global Deduplication: Prevent any user from submitting a duplicate website URL or product name
+  // Global Deduplication: Prevent any user from submitting a duplicate website URL or product name.
+  // Drafts are private to the user, so skip the global dedup check for them —
+  // multiple people can hold drafts of the same URL until one publishes.
   const rawUrl = parsed.websiteUrl || `https://${slugify(parsed.name)}.com`;
   const domain = extractDomainAndPath(rawUrl);
 
-  if (domain && domain.length > 3) {
+  if (!isDraft && domain && domain.length > 3) {
     // 1. Check if product is already LIVE or exists on platform
     const existingProduct = await prisma.product.findFirst({
       where: {
@@ -209,21 +213,33 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
       }
     }
 
-    // 2. Check if a submission is already queued by any user
+    // 2. Check if a submission is already queued by any user.
+    // If the same user already has a matching SCHEDULED or DRAFT row for this
+    // domain, treat this call as an idempotent resubmit and return the existing
+    // row instead of throwing — the auto-submit-after-signin flow relies on this
+    // when a user hits Submit twice or edits a queued launch from the profile.
     const existingSubmission = await prisma.submission.findFirst({
       where: {
-        status: "SCHEDULED",
+        status: { in: ["SCHEDULED", "DRAFT"] },
         OR: [
           { websiteUrl: { contains: domain, mode: "insensitive" } },
           { name: { equals: parsed.name, mode: "insensitive" } },
         ],
       },
-      select: { id: true, name: true, websiteUrl: true },
+      select: { id: true, name: true, websiteUrl: true, ownerId: true, status: true },
     });
 
     if (existingSubmission) {
       const existingSubDomain = extractDomainAndPath(existingSubmission.websiteUrl);
-      if (existingSubDomain === domain || existingSubmission.name.toLowerCase().trim() === parsed.name.toLowerCase().trim()) {
+      const isMatch =
+        existingSubDomain === domain ||
+        existingSubmission.name.toLowerCase().trim() === parsed.name.toLowerCase().trim();
+      if (isMatch) {
+        if (existingSubmission.ownerId === user.id) {
+          // Same user re-submitting — return their existing row silently.
+          const row = await prisma.submission.findUnique({ where: { id: existingSubmission.id } });
+          if (row) return row;
+        }
         throw new Error(
           `A launch for "${existingSubmission.name}" (${domain}) is already queued on The Launch Feed. Duplicate submissions are not permitted.`
         );
@@ -231,18 +247,17 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     }
   }
 
-  const scheduledFor = getNext6AmIstRelease();
+  const scheduledFor = isDraft ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : getNext6AmIstRelease();
 
   const category = await resolveCategory(parsed.categorySlug);
 
-  const logoUrl = await processImageString(parsed.logoUrl, "logos");
-  const screenshots: string[] = [];
-  if (parsed.screenshots) {
-    for (const scr of parsed.screenshots) {
-      const uploaded = await processImageString(scr, "screenshots");
-      if (uploaded) screenshots.push(uploaded);
-    }
-  }
+  const [logoUrl, uploadedScreenshots] = await Promise.all([
+    processImageString(parsed.logoUrl, "logos"),
+    parsed.screenshots
+      ? Promise.all(parsed.screenshots.map((scr) => processImageString(scr, "screenshots")))
+      : Promise.resolve<Array<string | null>>([]),
+  ]);
+  const screenshots: string[] = uploadedScreenshots.filter((s): s is string => !!s);
 
   const sub = await prisma.submission.create({
     data: {
@@ -260,37 +275,43 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
       makerName: parsed.makerName,
       makerHandle: parsed.makerHandle,
       makerEmail: user.email,
-      status: "SCHEDULED",
+      status: isDraft ? "DRAFT" : "SCHEDULED",
       scheduledFor,
     },
   });
 
-  // Fire the "product submitted" email in-process so it arrives even in
-  // dev without inngest-cli, and also emit the Inngest event so cloud
-  // workers can react if wired.
-  try {
-    const { sendAndLog } = await import("@/lib/inngest/functions");
-    await sendAndLog({
-      templateId: "product-submitted",
-      to: user.email,
-      toUserId: user.id,
-      trigger: "on-submit",
-      vars: {
-        productName: sub.name,
-        productSlug: slugify(sub.name),
-        userName: user.name || user.username,
-        slotExpiresOn: sub.scheduledFor.toISOString().slice(0, 10),
-      },
-    });
-  } catch (e) {
-    console.error("[submission-email] failed:", e);
+  if (isDraft) {
+    return sub;
   }
-  try {
-    const { inngest } = await import("@/lib/inngest");
-    await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
-  } catch {
-    // Inngest not wired in this env — email already sent inline above.
-  }
+
+  // Fire the "product submitted" email + inngest event AS A BACKGROUND job so
+  // the client sees the queued-launch screen instantly. If Resend or the inngest
+  // producer is slow, it must not block the server action from returning.
+  (async () => {
+    try {
+      const { sendAndLog } = await import("@/lib/inngest/functions");
+      await sendAndLog({
+        templateId: "product-submitted",
+        to: user.email,
+        toUserId: user.id,
+        trigger: "on-submit",
+        vars: {
+          productName: sub.name,
+          productSlug: slugify(sub.name),
+          userName: user.name || user.username,
+          slotExpiresOn: sub.scheduledFor.toISOString().slice(0, 10),
+        },
+      });
+    } catch (e) {
+      console.error("[submission-email] failed:", e);
+    }
+    try {
+      const { inngest } = await import("@/lib/inngest");
+      await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
+    } catch {
+      // Inngest not wired in this env — email already dispatched above.
+    }
+  })().catch((e) => console.error("[submission:background] failed:", e));
 
   revalidatePath("/admin");
   revalidatePath("/submit");
@@ -452,6 +473,22 @@ export async function publishSubmissionNow(id: string): Promise<void> {
     // Inngest not wired — owner email and broadcast already handled inline.
   }
 
+  // Automated Web Search Indexing (Google Indexing API & IndexNow)
+  try {
+    const { submitBatch } = await import("@/lib/indexing");
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+    const urlsToIndex = [
+      `${appUrl}/product/${encodeURIComponent(product.slug)}`,
+      `${appUrl}/`,
+    ];
+    if (sub.category?.slug) {
+      urlsToIndex.push(`${appUrl}/category/${encodeURIComponent(sub.category.slug)}`);
+    }
+    await submitBatch(urlsToIndex);
+  } catch (e) {
+    console.error("[web-indexing] inline publish failed:", e);
+  }
+
   revalidatePath("/admin");
   revalidatePath("/");
   revalidatePath("/profile");
@@ -554,6 +591,20 @@ export async function deleteSubmission(id: string): Promise<void> {
   await requireAdmin();
   await prisma.submission.delete({ where: { id } });
   revalidatePath("/admin");
+}
+
+/**
+ * Delete a draft submission owned by the current user.
+ * Only DRAFT rows may be deleted this way — scheduled/published items are
+ * managed by admin actions.
+ */
+export async function deleteMyDraft(submissionId: string): Promise<void> {
+  const user = await requireUser();
+  const sub = await prisma.submission.findUnique({ where: { id: submissionId } });
+  if (!sub || sub.ownerId !== user.id) throw new Error("FORBIDDEN");
+  if (sub.status !== "DRAFT") throw new Error("NOT_A_DRAFT");
+  await prisma.submission.delete({ where: { id: submissionId } });
+  revalidatePath("/profile");
 }
 
 /* ─────────── user-facing status lookup ─────────── */
@@ -674,7 +725,8 @@ export async function updateMySubmission(
     : null;
 
   const wasRejected = existing.status === "REJECTED";
-  const scheduledFor = wasRejected
+  const wasDraft = existing.status === "DRAFT";
+  const scheduledFor = wasRejected || wasDraft
     ? getNext6AmIstRelease()
     : existing.scheduledFor;
 
@@ -779,6 +831,16 @@ export async function updateMyProduct(
   revalidatePath("/");
   revalidatePath("/profile");
   revalidatePath(`/product/${updated.slug}`);
+
+  // Automated Web Search Indexing (Google Indexing API & IndexNow)
+  try {
+    const { submitUrl } = await import("@/lib/indexing");
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+    await submitUrl(`${appUrl}/product/${encodeURIComponent(updated.slug)}`, { type: "URL_UPDATED" });
+  } catch (err) {
+    console.error("[web-indexing] failed for updateProduct:", err);
+  }
+
   return updated;
 }
 

@@ -322,12 +322,22 @@ export default function SubmitClientView({
   const searchParams = useSearchParams();
   const editParam = searchParams?.get("edit") || null;
   const autoSubmitParam = searchParams?.get("auto_submit") || null;
+  const autoSaveDraftParam = searchParams?.get("auto_save_draft") || null;
   const [editTarget, setEditTarget] = useState<EditablePayload | null>(null);
-  const [isAutoSubmitting, setIsAutoSubmitting] = useState(false);
+  // Start in the "finalizing" state immediately when returning from sign-in
+  // so the user never sees the empty form flash before the auto-submit effect
+  // takes over.
+  const [isAutoSubmitting, setIsAutoSubmitting] = useState(autoSubmitParam === "1");
+  const [autoSubmitStage, setAutoSubmitStage] = useState<
+    "restoring" | "authenticating" | "creating" | "redirecting_payment" | "done"
+  >("restoring");
   const [draftLoaded, setDraftLoaded] = useState(false);
   const autoSubmittedRef = React.useRef(false);
+  const autoSavedDraftRef = React.useRef(false);
   const isSubmittingRef = React.useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [draftSavedFlash, setDraftSavedFlash] = useState(false);
 
   const isEditMode = Boolean(onSaveProduct || editTarget || editParam);
 
@@ -474,26 +484,32 @@ export default function SubmitClientView({
   // 3. Post-Auth Auto-Submission Execution (?auto_submit=1)
   useEffect(() => {
     if (autoSubmitParam !== "1" || isEmbeddedMode || editParam || submitted || autoSubmittedRef.current) return;
-    autoSubmittedRef.current = true;
 
     let cancelled = false;
     (async () => {
       setIsAutoSubmitting(true);
+      setAutoSubmitStage("restoring");
       try {
         // Read draft
         let draft: any = null;
         try {
           const raw = localStorage.getItem("tlf_pending_submission") || localStorage.getItem("tlf_submit_draft");
           if (raw) draft = JSON.parse(raw);
-          localStorage.removeItem("tlf_pending_submission");
         } catch {}
 
         const activeForm = draft?.formData || formData;
         if (!activeForm || !activeForm.name) {
+          // No draft to resume — bail without burning the retry flag so a
+          // late-arriving draft restore effect can trigger us again.
           setIsAutoSubmitting(false);
           return;
         }
 
+        // Commit to the attempt now that we have real data to submit.
+        autoSubmittedRef.current = true;
+        try { localStorage.removeItem("tlf_pending_submission"); } catch {}
+
+        setAutoSubmitStage("authenticating");
         // Hydrate and confirm user session
         let sess = getStoredSession();
         if (!sess) {
@@ -511,6 +527,7 @@ export default function SubmitClientView({
           setIsAutoSubmitting(false);
           return;
         }
+        setAutoSubmitStage("creating");
 
         const categorySlug = (activeForm.category || "").trim() || undefined;
 
@@ -544,6 +561,7 @@ export default function SubmitClientView({
           faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
           supportEmail: activeForm.supportEmail,
           githubUrl: activeForm.githubUrl,
+          launchTier: draft?.launchTier ?? launchTier,
         };
 
         const sub = await createSubmission({
@@ -575,9 +593,34 @@ export default function SubmitClientView({
           localStorage.removeItem("tlf_submit_draft");
         } catch {}
 
+        // Paid launch tier — kick off Dodo checkout BEFORE showing success.
+        const restoredTier = (draft?.launchTier ?? launchTier) as 0 | 5 | 10;
+        if (restoredTier === 5 || restoredTier === 10) {
+          setAutoSubmitStage("redirecting_payment");
+          try {
+            const res = await fetch("/api/checkout/dodo", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                submissionId: sub.id,
+                tier: restoredTier,
+                returnTo: "submit",
+              }),
+            });
+            const dodoData = await res.json();
+            if (dodoData.checkoutUrl && !cancelled) {
+              window.location.href = dodoData.checkoutUrl;
+              return; // Redirect to checkout — do not flip to success screen.
+            }
+          } catch (e) {
+            console.warn("[auto_submit] Dodo checkout initialization failed:", e);
+          }
+        }
+
         if (!cancelled) {
+          setAutoSubmitStage("done");
           window.history.replaceState({}, "", "/submit");
-          setQueuedSubmission({ id: sub.id, scheduledFor: sub.scheduledFor.toString() });
+          setQueuedSubmission({ id: sub.id, scheduledFor: sub.scheduledFor.toString(), launchTier: restoredTier });
           setSubmitted(true);
           window.scrollTo({ top: 0, behavior: "smooth" });
         }
@@ -593,6 +636,112 @@ export default function SubmitClientView({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSubmitParam, isEmbeddedMode, editParam, submitted]);
+
+  // 3b. Post-Auth Auto-Save-Draft Execution (?auto_save_draft=1)
+  // When a guest clicks "Save as Draft", we redirect them to sign-in with this
+  // flag. After sign-in they land back here and we finish saving the draft
+  // server-side without requiring another click.
+  useEffect(() => {
+    if (autoSaveDraftParam !== "1" || isEmbeddedMode || editParam || submitted || autoSavedDraftRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      // Read the persisted draft from localStorage so we don't depend on React
+      // state having hydrated yet.
+      let draft: any = null;
+      try {
+        const raw = localStorage.getItem("tlf_pending_submission") || localStorage.getItem("tlf_submit_draft");
+        if (raw) draft = JSON.parse(raw);
+      } catch {}
+      const activeForm = draft?.formData || formData;
+      if (!activeForm || !activeForm.name) return;
+      autoSavedDraftRef.current = true;
+
+      let sess = getStoredSession();
+      if (!sess) {
+        try {
+          const meRes = await fetch("/api/me", { cache: "no-store" });
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            if (meData?.session) {
+              sess = meData.session;
+              saveSession(meData.session);
+            }
+          }
+        } catch {}
+      }
+      if (!sess || cancelled) return;
+
+      setIsSavingDraft(true);
+      try {
+        const activeFeatures = draft?.features || features;
+        const activeTiers = draft?.pricingTiers || pricingTiers;
+        const activeFaqs = draft?.faqs || faqs;
+        const activeThumbnail = draft?.thumbnailAvif || thumbnailAvif;
+        const activeGallery = draft?.galleryAvif || galleryAvif;
+        const activeTier = (draft?.launchTier ?? launchTier) as 0 | 5 | 10;
+
+        const details = {
+          overviewPitch: activeForm.overviewPitch,
+          features: activeFeatures.filter((f: string) => f.trim().length > 0),
+          pricingTiers: activeTiers.filter((t: any) => t.name?.trim() || t.price?.trim() || t.specs?.trim()),
+          freePlan: activeForm.freePlan,
+          proPlan: activeForm.proPlan,
+          enterprisePlan: activeForm.enterprisePlan,
+          techStack: activeForm.techStack,
+          infraHosting: activeForm.infraHosting,
+          apiUrl: activeForm.apiUrl,
+          securityStandards: activeForm.securityStandards,
+          targetAudience: activeForm.targetAudience,
+          originStory: activeForm.originStory,
+          makerThesis: activeForm.makerThesis,
+          latestVersion: activeForm.latestVersion,
+          latestChangelog: activeForm.latestChangelog,
+          roadmapQ3: activeForm.roadmapQ3,
+          roadmapQ4: activeForm.roadmapQ4,
+          pricingPartner: activeForm.pricingPartner,
+          revenue: activeForm.revenue,
+          apiKey: activeForm.apiKey,
+          faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
+          supportEmail: activeForm.supportEmail,
+          githubUrl: activeForm.githubUrl,
+          launchTier: activeTier,
+        };
+        await createSubmission({
+          name: activeForm.name || "Untitled draft",
+          tagline: activeForm.tagline || "",
+          websiteUrl: activeForm.websiteUrl || "",
+          videoUrl: activeForm.videoUrl || undefined,
+          tags: activeForm.tags ? activeForm.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
+          description: activeForm.overviewPitch,
+          categorySlug: (activeForm.category || "").trim() || undefined,
+          makerName: activeForm.makerName || sess.name || "Unknown maker",
+          makerHandle: activeForm.makerHandle || sess.handle || "@user",
+          logoUrl: activeThumbnail || undefined,
+          screenshots: activeGallery.filter(Boolean),
+          details,
+          asDraft: true,
+        });
+        try {
+          localStorage.removeItem("tlf_pending_submission");
+          localStorage.removeItem("tlf_submit_draft");
+        } catch {}
+        if (!cancelled) {
+          window.history.replaceState({}, "", "/submit");
+          setDraftSavedFlash(true);
+          setTimeout(() => setDraftSavedFlash(false), 5000);
+        }
+      } catch (err) {
+        console.error("[auto_save_draft] failed", err);
+      } finally {
+        if (!cancelled) setIsSavingDraft(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSaveDraftParam, isEmbeddedMode, editParam, submitted]);
 
   React.useEffect(() => {
     if (initialProductData) {
@@ -732,6 +881,9 @@ export default function SubmitClientView({
         }
         if (Array.isArray(dt.faqs) && dt.faqs.length > 0) {
           setFaqs(dt.faqs);
+        }
+        if (dt.launchTier === 5 || dt.launchTier === 10 || dt.launchTier === 0) {
+          setLaunchTier(dt.launchTier);
         }
       } catch (err) {
         console.error("[submit:edit] load failed", err);
@@ -1064,6 +1216,123 @@ export default function SubmitClientView({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Wipe all in-memory + persisted submit state. Called after a successful
+  // submission so the same product never resurrects on the next /submit visit,
+  // and by the "Submit Another Product" button on the success screen.
+  const resetSubmitFormState = React.useCallback(() => {
+    setFormData(EMPTY_PROFILE);
+    setThumbnailAvif("");
+    setGalleryAvif([]);
+    setFeatures(["", "", ""]);
+    setPricingTiers([
+      { name: "Free", price: "", specs: "" },
+      { name: "Pro", price: "", specs: "" },
+      { name: "Enterprise", price: "", specs: "" },
+    ]);
+    setFaqs([{ q: "", a: "" }]);
+    setAutofillUrl("");
+    setAutofillError("");
+    setAutofillMeta(null);
+    setLaunchTier(0);
+    setIsAuthorizedConfirmed(false);
+    setSkippedSteps(new Set());
+    try {
+      localStorage.removeItem("tlf_pending_submission");
+      localStorage.removeItem("tlf_submit_draft");
+    } catch {}
+    try {
+      window.history.replaceState({}, "", "/submit");
+    } catch {}
+  }, []);
+
+  const handleSaveDraft = async () => {
+    if (isSavingDraft || isSubmitting) return;
+    // If not signed in, save locally + redirect to sign-in like handleSubmit does.
+    let sess = getStoredSession();
+    if (!sess) {
+      try {
+        const meRes = await fetch("/api/me", { cache: "no-store" });
+        if (meRes.ok) {
+          const meData = await meRes.json();
+          if (meData?.session) {
+            sess = meData.session;
+            saveSession(meData.session);
+          }
+        }
+      } catch {}
+    }
+    if (!sess) {
+      const pendingSubmission = {
+        formData,
+        thumbnailAvif,
+        galleryAvif,
+        faqs,
+        pricingTiers,
+        features,
+        autofillUrl,
+        launchTier,
+        isAuthorizedConfirmed,
+      };
+      try {
+        localStorage.setItem("tlf_pending_submission", JSON.stringify(pendingSubmission));
+        localStorage.setItem("tlf_submit_draft", JSON.stringify(pendingSubmission));
+      } catch {}
+      window.location.assign(`/handler/sign-in?after_auth_return_to=${encodeURIComponent("/submit?auto_save_draft=1")}`);
+      return;
+    }
+    setIsSavingDraft(true);
+    try {
+      const details = {
+        overviewPitch: formData.overviewPitch,
+        features: features.filter((f) => f.trim().length > 0),
+        pricingTiers: pricingTiers.filter((t) => t.name.trim() || t.price.trim() || t.specs.trim()),
+        freePlan: formData.freePlan,
+        proPlan: formData.proPlan,
+        enterprisePlan: formData.enterprisePlan,
+        techStack: formData.techStack,
+        infraHosting: formData.infraHosting,
+        apiUrl: formData.apiUrl,
+        securityStandards: formData.securityStandards,
+        targetAudience: formData.targetAudience,
+        originStory: formData.originStory,
+        makerThesis: formData.makerThesis,
+        latestVersion: formData.latestVersion,
+        latestChangelog: formData.latestChangelog,
+        roadmapQ3: formData.roadmapQ3,
+        roadmapQ4: formData.roadmapQ4,
+        pricingPartner: formData.pricingPartner,
+        revenue: formData.revenue,
+        apiKey: formData.apiKey,
+        faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
+        supportEmail: formData.supportEmail,
+        githubUrl: formData.githubUrl,
+        launchTier,
+      };
+      await createSubmission({
+        name: formData.name || "Untitled draft",
+        tagline: formData.tagline || "",
+        websiteUrl: formData.websiteUrl || "",
+        videoUrl: formData.videoUrl || undefined,
+        tags: formData.tags ? formData.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
+        description: formData.overviewPitch,
+        categorySlug: (formData.category || "").trim() || undefined,
+        makerName: formData.makerName || sess.name || "Unknown maker",
+        makerHandle: formData.makerHandle || sess.handle || "@user",
+        logoUrl: thumbnailAvif || undefined,
+        screenshots: galleryAvif.filter(Boolean),
+        details,
+        asDraft: true,
+      });
+      setDraftSavedFlash(true);
+      setTimeout(() => setDraftSavedFlash(false), 3000);
+    } catch (err) {
+      console.error("[save-draft] failed", err);
+      alert(err instanceof Error && err.message ? err.message : "Could not save draft — please try again.");
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmittingRef.current) return;
@@ -1163,6 +1432,7 @@ export default function SubmitClientView({
         faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
         supportEmail: formData.supportEmail,
         githubUrl: formData.githubUrl,
+        launchTier,
       };
 
       // EDIT MODE — /submit?edit=sub:X or ?edit=prod:X
@@ -1181,7 +1451,31 @@ export default function SubmitClientView({
         };
         if (editTarget.kind === "submission" && editTarget.submissionId) {
           const upd = await updateMySubmission(editTarget.submissionId, fields);
-          setQueuedSubmission({ id: upd.id, scheduledFor: upd.scheduledFor.toString() });
+          // Draft → publish with paid tier: kick off Dodo checkout BEFORE
+          // showing the queued screen. Return from here — the checkout return
+          // handler at the top of this file completes the submission.
+          const wasDraft = editTarget.status === "DRAFT";
+          if (wasDraft && (launchTier === 5 || launchTier === 10)) {
+            try {
+              const res = await fetch("/api/checkout/dodo", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  submissionId: upd.id,
+                  tier: launchTier,
+                  returnTo: "submit",
+                }),
+              });
+              const dodoData = await res.json();
+              if (dodoData.checkoutUrl) {
+                window.location.href = dodoData.checkoutUrl;
+                return;
+              }
+            } catch (e) {
+              console.warn("[Submit] Draft → checkout initialization failed:", e);
+            }
+          }
+          setQueuedSubmission({ id: upd.id, scheduledFor: upd.scheduledFor.toString(), launchTier });
         } else if (editTarget.kind === "product" && editTarget.productId) {
           const upd = await updateMyProduct(editTarget.productId, fields);
           setUpdatedProductSlug(upd.slug);
@@ -1638,21 +1932,68 @@ export default function SubmitClientView({
           </div>
         )}
 
-        {isAutoSubmitting && (
-          <div className="border border-signal bg-surface p-8 text-center space-y-4 font-mono">
-            <div className="w-12 h-12 border border-signal bg-void mx-auto flex items-center justify-center font-display font-black text-xl text-signal animate-spin">
-              ⟳
+        {isAutoSubmitting && (() => {
+          const stages: Record<typeof autoSubmitStage, { title: string; body: React.ReactNode }> = {
+            restoring: {
+              title: "Restoring your draft…",
+              body: <>Reading the details you filled in before signing in.</>,
+            },
+            authenticating: {
+              title: "Verifying session…",
+              body: <>Confirming you're signed in with your account.</>,
+            },
+            creating: {
+              title: "Registering into the daily queue…",
+              body: (
+                <>
+                  Registering <strong className="text-ink">{formData.name || "your product"}</strong> for the next 6:00 AM IST drop.
+                </>
+              ),
+            },
+            redirecting_payment: {
+              title: "Redirecting to secure checkout…",
+              body: (
+                <>
+                  Opening Dodo Payments to complete your <strong className="text-ink">
+                    {(draftLoaded && (formData as any) && launchTier === 10) ? "featured" : "priority"}
+                  </strong> launch upgrade. Do not close this tab.
+                </>
+              ),
+            },
+            done: {
+              title: "Finalizing…",
+              body: <>Loading your queued launch card.</>,
+            },
+          };
+          const s = stages[autoSubmitStage];
+          return (
+            <div className="border border-signal bg-surface p-8 text-center space-y-4 font-mono">
+              <div className="w-12 h-12 border border-signal bg-void mx-auto flex items-center justify-center font-display font-black text-xl text-signal animate-spin">
+                ⟳
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold uppercase tracking-wider text-ink">{s.title}</h3>
+                <p className="text-xs text-ink-dim max-w-md mx-auto">{s.body}</p>
+              </div>
+              <div className="flex items-center justify-center gap-1.5 pt-1" aria-hidden="true">
+                {(["restoring", "authenticating", "creating", "redirecting_payment", "done"] as const).map((k) => {
+                  const order: Record<string, number> = {
+                    restoring: 0, authenticating: 1, creating: 2, redirecting_payment: 3, done: 4,
+                  };
+                  const active = order[k] <= order[autoSubmitStage];
+                  const skipPay = launchTier === 0 && k === "redirecting_payment";
+                  if (skipPay) return null;
+                  return (
+                    <span
+                      key={k}
+                      className={`h-1 w-6 ${active ? "bg-signal" : "bg-hairline"}`}
+                    />
+                  );
+                })}
+              </div>
             </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-bold uppercase tracking-wider text-ink">
-                Finalizing Launch Shipment...
-              </h3>
-              <p className="text-xs text-ink-dim max-w-md mx-auto">
-                Authentication verified. Registering <strong className="text-ink">{formData.name || "your product"}</strong> into the daily launch queue.
-              </p>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {submitted && (
           editTarget?.kind === "product" ? (
@@ -1782,12 +2123,16 @@ export default function SubmitClientView({
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
+              <div className="pt-2 flex items-center justify-center gap-3 flex-wrap">
                 <button
-                  onClick={() => setSubmitted(false)}
-                  className="px-6 py-2.5 border border-hairline bg-surface text-ink text-xs font-bold hover:bg-raised transition-colors cursor-pointer"
+                  onClick={() => {
+                    resetSubmitFormState();
+                    setQueuedSubmission(null);
+                    setSubmitted(false);
+                  }}
+                  className="px-6 py-2.5 border border-signal bg-void text-signal text-xs font-bold hover:bg-signal/10 transition-colors cursor-pointer"
                 >
-                  Edit Details
+                  + Submit Another Product
                 </button>
                 <Link
                   href="/profile"
@@ -1795,6 +2140,14 @@ export default function SubmitClientView({
                 >
                   Go to My Profile →
                 </Link>
+                {queuedSubmission?.id && (
+                  <Link
+                    href={`/submit?edit=sub:${queuedSubmission.id}`}
+                    className="px-6 py-2.5 border border-hairline bg-surface text-ink text-xs font-bold hover:bg-raised transition-colors cursor-pointer"
+                  >
+                    Edit This Submission
+                  </Link>
+                )}
               </div>
             </div>
           )
@@ -1961,7 +2314,7 @@ export default function SubmitClientView({
                     <div className="w-16 h-16 bg-surface border border-hairline shrink-0 flex items-center justify-center relative overflow-hidden">
                       {thumbnailAvif ? (
                         <>
-                          <img
+                          <img width="64" height="64"
                             src={thumbnailAvif}
                             alt="AVIF Converted Preview"
                             className="w-full h-full object-cover"
@@ -2044,7 +2397,7 @@ export default function SubmitClientView({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 pt-1">
                       {galleryAvif.map((imgUrl, idx) => (
                         <div key={idx} className="relative group border border-hairline bg-surface h-24 overflow-hidden">
-                          <img src={imgUrl} alt={`Screenshot ${idx + 1}`} className="w-full h-full object-cover" />
+                          <img width="64" height="64" src={imgUrl} alt={`Screenshot ${idx + 1}`} className="w-full h-full object-cover" />
                           <button
                             type="button"
                             onClick={() => removeGalleryImage(idx)}
@@ -3011,6 +3364,11 @@ export default function SubmitClientView({
                 )}
               </div>
 
+              {draftSavedFlash && (
+                <div className="text-[11px] font-mono text-signal uppercase tracking-wider text-right pt-1">
+                  ✓ Draft saved to your profile
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row items-center justify-end gap-3 w-full pt-1">
                 {!isEmbeddedMode && (
                   <button
@@ -3022,6 +3380,30 @@ export default function SubmitClientView({
                     className="w-full sm:w-auto px-5 py-2.5 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold uppercase transition-colors cursor-pointer text-center justify-center flex items-center shrink-0"
                   >
                     Inspect Live 360° Preview ↗
+                  </button>
+                )}
+                {!isEditMode && !onSaveProduct && !isEmbeddedMode && (
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting || isSavingDraft}
+                    className={`w-full sm:w-auto px-5 py-2.5 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2 shrink-0 border ${
+                      isSavingDraft
+                        ? "border-hairline bg-surface text-ink-dim cursor-wait"
+                        : "border-hairline bg-surface text-ink hover:border-signal/60 hover:text-signal cursor-pointer"
+                    }`}
+                  >
+                    {isSavingDraft ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        <span>Saving Draft…</span>
+                      </>
+                    ) : (
+                      <span>Save as Draft</span>
+                    )}
                   </button>
                 )}
                 <button
@@ -3079,7 +3461,7 @@ export default function SubmitClientView({
               <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                 <div className="w-16 h-16 bg-surface border border-hairline flex items-center justify-center font-mono text-xl font-bold text-ink shrink-0 overflow-hidden relative">
                   {thumbnailAvif ? (
-                    <img
+                    <img width="64" height="64"
                       src={thumbnailAvif}
                       alt="Product AVIF Thumbnail"
                       className="w-full h-full object-cover"
@@ -3209,7 +3591,7 @@ export default function SubmitClientView({
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         {galleryAvif.map((imgUrl, idx) => (
                           <div key={idx} className="border border-hairline bg-surface h-32 overflow-hidden relative">
-                            <img src={imgUrl} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                            <img width="64" height="64" src={imgUrl} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
                             <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/80 text-white text-[9px] font-mono">
                               .AVIF
                             </span>
@@ -3415,10 +3797,39 @@ export default function SubmitClientView({
               )}
             </div>
 
-            <div className="pt-4 flex justify-end w-full">
+            <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-end gap-2 w-full">
+              {draftSavedFlash && (
+                <span className="text-[11px] font-mono text-signal uppercase tracking-wider sm:mr-2">
+                  ✓ Draft saved to your profile
+                </span>
+              )}
+              {!isEditMode && !onSaveProduct && (
+                <button
+                  type="button"
+                  onClick={handleSaveDraft}
+                  disabled={isSubmitting || isSavingDraft}
+                  className={`w-full sm:w-auto px-5 py-3 text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 shrink-0 border ${
+                    isSavingDraft
+                      ? "border-hairline bg-surface text-ink-dim cursor-wait"
+                      : "border-hairline bg-surface text-ink hover:border-signal/60 hover:text-signal cursor-pointer"
+                  }`}
+                >
+                  {isSavingDraft ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      <span>Saving Draft…</span>
+                    </>
+                  ) : (
+                    <span>Save as Draft</span>
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleSubmit}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSavingDraft}
                 className={`w-full sm:w-auto px-6 sm:px-8 py-3 text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 shrink-0 active:scale-[0.99] ${
                   isSubmitting
                     ? "bg-signal text-void opacity-95 cursor-wait"

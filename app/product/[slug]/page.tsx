@@ -2,14 +2,12 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getProductBySlug, getSimilarProducts } from "@/lib/queries/products";
 import { listCommentsForSlug } from "@/app/actions/comments";
-import { getCurrentUser } from "@/lib/auth";
-import { prisma } from "@/lib/db";
 import { getAccoladeDetails } from "@/lib/awards";
 import { computeAwardsForProduct } from "@/lib/queries/awards";
 import ProductClientView, { type ViewProduct } from "./ProductClientView";
+import { organizationNode, websiteNode, breadcrumb, ORG_ID, WEBSITE_ID, SITE_URL, SITE_NAME } from "@/lib/seo/schema";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 30;
+export const revalidate = 300;
 
 export async function generateMetadata({
   params,
@@ -29,8 +27,6 @@ export async function generateMetadata({
   const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
   const canonicalUrl = `${siteUrl}/product/${product.slug}`;
   const description = product.description || product.tagline || `${product.name} on The Launch Feed. Discover technical architecture, 360° product specs, and community upvotes.`;
-  const ogImage = product.logoUrl || `${siteUrl}/icon.svg`;
-
   return {
     title: `${product.name} - The Launch Feed`,
     description,
@@ -54,20 +50,11 @@ export async function generateMetadata({
       title: `${product.name} - The Launch Feed`,
       description,
       siteName: "The Launch Feed",
-      images: [
-        {
-          url: ogImage,
-          width: 1200,
-          height: 630,
-          alt: `${product.name} — ${product.tagline}`,
-        },
-      ],
     },
     twitter: {
       card: "summary_large_image",
       title: `${product.name} - The Launch Feed`,
       description,
-      images: [ogImage],
       creator: product.owner.twitterHandle ? `@${product.owner.twitterHandle.replace(/^@/, "")}` : "@thelaunchfeed",
     },
     robots: {
@@ -94,24 +81,14 @@ export default async function ProductPage({
   const p = await getProductBySlug(cleanSlug);
   if (!p) notFound();
 
-  // Run user lookup, cached similar products, and initial comments in parallel
-  const [user, similarProducts, initialComments] = await Promise.all([
-    getCurrentUser().catch(() => null),
+  // Public render only — vote/save state hydrates client-side from /api/me
+  // via SessionBridge, so the page can be ISR-cached at the edge.
+  const [similarProducts, initialComments] = await Promise.all([
     getSimilarProducts(p.categoryId, p.id).catch(() => []),
     listCommentsForSlug(cleanSlug).catch(() => []),
   ]);
-
-  let initialHasVoted = false;
-  let initialIsSaved = false;
-
-  if (user) {
-    const vote = await prisma.vote.findUnique({
-      where: { productId_userId: { productId: p.id, userId: user.id } },
-      select: { id: true },
-    });
-    initialHasVoted = !!vote;
-    initialIsSaved = (user.savedProductIds ?? []).includes(p.id);
-  }
+  const initialHasVoted = false;
+  const initialIsSaved = false;
 
   const isRevenueVerified = !!p.revenue?.isVerified;
   const mrrCents = isRevenueVerified ? (p.revenue?.mrrCents ?? 0) : 0;
@@ -147,6 +124,7 @@ export default async function ProductPage({
     tags: p.tags ?? [],
     category: p.category?.name ?? "Uncategorized",
     launchedAt: new Date(p.launchedAt).toISOString().slice(0, 10),
+    updatedAt: (p as any).updatedAt ? new Date((p as any).updatedAt).toISOString() : null,
     votes: p.voteCount,
     maker: `@${p.owner.username}`,
     makerName: p.owner.name || p.owner.username,
@@ -171,32 +149,68 @@ export default async function ProductPage({
   };
 
 
-  const isOwner = !!(
-    user &&
-    (user.id === p.ownerId ||
-      (p.owner?.email && user.email.toLowerCase() === p.owner.email.toLowerCase()))
-  );
+  // isOwner is determined client-side after session hydration to keep this page cacheable.
+  const isOwner = false;
 
-  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+  const siteUrl = SITE_URL;
+  const productUrl = `${siteUrl}/product/${p.slug}`;
+  const founderUrl = `${siteUrl}/founder/${p.owner.username}`;
+  const founderSameAs = [
+    p.owner.websiteUrl || null,
+    p.owner.twitterHandle
+      ? (p.owner.twitterHandle.startsWith("http")
+          ? p.owner.twitterHandle
+          : `https://x.com/${p.owner.twitterHandle.replace(/^@/, "")}`)
+      : null,
+    p.owner.githubHandle
+      ? (p.owner.githubHandle.startsWith("http")
+          ? p.owner.githubHandle
+          : `https://github.com/${p.owner.githubHandle.replace(/^@/, "")}`)
+      : null,
+  ].filter(Boolean);
+
+  const launchedIso = new Date(p.launchedAt).toISOString();
+  const updatedIso = new Date((p as any).updatedAt || p.launchedAt).toISOString();
 
   // Structured Data (JSON-LD) for Search Engines & AI Bots
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
+      organizationNode(),
+      websiteNode(),
+      {
+        "@type": "WebPage",
+        "@id": `${productUrl}#webpage`,
+        url: productUrl,
+        name: `${p.name} — ${SITE_NAME}`,
+        isPartOf: { "@id": WEBSITE_ID },
+        primaryImageOfPage: {
+          "@type": "ImageObject",
+          url: p.logoUrl || `${siteUrl}/icon.svg`,
+        },
+        datePublished: launchedIso,
+        dateModified: updatedIso,
+        breadcrumb: { "@id": `${productUrl}#breadcrumb` },
+      },
       {
         "@type": "SoftwareApplication",
-        "@id": `${siteUrl}/product/${p.slug}#software`,
+        "@id": `${productUrl}#software`,
         name: p.name,
         headline: p.tagline,
         description: p.description || p.tagline,
-        url: `${siteUrl}/product/${p.slug}`,
+        url: productUrl,
         applicationCategory: p.category?.name || "DeveloperApplication",
         operatingSystem: "All",
         image: p.logoUrl || `${siteUrl}/icon.svg`,
+        datePublished: launchedIso,
+        dateModified: updatedIso,
+        publisher: { "@id": ORG_ID },
         author: {
           "@type": "Person",
+          "@id": `${founderUrl}#person`,
           name: p.owner.name || p.owner.username,
-          url: `${siteUrl}/founder/${p.owner.username}`,
+          url: founderUrl,
+          ...(founderSameAs.length ? { sameAs: founderSameAs } : {}),
         },
         aggregateRating: {
           "@type": "AggregateRating",
@@ -213,27 +227,17 @@ export default async function ProductPage({
         },
       },
       {
-        "@type": "BreadcrumbList",
-        itemListElement: [
+        ...breadcrumb([
+          { name: "Home", url: siteUrl },
           {
-            "@type": "ListItem",
-            position: 1,
-            name: "Home",
-            item: siteUrl,
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
             name: p.category?.name || "Products",
-            item: p.category?.slug ? `${siteUrl}/category/${p.category.slug}` : `${siteUrl}/`,
+            url: p.category?.slug
+              ? `${siteUrl}/category/${p.category.slug}`
+              : `${siteUrl}/`,
           },
-          {
-            "@type": "ListItem",
-            position: 3,
-            name: p.name,
-            item: `${siteUrl}/product/${p.slug}`,
-          },
-        ],
+          { name: p.name, url: productUrl },
+        ]),
+        "@id": `${productUrl}#breadcrumb`,
       },
     ],
   };

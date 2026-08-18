@@ -21,16 +21,15 @@ export default function SessionBridge() {
         const res = await fetch("/api/me", { cache: "no-store" });
         if (cancelled) return;
         if (!res.ok) {
-          // Server returned an error — clear any stale local session
-          logoutSession();
+          // Temporary server error or connection drop — preserve local session!
           return;
         }
-        const data = (await res.json()) as { session: UserSession | null };
+        const data = (await res.json()) as { session: UserSession | null; unauthenticated?: boolean };
         if (cancelled) return;
         if (data.session) {
           saveSession(data.session);
-        } else {
-          // Server confirmed user is NOT signed in — clear local state
+        } else if (data.unauthenticated) {
+          // Server explicitly verified that no session cookies exist
           logoutSession();
         }
       } catch {

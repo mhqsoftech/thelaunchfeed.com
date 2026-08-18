@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getPublicProfile, getSuggestedFounders } from "@/lib/queries/user";
-import { decryptPaymentApiKey } from "@/lib/crypto";
-import { fetchLiveRevenueFromSDK } from "@/app/lib/revenueTelemetrySDK";
-import { getAccoladeDetails } from "@/lib/awards";
-import { computeAwardsForProducts } from "@/lib/queries/awards";
-import FounderClientView, { type ViewFounder } from "./FounderClientView";
+import { getPublicProfile } from "@/lib/queries/user";
+import { buildFounderViewWithSuggested } from "@/lib/queries/founderView";
+import FounderClientView from "./FounderClientView";
+import { organizationNode, websiteNode, breadcrumb, ORG_ID, WEBSITE_ID, SITE_NAME } from "@/lib/seo/schema";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 30;
+export const revalidate = 300;
 
 export async function generateMetadata({
   params,
@@ -36,8 +33,6 @@ export async function generateMetadata({
 
   const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com";
   const canonicalUrl = `${siteUrl}/founder/${founder.username}`;
-  const ogImage = founder.image || `${siteUrl}/icon.svg`;
-
   return {
     title: `${name} - The Launch Feed`,
     description,
@@ -65,20 +60,11 @@ export async function generateMetadata({
       title: `${name} - The Launch Feed`,
       description,
       siteName: "The Launch Feed",
-      images: [
-        {
-          url: ogImage,
-          width: 400,
-          height: 400,
-          alt: `${name} Founder Profile`,
-        },
-      ],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title: `${name} - The Launch Feed`,
       description,
-      images: [ogImage],
       creator: founder.twitterHandle ? `@${founder.twitterHandle.replace(/^@/, "")}` : undefined,
     },
     robots: {
@@ -101,157 +87,12 @@ export default async function FounderPage({
 }) {
   const { slug } = await params;
   const cleanSlug = decodeURIComponent(slug).trim();
+  const built = await buildFounderViewWithSuggested(cleanSlug);
+  if (!built) notFound();
+  const { view, suggestedFounders } = built;
+  // Fetch the raw profile once more for schema-only fields (email domain, etc.)
   const f = await getPublicProfile(cleanSlug);
   if (!f) notFound();
-
-  const totalVotes = f.products.reduce((s: number, p: any) => s + p.voteCount, 0);
-
-  let verifiedMrrCents = 0;
-  let verifiedTotalRevenueCents = 0;
-  let verifiedMrrFormatted = "";
-  let verifiedProviderName = "Stripe";
-  let verifiedProviders: Array<{ name: string; mrrCents: number; totalRevenueCents: number }> = [];
-
-  // Any verified revenue is shown publicly — verification is the opt-in.
-  {
-    // Prefer per-connection aggregates so multiple providers are counted independently.
-    const activeConns = (f.revenueConnections || []).filter(
-      (c: any) => c.status === "ACTIVE" && (c.mrrCents || 0) > 0
-    );
-
-    if (activeConns.length > 0) {
-      verifiedProviders = activeConns.map((c: any) => {
-        const provKey = c.provider as string;
-        const name = provKey.charAt(0).toUpperCase() + provKey.slice(1).toLowerCase();
-        return {
-          name,
-          mrrCents: c.mrrCents || 0,
-          totalRevenueCents: c.totalRevenueCents || 0,
-        };
-      });
-      verifiedMrrCents = verifiedProviders.reduce((s, p) => s + p.mrrCents, 0);
-      verifiedTotalRevenueCents = verifiedProviders.reduce((s, p) => s + p.totalRevenueCents, 0);
-    }
-
-    // Fallback: sum per-product verified rows if connection aggregates aren't populated yet.
-    const verifiedRevenues = f.products
-      .map((p: any) => p.revenue)
-      .filter((r: any): r is NonNullable<typeof r> => !!r && r.isVerified);
-
-    if (verifiedMrrCents === 0) {
-      verifiedMrrCents = verifiedRevenues.reduce((sum: number, r: any) => sum + (r.mrrCents || 0), 0);
-      verifiedTotalRevenueCents = verifiedRevenues.reduce((sum: number, r: any) => sum + (r.totalRevenueCents || 0), 0);
-    }
-
-    if (verifiedMrrCents > 0) {
-      if (verifiedMrrCents >= 100000) {
-        verifiedMrrFormatted = `$${(verifiedMrrCents / 100000).toFixed(1)}K / mo`;
-      } else {
-        const dollars = verifiedMrrCents / 100;
-        verifiedMrrFormatted = `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)} / mo`;
-      }
-    }
-
-    // If we still have no per-provider aggregate (e.g. legacy rows), fall back to
-    // per-product ProductRevenue grouped by their connection.
-    if (verifiedProviders.length === 0 && f.revenueConnections && f.revenueConnections.length > 0) {
-      const connById = new Map<string, string>();
-      for (const c of f.revenueConnections) connById.set(c.id, c.provider);
-      const byProvider = new Map<string, { mrrCents: number; totalRevenueCents: number }>();
-      for (const r of verifiedRevenues) {
-        const prov = connById.get((r as any).connectionId);
-        if (!prov) continue;
-        const key = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
-        const cur = byProvider.get(key) || { mrrCents: 0, totalRevenueCents: 0 };
-        cur.mrrCents += r.mrrCents || 0;
-        cur.totalRevenueCents += r.totalRevenueCents || 0;
-        byProvider.set(key, cur);
-      }
-      verifiedProviders = Array.from(byProvider.entries()).map(([name, v]) => ({
-        name,
-        mrrCents: v.mrrCents,
-        totalRevenueCents: v.totalRevenueCents,
-      }));
-    }
-
-    if (f.revenueConnections && f.revenueConnections.length > 0) {
-      const primaryConn = f.revenueConnections[0];
-      const prov = primaryConn.provider.toLowerCase();
-      verifiedProviderName =
-        prov.charAt(0).toUpperCase() + prov.slice(1);
-
-      if (!verifiedMrrFormatted || verifiedMrrFormatted === "$0" || verifiedMrrFormatted === "$0 / mo") {
-        try {
-          const decryptedKey = decryptPaymentApiKey(primaryConn.accessToken);
-          // Timeout after 600ms so third party APIs never hang the founder page
-          const telemetry = await Promise.race([
-            fetchLiveRevenueFromSDK(prov, decryptedKey),
-            new Promise<null>((resolve) => setTimeout(() => resolve(null), 600)),
-          ]);
-          if (telemetry && telemetry.mrrCents > 0) {
-            verifiedMrrCents = telemetry.mrrCents;
-            verifiedTotalRevenueCents = telemetry.totalRevenueCents;
-            verifiedMrrFormatted = telemetry.mrrFormatted;
-          }
-        } catch {
-          // Ignore
-        }
-      }
-    }
-  }
-
-  const awardsMap = await computeAwardsForProducts(f.products);
-
-  const view: ViewFounder = {
-    id: f.id,
-    username: f.username,
-    name: f.name || f.username,
-    handle: `@${f.username}`,
-    bio: f.bio || "",
-    image: f.image || null,
-    website: f.websiteUrl || "",
-    twitter: f.twitterHandle || "",
-    github: f.githubHandle || "",
-    revenue: verifiedMrrFormatted,
-    mrrCents: verifiedMrrCents,
-    totalRevenueCents: verifiedTotalRevenueCents,
-    revenueProvider: verifiedProviderName,
-    verifiedProviders,
-    title: f.title || "",
-    totalVotes,
-    productsCount: f.products.length,
-    joinedAt: new Date(f.createdAt).toISOString().slice(0, 10),
-    products: f.products.map((p: any) => {
-      const productAwards = awardsMap.get(p.id) || ["launch"];
-      const accolades = getAccoladeDetails(productAwards, p.slug);
-      const awardsDisplay = accolades
-        .filter((a) => a.id !== "launch")
-        .map((a) => ({
-          label: a.rankBadge ? `${a.rankBadge} ${a.badgeLabel}` : a.badgeLabel,
-          style: `${a.tone.border} ${a.tone.text} ${a.tone.bg}`,
-        }));
-
-      return {
-        id: p.id,
-        slug: p.slug,
-        name: p.name,
-        tagline: p.tagline,
-        category: p.category?.name ?? "Uncategorized",
-        logoUrl: p.logoUrl ?? null,
-        websiteUrl: p.websiteUrl ?? null,
-        tags: p.tags ?? [],
-        commentCount: p.commentCount ?? 0,
-        votes: p.voteCount,
-        awards: awardsDisplay,
-        revenue: p.revenue?.isVerified
-          ? p.revenue.mrrCents >= 100000
-            ? `$${(p.revenue.mrrCents / 100000).toFixed(1)}K / mo`
-            : `$${(p.revenue.mrrCents / 100).toFixed(p.revenue.mrrCents % 100 === 0 ? 0 : 2)} / mo`
-          : "",
-        launchedAt: new Date(p.launchedAt).toISOString().slice(0, 10),
-      };
-    }),
-  };
 
   const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com";
   const canonicalUrl = `${siteUrl}/founder/${f.username}`;
@@ -262,54 +103,55 @@ export default async function FounderPage({
     f.githubHandle ? (f.githubHandle.startsWith("http") ? f.githubHandle : `https://github.com/${f.githubHandle.replace(/^@/, "")}`) : null,
   ].filter(Boolean);
 
+  const personId = `${canonicalUrl}#person`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
+      organizationNode(),
+      websiteNode(),
       {
         "@type": "ProfilePage",
         "@id": `${canonicalUrl}#profile`,
         name: `${f.name || f.username} — Founder Profile`,
         url: canonicalUrl,
-        mainEntity: {
-          "@type": "Person",
-          name: f.name || f.username,
-          alternateName: `@${f.username}`,
-          identifier: f.username,
-          url: canonicalUrl,
-          image: f.image || `${siteUrl}/icon.svg`,
-          jobTitle: f.title || "Founder & Software Maker",
-          description: f.bio || undefined,
-          sameAs: sameAsUrls,
-          knowsAbout: f.products.map((p: any) => p.name),
-        },
+        isPartOf: { "@id": WEBSITE_ID },
+        about: { "@id": personId },
+        mainEntity: { "@id": personId },
+        breadcrumb: { "@id": `${canonicalUrl}#breadcrumb` },
       },
       {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: "Home",
-            item: siteUrl,
+        "@type": "Person",
+        "@id": personId,
+        name: f.name || f.username,
+        alternateName: `@${f.username}`,
+        identifier: f.username,
+        url: canonicalUrl,
+        image: f.image || `${siteUrl}/icon.svg`,
+        jobTitle: f.title || "Founder & Software Maker",
+        description: f.bio || undefined,
+        sameAs: sameAsUrls,
+        knowsAbout: f.products.map((p: any) => p.name),
+        worksFor: { "@id": ORG_ID },
+        makesOffer: f.products.map((p: any) => ({
+          "@type": "Offer",
+          itemOffered: {
+            "@type": "SoftwareApplication",
+            name: p.name,
+            url: `${siteUrl}/product/${p.slug}`,
+            applicationCategory: p.category?.name || "DeveloperApplication",
           },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: "Founders",
-            item: `${siteUrl}/founders`,
-          },
-          {
-            "@type": "ListItem",
-            position: 3,
-            name: f.name || f.username,
-            item: canonicalUrl,
-          },
-        ],
+        })),
+      },
+      {
+        ...breadcrumb([
+          { name: "Home", url: siteUrl },
+          { name: "Founders", url: `${siteUrl}/founders` },
+          { name: f.name || f.username, url: canonicalUrl },
+        ]),
+        "@id": `${canonicalUrl}#breadcrumb`,
       },
     ],
   };
-
-  const suggestedFounders = await getSuggestedFounders(f.username, 12);
 
   return (
     <>

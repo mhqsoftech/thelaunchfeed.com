@@ -103,6 +103,7 @@ export default function SubmitPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      <h1 className="sr-only">Submit Your Product Launch</h1>
       <Suspense
         fallback={
           <div className="min-h-[50vh] flex items-center justify-center p-8">

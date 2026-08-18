@@ -165,12 +165,10 @@ export default function FoundersClientView({
                 <div className="flex items-start justify-between gap-2 min-w-0 w-full">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
                     <span className="font-display font-black text-xl sm:text-2xl text-ink-dim shrink-0">#02</span>
-                    <Link
-                      href={`/founder/${slugify(founders[1].name)}`}
-                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-xs bg-void border border-hairline overflow-hidden shrink-0 block"
+                    <Link href={`/founder/${slugify(founders[1].name)}`} aria-label={founders[1].name} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xs bg-void border border-hairline overflow-hidden shrink-0 block"
                     >
                       {founders[1].image ? (
-                        <img src={founders[1].image} alt={founders[1].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <img width="64" height="64" src={founders[1].image} alt={founders[1].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center font-bold text-xs">
                           {founders[1].name.substring(0, 2).toUpperCase()}
@@ -210,12 +208,10 @@ export default function FoundersClientView({
                 <div className="flex items-start justify-between gap-2 min-w-0 w-full">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
                     <span className="font-display font-black text-2xl sm:text-3xl text-signal shrink-0">#01</span>
-                    <Link
-                      href={`/founder/${slugify(founders[0].name)}`}
-                      className="w-11 h-11 sm:w-12 sm:h-12 rounded-xs bg-void border border-signal/40 overflow-hidden shrink-0 block"
+                    <Link href={`/founder/${slugify(founders[0].name)}`} aria-label={founders[0].name} className="w-11 h-11 sm:w-12 sm:h-12 rounded-xs bg-void border border-signal/40 overflow-hidden shrink-0 block"
                     >
                       {founders[0].image ? (
-                        <img src={founders[0].image} alt={founders[0].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <img width="64" height="64" src={founders[0].image} alt={founders[0].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center font-bold text-sm">
                           {founders[0].name.substring(0, 2).toUpperCase()}
@@ -255,12 +251,10 @@ export default function FoundersClientView({
                 <div className="flex items-start justify-between gap-2 min-w-0 w-full">
                   <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
                     <span className="font-display font-black text-xl sm:text-2xl text-ink-dim shrink-0">#03</span>
-                    <Link
-                      href={`/founder/${slugify(founders[2].name)}`}
-                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-xs bg-void border border-hairline overflow-hidden shrink-0 block"
+                    <Link href={`/founder/${slugify(founders[2].name)}`} aria-label={founders[2].name} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xs bg-void border border-hairline overflow-hidden shrink-0 block"
                     >
                       {founders[2].image ? (
-                        <img src={founders[2].image} alt={founders[2].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <img width="64" height="64" src={founders[2].image} alt={founders[2].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center font-bold text-xs">
                           {founders[2].name.substring(0, 2).toUpperCase()}
@@ -332,7 +326,7 @@ export default function FoundersClientView({
                     className="w-9 h-9 sm:w-10 sm:h-10 rounded-xs bg-surface border border-hairline shrink-0 overflow-hidden flex items-center justify-center font-bold text-xs"
                   >
                     {founder.image ? (
-                      <img src={founder.image} alt={founder.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                      <img width="64" height="64" src={founder.image} alt={founder.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                     ) : (
                       founder.name.substring(0, 2).toUpperCase()
                     )}

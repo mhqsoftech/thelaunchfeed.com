@@ -1,4 +1,4 @@
-import { getNeonStorageUrl } from "@/lib/storage";
+import { getNeonStorageUrl } from "@/lib/storage-url";
 
 export interface RevenueProviderConfig {
   id: string;
@@ -780,7 +780,7 @@ export async function fetchLiveRevenueFromSDK(
 export function PaymentProviderLogo({ id, className = "w-4 h-4" }: { id: string; className?: string }) {
   const logoId = id?.toLowerCase() || "stripe";
   return (
-    <img
+    <img width="64" height="64"
       src={getNeonStorageUrl(`logos/providers/${logoId}.avif`)}
       alt={`${id} official logo`}
       className={`${className} object-contain shrink-0`}

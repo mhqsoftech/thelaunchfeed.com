@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
+import { PaymentProviderLogo } from "@/app/lib/revenueTelemetrySDK";
 
 export interface MonthlyHistoryPoint {
   month: string;
@@ -35,6 +36,20 @@ const SERIES_COLORS = [
   "#84cc16",
 ];
 
+// Solid hex fallbacks used for gradient fills (CSS vars cant be used inside
+// linearGradient stops reliably across all engines, so pair each series with a
+// stable hex for its area fill).
+const SERIES_HEX = [
+  "#84cc16",
+  "#8b5cf6",
+  "#f59e0b",
+  "#ec4899",
+  "#22d3ee",
+  "#eab308",
+];
+
+const slug = (s: string) => s.replace(/[^A-Za-z0-9]/g, "-").toLowerCase();
+
 function formatCentsValue(cents: number): string {
   if (cents <= 0) return "$0";
   if (cents >= 10000000) {
@@ -66,11 +81,18 @@ export default function VerifiedRevenueChart({
     const monthNames = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
     const now = new Date();
     return activeSeries.map((s) => {
+      const yearSuffix = (d: Date) => `'${String(d.getFullYear()).slice(2)}`;
+      const monthLabel = (raw: string): string => {
+        // history point "month" may be an ISO date, "2026-08", or already "AUG"
+        const d = new Date(raw);
+        if (!Number.isNaN(d.getTime())) return `${monthNames[d.getMonth()]} ${yearSuffix(d)}`;
+        return raw;
+      };
       if (s.history && s.history.length >= 2) {
         return {
           providerName: s.providerName,
           points: s.history.map((h) => ({
-            month: h.month,
+            month: monthLabel(h.month),
             amountCents: h.amountCents || 0,
             label: h.amountFormatted || formatCentsValue(h.amountCents || 0),
           })),
@@ -81,7 +103,7 @@ export default function VerifiedRevenueChart({
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
         const amount = i === 0 ? s.mrrCents ?? 0 : 0;
         months.push({
-          month: monthNames[d.getMonth()],
+          month: `${monthNames[d.getMonth()]} ${yearSuffix(d)}`,
           amountCents: amount,
           label: formatCentsValue(amount),
         });
@@ -155,8 +177,28 @@ export default function VerifiedRevenueChart({
   const seriesRendered = seriesData.map((s, idx) => ({
     providerName: s.providerName,
     color: SERIES_COLORS[idx % SERIES_COLORS.length],
+    hex: SERIES_HEX[idx % SERIES_HEX.length],
+    gradientId: `revgrad-${slug(s.providerName)}-${idx}`,
     points: toPoints(s.points),
   }));
+
+  const buildAreaPath = (pts: { x: number; y: number }[]) => {
+    if (pts.length === 0) return "";
+    const line = pts.reduce((acc, pt, i) => {
+      if (i === 0) return `M ${pt.x} ${pt.y}`;
+      const prev = pts[i - 1];
+      const cx1 = prev.x + (pt.x - prev.x) / 2;
+      const cy1 = prev.y;
+      const cx2 = prev.x + (pt.x - prev.x) / 2;
+      const cy2 = pt.y;
+      return `${acc} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${pt.x} ${pt.y}`;
+    }, "");
+    const last = pts[pts.length - 1];
+    const first = pts[0];
+    return `${line} L ${last.x} ${height - paddingY} L ${first.x} ${height - paddingY} Z`;
+  };
+
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const buildPath = (pts: { x: number; y: number }[]) =>
     pts.reduce((acc, pt, i) => {
@@ -191,12 +233,13 @@ export default function VerifiedRevenueChart({
           {(isMulti ? activeSeries.map((s) => s.providerName) : [providerName]).map((name) => (
             <div
               key={name}
-              className="flex items-center gap-1.5 text-[10px] text-signal font-bold bg-void px-2.5 py-1 border border-signal/40 uppercase shrink-0"
+              className="flex items-center gap-1.5 text-[10px] text-signal font-bold bg-void px-2 py-1 border border-signal/40 uppercase shrink-0"
             >
+              <PaymentProviderLogo id={name} className="w-3.5 h-3.5" />
+              <span>{name} Verified</span>
               <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                 <path strokeLinecap="square" strokeLinejoin="miter" d="M5 13l4 4L19 7" />
               </svg>
-              <span>{name} Verified</span>
             </div>
           ))}
         </div>
@@ -229,9 +272,16 @@ export default function VerifiedRevenueChart({
         >
           <defs>
             <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-signal)" stopOpacity="0.25" />
+              <stop offset="0%" stopColor="var(--color-signal)" stopOpacity="0.32" />
               <stop offset="100%" stopColor="var(--color-signal)" stopOpacity="0.0" />
             </linearGradient>
+            {seriesRendered.map((s) => (
+              <linearGradient key={s.gradientId} id={s.gradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={s.hex} stopOpacity="0.35" />
+                <stop offset="60%" stopColor={s.hex} stopOpacity="0.12" />
+                <stop offset="100%" stopColor={s.hex} stopOpacity="0.0" />
+              </linearGradient>
+            ))}
           </defs>
 
           {/* Horizontal Grid Lines */}
@@ -254,74 +304,181 @@ export default function VerifiedRevenueChart({
           {/* Area Fill (aggregate) */}
           {!isMulti && <path d={areaPath} fill="url(#revenueGradient)" />}
 
-          {isMulti ? (
-            seriesRendered.map((s) => (
-              <path
-                key={s.providerName}
-                d={buildPath(s.points)}
-                fill="none"
-                stroke={s.color}
-                strokeWidth="2.5"
-                strokeLinecap="square"
-                strokeLinejoin="miter"
-                opacity="0.95"
-              />
-            ))
-          ) : (
+          {isMulti && (
+            <>
+              {seriesRendered.map((s) => (
+                <path
+                  key={`area-${s.providerName}`}
+                  d={buildAreaPath(s.points)}
+                  fill={`url(#${s.gradientId})`}
+                  opacity="0.9"
+                />
+              ))}
+              {seriesRendered.map((s) => (
+                <path
+                  key={`line-${s.providerName}`}
+                  d={buildPath(s.points)}
+                  fill="none"
+                  stroke={s.hex}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+              {seriesRendered.map((s) =>
+                s.points.map((pt, i) => (
+                  <circle
+                    key={`pt-${s.providerName}-${i}`}
+                    cx={pt.x}
+                    cy={pt.y}
+                    r="3"
+                    fill="var(--color-void)"
+                    stroke={s.hex}
+                    strokeWidth="2"
+                  />
+                ))
+              )}
+            </>
+          )}
+          {!isMulti && (
             <path
               d={dPath}
               fill="none"
               stroke="var(--color-signal)"
               strokeWidth="3"
-              strokeLinecap="square"
-              strokeLinejoin="miter"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             />
           )}
 
           {/* Data Points & Labels (aggregate axis) */}
-          {points.map((pt, i) => (
-            <g key={i} className="group cursor-pointer">
-              {/* Vertical dotted guide */}
-              <line
-                x1={pt.x}
-                y1={pt.y}
-                x2={pt.x}
-                y2={height - paddingY}
-                stroke="var(--color-hairline)"
-                strokeDasharray="2 2"
-                strokeWidth="1"
-              />
+          {points.map((pt, i) => {
+            const isHovered = hoverIdx === i;
+            const colWidth = (width - 2 * paddingX) / Math.max(points.length - 1, 1);
+            return (
+              <g key={i} className="cursor-pointer">
+                {/* Vertical hover-hit rectangle spanning full chart height */}
+                <rect
+                  x={pt.x - colWidth / 2}
+                  y={paddingY}
+                  width={colWidth}
+                  height={height - 2 * paddingY}
+                  fill="transparent"
+                  onMouseEnter={() => setHoverIdx(i)}
+                  onMouseLeave={() => setHoverIdx((cur) => (cur === i ? null : cur))}
+                />
+                {/* Vertical guide */}
+                <line
+                  x1={pt.x}
+                  y1={paddingY}
+                  x2={pt.x}
+                  y2={height - paddingY}
+                  stroke={isHovered ? "var(--color-signal)" : "var(--color-hairline)"}
+                  strokeDasharray={isHovered ? "0" : "2 2"}
+                  strokeWidth={isHovered ? "1.5" : "1"}
+                  opacity={isHovered ? 0.6 : 1}
+                />
 
-              {/* Data Node Circle */}
-              <circle
-                cx={pt.x}
-                cy={pt.y}
-                r="4.5"
-                className="fill-void stroke-signal"
-                strokeWidth="2.5"
-              />
+                {/* Aggregate node — only when single-series (otherwise per-series nodes already drawn) */}
+                {!isMulti && (
+                  <circle
+                    cx={pt.x}
+                    cy={pt.y}
+                    r={isHovered ? 5.5 : 4.5}
+                    className="fill-void stroke-signal"
+                    strokeWidth="2.5"
+                  />
+                )}
 
-              {/* Value Callout Badge above node */}
-              <text
-                x={pt.x}
-                y={pt.y - 10}
-                textAnchor="middle"
-                className="fill-ink text-[10px] font-mono font-bold"
-              >
-                {pt.label}
-              </text>
+                {/* Aggregate value above node — only in single-series mode */}
+                {!isMulti && (
+                  <text
+                    x={pt.x}
+                    y={pt.y - 10}
+                    textAnchor="middle"
+                    className="fill-ink text-[10px] font-mono font-bold"
+                  >
+                    {pt.label}
+                  </text>
+                )}
 
-              {/* Month Label below baseline */}
-              <text
-                x={pt.x}
-                y={height - 8}
-                textAnchor="middle"
-                className="fill-ink-dim text-[10px] font-mono uppercase font-bold"
-              >
-                {pt.month}
-              </text>
-            </g>
-          ))}
+                {/* Month + year label below baseline */}
+                <text
+                  x={pt.x}
+                  y={height - 8}
+                  textAnchor="middle"
+                  className="fill-ink-dim text-[10px] font-mono uppercase font-bold"
+                >
+                  {pt.month}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Hover tooltip — per-series exact amounts for the hovered month */}
+          {hoverIdx !== null && (() => {
+            const anchor = points[hoverIdx];
+            if (!anchor) return null;
+            const rows = isMulti
+              ? seriesRendered.map((s) => ({
+                  name: s.providerName,
+                  hex: s.hex,
+                  label: s.points[hoverIdx]?.label ?? "$0",
+                }))
+              : [{ name: providerName, hex: "#84cc16", label: anchor.label }];
+            const rowH = 14;
+            const boxW = 148;
+            const boxH = 22 + rows.length * rowH;
+            const bx = Math.min(Math.max(anchor.x + 10, paddingX), width - paddingX - boxW);
+            const by = Math.max(paddingY, anchor.y - boxH - 8);
+            return (
+              <g pointerEvents="none">
+                <rect
+                  x={bx}
+                  y={by}
+                  width={boxW}
+                  height={boxH}
+                  rx="2"
+                  fill="var(--color-void)"
+                  stroke="var(--color-hairline)"
+                  strokeWidth="1"
+                />
+                <text
+                  x={bx + 8}
+                  y={by + 14}
+                  className="fill-ink text-[10px] font-mono font-bold uppercase"
+                >
+                  {anchor.month}
+                </text>
+                {rows.map((r, ri) => (
+                  <g key={r.name}>
+                    <rect
+                      x={bx + 8}
+                      y={by + 20 + ri * rowH + 3}
+                      width={6}
+                      height={6}
+                      fill={r.hex}
+                    />
+                    <text
+                      x={bx + 20}
+                      y={by + 20 + ri * rowH + 9}
+                      className="fill-ink-dim text-[10px] font-mono"
+                    >
+                      {r.name}
+                    </text>
+                    <text
+                      x={bx + boxW - 8}
+                      y={by + 20 + ri * rowH + 9}
+                      textAnchor="end"
+                      className="fill-ink text-[10px] font-mono font-bold"
+                    >
+                      {r.label}
+                    </text>
+                  </g>
+                ))}
+              </g>
+            );
+          })()}
         </svg>
       </div>
 
@@ -329,7 +486,11 @@ export default function VerifiedRevenueChart({
         <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono border-t border-hairline pt-2">
           {seriesRendered.map((s) => (
             <div key={s.providerName} className="flex items-center gap-1.5">
-              <span className="inline-block w-3 h-0.5" style={{ background: s.color }} />
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                style={{ background: s.hex }}
+              />
+              <PaymentProviderLogo id={s.providerName} className="w-3.5 h-3.5" />
               <span className="text-ink-dim uppercase font-bold">{s.providerName}</span>
               <span className="text-ink">
                 {formatCentsValue(activeSeries.find((a) => a.providerName === s.providerName)?.mrrCents || 0)} / mo

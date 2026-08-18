@@ -5,6 +5,7 @@ import Link from "next/link";
 import { format } from "date-fns";
 import MainLayoutShell from "@/app/MainLayoutShell";
 import { BookmarkButton } from "@/components/ui/BookmarkButton";
+import PrimaryCTA from "@/components/ui/PrimaryCTA";
 
 export type CategoryProductItem = {
   id: string;
@@ -130,12 +131,28 @@ export default function CategoryClientView({
               {filteredProducts.length}{" "}
               {filteredProducts.length === 1 ? "PRODUCT" : "PRODUCTS"}
             </span>
+            {category.products.length > 0 && (() => {
+              const latest = category.products.reduce((acc, p) => {
+                const d = new Date(p.launchedAt).getTime();
+                return d > acc ? d : acc;
+              }, 0);
+              const iso = new Date(latest).toISOString();
+              return (
+                <span className="text-ink-faint text-[11px] font-mono leading-none pb-0.5 shrink-0 hidden md:inline">
+                  Updated{" "}
+                  <time dateTime={iso}>
+                    {new Date(latest).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                  </time>
+                </span>
+              );
+            })()}
           </div>
 
           {/* Quick Filter Search Input */}
           <div className="flex items-center gap-2">
             <input
-              type="text"
+              type="search"
+              aria-label={`Filter in ${category.name}`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={`Filter in ${category.name}…`}
@@ -166,10 +183,11 @@ export default function CategoryClientView({
                   {/* Product Logo with Fallback to Initials */}
                   <Link
                     href={`/product/${prod.slug}`}
+                    aria-label={prod.name}
                     className="w-10 h-10 sm:w-12 sm:h-12 bg-surface border border-hairline flex-shrink-0 rounded-xs flex items-center justify-center font-mono text-[10px] sm:text-xs font-bold text-ink-dim overflow-hidden relative"
                   >
                     {prod.logoUrl ? (
-                      <img
+                      <img width="64" height="64"
                         src={prod.logoUrl}
                         alt={prod.name}
                         className="w-full h-full object-cover"
@@ -205,9 +223,9 @@ export default function CategoryClientView({
                         className="text-ink-faint hover:text-ink font-mono truncate flex items-center gap-1 transition-colors"
                       >
                         {prod.owner.image && (
-                          <img
+                          <img width="64" height="64"
                             src={prod.owner.image}
-                            alt=""
+                            alt={`${prod.owner.name || prod.owner.username} avatar`}
                             className="w-3.5 h-3.5 rounded-xs"
                           />
                         )}
@@ -215,9 +233,12 @@ export default function CategoryClientView({
                       </Link>
 
                       <span className="text-hairline">·</span>
-                      <span className="text-ink-faint font-mono text-[10px]">
+                      <time
+                        dateTime={new Date(prod.launchedAt).toISOString()}
+                        className="text-ink-faint font-mono text-[10px]"
+                      >
                         {format(new Date(prod.launchedAt), "MMM d, yyyy")}
-                      </span>
+                      </time>
 
                       {formattedRevenue && (
                         <>
@@ -271,6 +292,7 @@ export default function CategoryClientView({
             </div>
           )}
         </div>
+        <PrimaryCTA variant="category" className="mt-6" />
       </div>
     </MainLayoutShell>
   );

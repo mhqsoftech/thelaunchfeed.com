@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { doto, geistSans, geistMono } from "./fonts";
 import SessionBridge from "./components/SessionBridge";
+import { organizationNode, websiteNode } from "@/lib/seo/schema";
 import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://thelaunchfeed.com"),
+  alternates: { canonical: "/" },
   title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
   description:
     "Discover the best new tech products, SaaS apps, AI tools, and developer software every day. Real-time community voting, verified founder MRR, and instant launch scheduling.",
@@ -126,8 +128,25 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
       </head>
       <body className="min-h-full flex flex-col bg-void text-ink font-mono">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-3 focus:py-2 focus:bg-signal focus:text-void focus:font-bold focus:rounded-sm"
+        >
+          Skip to main content
+        </a>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@graph": [organizationNode(), websiteNode()],
+            }),
+          }}
+        />
         <SessionBridge />
-        {children}
+        <main id="main" className="flex-1 flex flex-col">
+          {children}
+        </main>
       </body>
     </html>
   );

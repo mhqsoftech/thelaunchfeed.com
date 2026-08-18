@@ -103,6 +103,18 @@ export async function updateProfile(input: UpdateProfileInput) {
   revalidatePath("/profile");
   revalidatePath(`/founder/${updated.username}`);
 
+  // Automated Web Search Indexing (Google Indexing API & IndexNow)
+  try {
+    const { submitBatch } = await import("@/lib/indexing");
+    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+    await submitBatch([
+      `${appUrl}/founder/${encodeURIComponent(updated.username.replace(/^@/, "").trim())}`,
+      `${appUrl}/founders`,
+    ]);
+  } catch (err) {
+    console.error("[web-indexing] failed for profile update:", err);
+  }
+
   return updated;
 }
 
@@ -111,7 +123,7 @@ export async function updateProfile(input: UpdateProfileInput) {
  * haven't published anything — the profile page must render an empty state
  * in that case, never fake placeholders.
  */
-export type MyProductStatus = "LIVE" | "SCHEDULED" | "REJECTED";
+export type MyProductStatus = "LIVE" | "SCHEDULED" | "REJECTED" | "DRAFT";
 
 /**
  * Awards a product is currently eligible to show a badge for.
@@ -163,7 +175,7 @@ export async function listMyProducts(): Promise<MyProduct[]> {
       },
     }),
     prisma.submission.findMany({
-      where: { ownerId: user.id, status: { in: ["SCHEDULED", "REJECTED"] } },
+      where: { ownerId: user.id, status: { in: ["SCHEDULED", "REJECTED", "DRAFT"] } },
       orderBy: [{ status: "asc" }, { scheduledFor: "asc" }],
       select: {
         id: true,
@@ -209,7 +221,12 @@ export async function listMyProducts(): Promise<MyProduct[]> {
     makerName: displayName,
     maker: `@${user.username}`,
     launchedAt: s.scheduledFor.toISOString(),
-    status: s.status === "REJECTED" ? "REJECTED" : "SCHEDULED",
+    status:
+      s.status === "REJECTED"
+        ? "REJECTED"
+        : s.status === "DRAFT"
+          ? "DRAFT"
+          : "SCHEDULED",
     scheduledFor: s.scheduledFor.toISOString(),
     submissionId: s.id,
     rejectionReason: s.rejectionReason ?? undefined,

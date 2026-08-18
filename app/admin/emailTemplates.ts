@@ -18,7 +18,8 @@ export type EmailTemplateId =
   | "featured-expiring"
   | "revenue-verified"
   | "comment-received"
-  | "custom-broadcast";
+  | "custom-broadcast"
+  | "directory-founder-invite";
 
 export type EmailTrigger =
   | "manual"
@@ -32,7 +33,8 @@ export type EmailTrigger =
   | "weekly-cron"
   | "on-slot-expiring"
   | "on-revenue-verified"
-  | "on-comment";
+  | "on-comment"
+  | "on-directory-crawl";
 
 export interface EmailTemplate {
   id: EmailTemplateId;
@@ -48,6 +50,8 @@ export interface TemplateVars {
   [key: string]: unknown;
   userName?: string;
   userEmail?: string;
+  founderName?: string;
+  sourceDirectory?: string;
   productName?: string;
   productSlug?: string;
   rank?: number;
@@ -867,6 +871,70 @@ export const TEMPLATES: EmailTemplate[] = [
       `,
         v.customBody?.slice(0, 90) || "A message from The Launch Feed."
       ),
+  },
+  {
+    id: "directory-founder-invite",
+    name: "Directory Founder Outreach",
+    description: "Invites founders discovered across product directories (Uneed, Product Hunt, Microlaunch, etc.) to launch on The Launch Feed freely with unique features.",
+    trigger: "manual",
+    auto: false,
+    subject: (v) =>
+      `Featured ${v.productName || "your product"} on ${v.sourceDirectory || "directories"}? Launch on The Launch Feed (100% Free)`,
+    render: (v) => {
+      const prodName = v.productName || "your product";
+      const founderName = v.founderName || "there";
+      const srcDir = v.sourceDirectory || "product directories";
+
+      return shell(
+        `
+        ${tag("FOUNDER INVITATION · 100% FREE", SIGNAL)}
+        ${h1(`Launch ${esc(prodName)} on The Launch Feed`)}
+
+        <div style="font-size:13px;line-height:1.7;color:#2b2b28;margin:0 0 16px;">
+          Hey ${esc(founderName)},
+          <br><br>
+          We discovered <strong>${esc(prodName)}</strong> while browsing <strong>${esc(srcDir)}</strong> and were really impressed by what you are building.
+          <br><br>
+          We would love to invite you to freely submit and launch ${esc(prodName)} on <strong>The Launch Feed</strong> — a real-time, founder-first discovery platform and daily tech leaderboard.
+        </div>
+
+        <div style="border:1px solid ${HAIRLINE};background:#fafaf8;padding:16px 18px;margin:18px 0;">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:${INK_DIM};letter-spacing:.05em;margin-bottom:8px;">
+            ${pulseDot(VERIFIED)}Why launch on The Launch Feed? (Key Differentiators)
+          </div>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:12.5px;color:#2b2b28;line-height:1.6;">
+            <tr>
+              <td style="padding:5px 0;" valign="top"><strong>1. Multi-Channel Social Launch Broadcast:</strong> The second you launch, our automated engine broadcasts your product to our X/Bluesky feed, WhatsApp Founder Community, Telegram Channel, and Webhooks.</td>
+            </tr>
+            <tr>
+              <td style="padding:5px 0;" valign="top"><strong>2. 24h Real-Time Leaderboards & Live Badges:</strong> Fair daily drops with live community upvoting, instant ranking telemetry, and embeddable dynamic SVG winner badges for Daily Top 3, Weekly Best, and Monthly Champions.</td>
+            </tr>
+            <tr>
+              <td style="padding:5px 0;" valign="top"><strong>3. Instant Automated Google & IndexNow Search Indexing:</strong> Every newly launched product and maker profile is automatically submitted via high-speed API indexing within hours of release.</td>
+            </tr>
+            <tr>
+              <td style="padding:5px 0;" valign="top"><strong>4. Verified Live Revenue & MRR Telemetry:</strong> Optional one-click revenue verification with Stripe, DodoPayments, Polar, Paddle, or LemonSqueezy to build instant trust.</td>
+            </tr>
+            <tr>
+              <td style="padding:5px 0;" valign="top"><strong>5. 100% Free Forever Launching:</strong> No paid queue skipping, no gatekeeping, and no hidden fees for makers.</td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="margin:20px 0 16px;">
+          ${primaryBtn(`🚀 Submit ${prodName} for Free`, `${BASE_URL}/submit`)}
+          ${ghostBtn("↗ Explore Live Feed & Platform", BASE_URL)}
+        </div>
+
+        <div style="font-size:12px;color:${INK_DIM};line-height:1.6;margin:16px 0 8px;">
+          Feel free to reply directly to this email if you have any questions or if there is anything we can do to support your launch.
+        </div>
+
+        ${communityChannelsBlock("Join Our Official Maker Channels")}
+      `,
+        `We noticed ${prodName} on ${srcDir}. Launch freely on The Launch Feed today.`
+      );
+    },
   },
 ];
 

@@ -333,7 +333,7 @@ export default function MainLayoutShell({
                     {/* Logo Icon */}
                     <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xs bg-void border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
                       {p.logoUrl ? (
-                        <img
+                        <img width="64" height="64"
                           src={p.logoUrl}
                           alt={p.name}
                           loading="lazy"
@@ -365,7 +365,7 @@ export default function MainLayoutShell({
                     {/* Logo Icon */}
                     <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xs bg-void border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
                       {p.logoUrl ? (
-                        <img
+                        <img width="64" height="64"
                           src={p.logoUrl}
                           alt={p.name}
                           loading="lazy"
@@ -408,7 +408,7 @@ export default function MainLayoutShell({
                 {/* Logo Icon */}
                 <div className="w-6 h-6 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
                   {p.logoUrl ? (
-                    <img
+                    <img width="64" height="64"
                       src={p.logoUrl}
                       alt={p.name}
                       loading="lazy"
@@ -439,7 +439,8 @@ export default function MainLayoutShell({
               </kbd>
               <input
                 ref={inputRef}
-                type="text"
+                type="search"
+                aria-label="Search products and makers"
                 value={searchQuery}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -496,9 +497,9 @@ export default function MainLayoutShell({
                 <span className="w-5 h-5 rounded-xs bg-ink text-void text-[10px] font-bold flex items-center justify-center shrink-0 overflow-hidden">
                   {userSession.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
+                    <img width="64" height="64"
                       src={userSession.image}
-                      alt=""
+                      alt={`${userSession.name || "Your"} avatar`}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -530,7 +531,7 @@ export default function MainLayoutShell({
                 {/* Logo Icon */}
                 <div className="w-6 h-6 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
                   {p.logoUrl ? (
-                    <img
+                    <img width="64" height="64"
                       src={p.logoUrl}
                       alt={p.name}
                       loading="lazy"
@@ -624,7 +625,7 @@ export default function MainLayoutShell({
 
                                 <div className="w-5.5 h-5.5 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
                                   {product.logoUrl ? (
-                                    <img
+                                    <img width="64" height="64"
                                       src={product.logoUrl}
                                       alt={product.name}
                                       loading="lazy"
@@ -736,7 +737,7 @@ export default function MainLayoutShell({
 
                             <div className="w-10 h-10 sm:w-11 sm:h-11 bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink group-hover:border-signal overflow-hidden relative">
                               {p.logoUrl ? (
-                                <img src={p.logoUrl} alt={p.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                                <img width="64" height="64" src={p.logoUrl} alt={p.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                               ) : (
                                 <span>{p.name.substring(0, 2).toUpperCase()}</span>
                               )}
@@ -793,7 +794,7 @@ export default function MainLayoutShell({
                           >
                             <div className="w-11 h-11 bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden relative">
                               {f.image ? (
-                                <img src={f.image} alt={f.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                                <img width="64" height="64" src={f.image} alt={f.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                               ) : (
                                 <span>{f.name.substring(0, 2).toUpperCase()}</span>
                               )}
@@ -845,7 +846,11 @@ export default function MainLayoutShell({
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 pb-8 border-b border-hairline w-full">
                 {/* Column 1: Brand, Motto & Social */}
                 <div className="space-y-3.5 min-w-0">
-                  <Link href="/" className="inline-flex items-center hover:opacity-85 transition-opacity">
+                  <Link
+                    href="/"
+                    aria-label="The Launch Feed — home"
+                    className="inline-flex items-center hover:opacity-85 transition-opacity"
+                  >
                     <LaunchFeedBrandLogo height={38} />
                   </Link>
                   <p className="text-xs text-ink-dim leading-relaxed font-sans">
@@ -1049,7 +1054,7 @@ export default function MainLayoutShell({
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1 text-xs text-ink-faint w-full">
                 {/* Left: Creator Attribution with Avatar */}
                 <div className="flex items-center gap-2 px-2.5 py-1 border border-hairline bg-surface/40 h-8 shrink-0">
-                  <img
+                  <img width="64" height="64"
                     src="/menajulm.avif"
                     alt="Menajul Hoque"
                     className="w-4 h-4 rounded-full object-cover grayscale opacity-85 hover:grayscale-0 hover:opacity-100 transition-all border border-hairline"
@@ -1231,7 +1236,7 @@ export default function MainLayoutShell({
 
                         <div className="w-5.5 h-5.5 rounded-full bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
                           {f.image ? (
-                            <img src={f.image} alt={f.name || f.username} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                            <img width="64" height="64" src={f.image} alt={f.name || f.username} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                           ) : (
                             (f.name || f.username).substring(0, 2).toUpperCase()
                           )}
@@ -1290,7 +1295,7 @@ export default function MainLayoutShell({
                   >
                     <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xs bg-void border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
                       {p.logoUrl ? (
-                        <img src={p.logoUrl} alt={p.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <img width="64" height="64" src={p.logoUrl} alt={p.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         p.name.substring(0, 2).toUpperCase()
                       )}

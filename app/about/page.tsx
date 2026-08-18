@@ -31,6 +31,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="max-w-4xl mx-auto py-8 sm:py-12 px-4 space-y-8 font-mono text-ink">
+      <h1 className="sr-only">About The Launch Feed</h1>
       {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <Link
@@ -147,7 +148,7 @@ export default function AboutPage() {
       {/* Creator Attribution & Contact Callout */}
       <div className="border border-hairline p-6 sm:p-8 bg-surface/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
-          <img
+          <img width="64" height="64"
             src="/menajulm.avif"
             alt="Menajul Hoque"
             className="w-14 h-14 rounded-full object-cover border border-hairline shrink-0"

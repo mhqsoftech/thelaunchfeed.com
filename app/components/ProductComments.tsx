@@ -311,7 +311,7 @@ function CommentRow({
             className="font-bold text-ink hover:underline hover:text-signal transition-colors flex items-center gap-1.5"
           >
             {c.userImage ? (
-              <img
+              <img width="64" height="64"
                 src={c.userImage}
                 alt={c.userName}
                 className="w-4 h-4 rounded-full object-cover shrink-0"

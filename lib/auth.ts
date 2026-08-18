@@ -29,16 +29,29 @@ export function invalidateUserSessionCache(userId?: string) {
 export const getCurrentUser = cache(async function getCurrentUser(): Promise<User | null> {
   try {
     const cookieStore = await cookies();
-    const token =
+    const allCookies = cookieStore.getAll();
+
+    let token =
       cookieStore.get("tlf.session_token")?.value ||
       cookieStore.get("__Secure-tlf.session_token")?.value ||
       cookieStore.get("better-auth.session_token")?.value ||
       cookieStore.get("__Secure-better-auth.session_token")?.value ||
       cookieStore.get("neon-auth.session_token")?.value ||
-      cookieStore.get("__Secure-neon-auth.session_token")?.value;
+      cookieStore.get("__Secure-neon-auth.session_token")?.value ||
+      cookieStore.get("authjs.session-token")?.value ||
+      cookieStore.get("__Secure-authjs.session-token")?.value ||
+      cookieStore.get("session_token")?.value ||
+      cookieStore.get("auth_session")?.value;
 
-    // Fast-path: if no auth session cookie exists, the visitor is definitely unauthenticated.
-    // This avoids hitting the DB / Better-Auth adapter on every anonymous request!
+    if (!token) {
+      const match = allCookies.find((c) =>
+        c.name.toLowerCase().includes("session") ||
+        c.name.toLowerCase().includes("token")
+      );
+      if (match) token = match.value;
+    }
+
+    // Fast-path: if no auth session cookie exists, the visitor is unauthenticated.
     if (!token) return null;
 
     const cached = userSessionCache.get(token);
@@ -56,7 +69,7 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Use
       }
     }
 
-    // Fallback: check session tokens directly from cookies
+    // Fallback: check session tokens directly from cookies (support both token and id)
     const decoded = decodeURIComponent(token);
     const cleanToken = decoded.replace(/^s:/, "");
     const dotSplit = cleanToken.split(".")[0];
@@ -70,10 +83,16 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Use
           { token: cleanToken },
           { token: dotSplit },
           { token: rawSplit },
+          { id: token },
+          { id: decoded },
+          { id: cleanToken },
+          { id: dotSplit },
+          { id: rawSplit },
         ],
         expiresAt: { gt: new Date() },
       },
       include: { user: true },
+      orderBy: { createdAt: "desc" },
     });
     if (session?.user) {
       userSessionCache.set(token, { user: session.user, timestamp: Date.now() });
@@ -86,7 +105,9 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Use
       userSessionCache.set(token, { user: synced.user, timestamp: Date.now() });
       return synced.user;
     }
-  } catch {}
+  } catch (err) {
+    console.warn("[auth:getCurrentUser] error resolving session:", err);
+  }
 
   return null;
 });

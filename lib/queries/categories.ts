@@ -23,53 +23,16 @@ const SLUG_ALIASES: Record<string, string> = {
  * If seed data is delisted, authentic user products remain visible.
  */
 export async function getCategoryBySlug(slug: string) {
-  const normalized = slug.trim().toLowerCase();
-  const targetSlug = SLUG_ALIASES[normalized] || normalized;
+  try {
+    const normalized = slug.trim().toLowerCase();
+    const targetSlug = SLUG_ALIASES[normalized] || normalized;
 
-  const { getDelistedSections } = await import("@/lib/queries/products");
-  const delistedSections = await getDelistedSections();
-  const isDelisted = delistedSections.includes("categories") || delistedSections.includes("all");
+    const { getDelistedSections } = await import("@/lib/queries/products");
+    const delistedSections: string[] = await getDelistedSections().catch(() => []);
+    const isDelisted = delistedSections.includes("categories") || delistedSections.includes("all");
 
-  let category = await prisma.category.findUnique({
-    where: { slug: targetSlug },
-    include: {
-      products: {
-        where: {
-          status: "LIVE",
-          ...(isDelisted ? GENUINE_PRODUCT_FILTER : {}),
-        },
-        orderBy: [{ voteCount: "desc" }, { launchedAt: "desc" }],
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          tagline: true,
-          description: true,
-          logoUrl: true,
-          websiteUrl: true,
-          voteCount: true,
-          commentCount: true,
-          launchedAt: true,
-          tags: true,
-          owner: {
-            select: { username: true, name: true, image: true },
-          },
-          revenue: {
-            select: { isVerified: true, mrrCents: true },
-          },
-        },
-      },
-    },
-  });
-
-  if (!category) {
-    category = await prisma.category.findFirst({
-      where: {
-        OR: [
-          { slug: { equals: targetSlug, mode: "insensitive" } },
-          { name: { equals: targetSlug, mode: "insensitive" } },
-        ],
-      },
+    let category = await prisma.category.findUnique({
+      where: { slug: targetSlug },
       include: {
         products: {
           where: {
@@ -98,18 +61,60 @@ export async function getCategoryBySlug(slug: string) {
           },
         },
       },
-    });
+    }).catch(() => null);
+
+    if (!category) {
+      category = await prisma.category.findFirst({
+        where: {
+          OR: [
+            { slug: { equals: targetSlug, mode: "insensitive" } },
+            { name: { equals: targetSlug, mode: "insensitive" } },
+          ],
+        },
+        include: {
+          products: {
+            where: {
+              status: "LIVE",
+              ...(isDelisted ? GENUINE_PRODUCT_FILTER : {}),
+            },
+            orderBy: [{ voteCount: "desc" }, { launchedAt: "desc" }],
+            select: {
+              id: true,
+              slug: true,
+              name: true,
+              tagline: true,
+              description: true,
+              logoUrl: true,
+              websiteUrl: true,
+              voteCount: true,
+              commentCount: true,
+              launchedAt: true,
+              tags: true,
+              owner: {
+                select: { username: true, name: true, image: true },
+              },
+              revenue: {
+                select: { isVerified: true, mrrCents: true },
+              },
+            },
+          },
+        },
+      }).catch(() => null);
+    }
+
+    if (!category) return null;
+
+    return {
+      ...category,
+      products: category.products.map((p) => ({
+        ...p,
+        websiteUrl: formatProductWebsiteUrl(p.websiteUrl),
+      })),
+    };
+  } catch (err) {
+    console.error(`[getCategoryBySlug] error loading slug "${slug}":`, err);
+    return null;
   }
-
-  if (!category) return null;
-
-  return {
-    ...category,
-    products: category.products.map((p) => ({
-      ...p,
-      websiteUrl: formatProductWebsiteUrl(p.websiteUrl),
-    })),
-  };
 }
 
 export const getCategoryWithProducts = getCategoryBySlug;

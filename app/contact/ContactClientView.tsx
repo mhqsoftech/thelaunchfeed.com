@@ -198,6 +198,7 @@ export default function ContactClientView() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 sm:py-12 px-4 space-y-8 font-mono text-ink">
+      <h1 className="sr-only">Contact The Launch Feed</h1>
       {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <Link
@@ -298,10 +299,12 @@ export default function ContactClientView() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs uppercase font-bold text-ink-dim mb-1.5">
+                  <label htmlFor="contact-name" className="block text-xs uppercase font-bold text-ink-dim mb-1.5">
                     Your Name
                   </label>
                   <input
+                    id="contact-name"
+                    name="name"
                     type="text"
                     placeholder="e.g. Alex Rivera"
                     value={name}
@@ -311,10 +314,12 @@ export default function ContactClientView() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs uppercase font-bold text-ink-dim mb-1.5">
+                  <label htmlFor="contact-email" className="block text-xs uppercase font-bold text-ink-dim mb-1.5">
                     Email Address *
                   </label>
                   <input
+                    id="contact-email"
+                    name="email"
                     type="email"
                     required
                     placeholder="e.g. alex@example.com"
@@ -327,10 +332,12 @@ export default function ContactClientView() {
               </div>
 
               <div>
-                <label className="block text-xs uppercase font-bold text-ink-dim mb-1.5">
+                <label htmlFor="contact-message" className="block text-xs uppercase font-bold text-ink-dim mb-1.5">
                   Message / Details *
                 </label>
                 <textarea
+                  id="contact-message"
+                  name="message"
                   required
                   rows={5}
                   placeholder="Describe your inquiry, product launch question, or feedback in detail..."

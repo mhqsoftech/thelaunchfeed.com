@@ -51,6 +51,32 @@ export default function ProfileClientView({
     "products" | "subscriptions" | "saved" | "settings"
   >("products");
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewData, setPreviewData] = useState<{
+    view: any;
+    suggestedFounders: any[];
+  } | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isPreviewing) return;
+    const username = session?.handle?.replace(/^@/, "").trim();
+    if (!username) return;
+    let cancelled = false;
+    setPreviewLoading(true);
+    fetch(`/api/founder/${encodeURIComponent(username)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        setPreviewData(data);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPreviewing, session?.handle]);
 
   /* Form states — kept separate so unsaved edits survive preview toggle */
   const [name, setName] = useState("");
@@ -593,6 +619,9 @@ export default function ProfileClientView({
   const savedProducts: InteractionProduct[] = savedProductsState;
   const upvotedProducts: InteractionProduct[] = upvotedProductsState;
 
+  const draftProducts = productsList.filter((p) => (p as MyProduct).status === "DRAFT");
+  const nonDraftProducts = productsList.filter((p) => (p as MyProduct).status !== "DRAFT");
+
   const previewRevenue = revenue || session.revenue;
   const isRevenueVerified = Boolean(
     previewRevenue &&
@@ -604,67 +633,88 @@ export default function ProfileClientView({
   return (
     <MainLayoutShell>
       <div className="space-y-5 sm:space-y-6 pb-16 font-mono text-ink">
+        <h1 className="sr-only">Your Profile</h1>
         {/* ── Sticky Tab Header & Attached Preview Sub-Strip ── */}
         <div className="sticky -top-4 z-30 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 pb-2.5">
             {/* Left cluster: back-nav + tab buttons */}
-            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar -mx-1 px-1">
+            <div className="w-full sm:w-auto flex items-center gap-1.5 sm:gap-3">
+              {/* Mobile compact back button */}
               <Link
                 href="/"
-                className="text-xs font-mono text-ink-dim hover:text-ink flex items-center gap-1.5 transition-colors shrink-0 whitespace-nowrap"
+                title="Back to Launch Feed"
+                className="sm:hidden h-7 w-7 border border-hairline bg-surface hover:bg-raised text-ink flex items-center justify-center shrink-0 text-xs font-mono font-bold transition-colors"
+              >
+                ←
+              </Link>
+
+              {/* Desktop full back link */}
+              <Link
+                href="/"
+                className="hidden sm:flex text-xs font-mono text-ink-dim hover:text-ink items-center gap-1.5 transition-colors shrink-0 whitespace-nowrap"
               >
                 ← Back to Launch Feed
               </Link>
-              <span className="h-4 w-px bg-hairline shrink-0" aria-hidden />
-              <div className="flex items-center gap-1">
-              {(
-                [
-                  { id: "products", label: "MY PRODUCTS" },
-                  { id: "subscriptions", label: "SUBSCRIPTIONS" },
-                  { id: "saved", label: "SAVED" },
-                  { id: "settings", label: "SETTINGS" },
-                ] as const
-              ).map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    setIsPreviewing(false);
-                  }}
-                  className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer shrink-0 whitespace-nowrap ${
-                    !isPreviewing && activeTab === tab.id
-                      ? tab.id === "subscriptions"
-                        ? "bg-signal text-void"
-                        : "bg-ink text-void"
-                      : "text-ink-dim hover:text-ink border border-hairline"
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              <span className="hidden sm:block h-4 w-px bg-hairline shrink-0" aria-hidden />
+
+              {/* 4 Tabs: fit 100% of remaining width on mobile */}
+              <div className="flex-1 grid grid-cols-4 gap-1 sm:flex sm:items-center sm:gap-1">
+                {(
+                  [
+                    { id: "products", label: "MY PRODUCTS", shortLabel: "Products" },
+                    { id: "subscriptions", label: "SUBSCRIPTIONS", shortLabel: "Subs" },
+                    { id: "saved", label: "SAVED", shortLabel: "Saved" },
+                    { id: "settings", label: "SETTINGS", shortLabel: "Settings" },
+                  ] as const
+                ).map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setIsPreviewing(false);
+                    }}
+                    className={`h-7 px-1 sm:px-3 text-[10px] sm:text-[11px] font-bold uppercase tracking-wider transition-colors cursor-pointer shrink-0 whitespace-nowrap inline-flex items-center justify-center border text-center ${
+                      !isPreviewing && activeTab === tab.id
+                        ? "bg-signal/10 text-signal border-signal/50"
+                        : "text-ink-dim hover:text-ink hover:border-ink-dim border-hairline bg-transparent"
+                    }`}
+                  >
+                    <span className="sm:hidden">{tab.shortLabel}</span>
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
+            {/* Action buttons: Single row across 100% mobile width */}
+            <div className="w-full grid grid-cols-3 gap-1 sm:flex sm:w-auto sm:items-center sm:gap-1.5">
               <button
                 type="button"
                 onClick={() => setIsPreviewing(!isPreviewing)}
-                className={`px-3 py-1 text-[11px] font-mono font-bold border transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
+                className={`h-7 px-1.5 sm:px-3 text-[10px] sm:text-[11px] font-mono font-bold border transition-colors shrink-0 inline-flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap text-center ${
                   isPreviewing
-                    ? "border-signal bg-signal text-void"
-                    : "border-ink bg-ink text-void hover:bg-ink-dim"
+                    ? "border-signal/60 bg-signal/15 text-signal"
+                    : "border-signal/40 bg-signal/5 text-signal hover:bg-signal/10"
                 }`}
               >
-                {isPreviewing
-                  ? "← Back to Dashboard"
-                  : "Preview Public Profile"}
+                {isPreviewing ? (
+                  <>
+                    <span className="sm:hidden">← Dashboard</span>
+                    <span className="hidden sm:inline">← Back to Dashboard</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="sm:hidden">Preview</span>
+                    <span className="hidden sm:inline">Preview Public Profile</span>
+                  </>
+                )}
               </button>
+
               {isAdmin ? (
                 <Link
                   href="/admin"
-                  className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline bg-surface text-ink hover:border-signal hover:text-signal transition-colors shrink-0 flex items-center gap-1.5 whitespace-nowrap"
+                  className="h-7 px-1.5 sm:px-3 text-[10px] sm:text-[11px] font-mono font-bold border border-hairline bg-surface text-ink hover:border-signal hover:text-signal transition-colors shrink-0 inline-flex items-center justify-center gap-1 whitespace-nowrap text-center"
                   title="Admin Dashboard"
                 >
                   <svg
@@ -680,20 +730,23 @@ export default function ProfileClientView({
                     <circle cx="12" cy="11" r="2" />
                     <path d="M12 16v1" />
                   </svg>
-                  Dashboard
+                  <span className="sm:hidden">Admin</span>
+                  <span className="hidden sm:inline">Dashboard</span>
                 </Link>
               ) : (
                 <Link
                   href="/submit"
-                  className="px-3 py-1 text-[11px] font-mono font-bold bg-signal text-void hover:bg-signal/80 transition-colors shrink-0 flex items-center gap-1 whitespace-nowrap"
+                  className="h-7 px-1.5 sm:px-3 text-[10px] sm:text-[11px] font-mono font-bold bg-signal text-void hover:bg-signal/80 transition-colors shrink-0 inline-flex items-center justify-center gap-1 whitespace-nowrap text-center"
                 >
-                  + Launch New
+                  <span className="sm:hidden">+ Launch</span>
+                  <span className="hidden sm:inline">+ Launch New</span>
                 </Link>
               )}
+
               <button
                 type="button"
                 onClick={handleLogout}
-                className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline text-ink-dim hover:text-signal hover:border-signal/50 transition-colors cursor-pointer shrink-0 whitespace-nowrap"
+                className="h-7 px-1.5 sm:px-3 text-[10px] sm:text-[11px] font-mono font-bold border border-hairline text-ink-dim hover:text-signal hover:border-signal/50 transition-colors cursor-pointer shrink-0 inline-flex items-center justify-center whitespace-nowrap text-center"
               >
                 Logout
               </button>
@@ -724,42 +777,27 @@ export default function ProfileClientView({
             PREVIEW MODE — In-Place Public Profile (FULL VIEW)
             ═════════════════════════════════════════ */}
         {isPreviewing ? (
-          <FounderProfileContent
-            founder={{
-              id: session.id,
-              username: session.handle.replace(/^@/, ""),
-              name: name || session.name || session.handle.replace(/^@/, ""),
-              handle: session.handle,
-              title: title || session.title || "",
-              bio: bio || session.bio || "",
-              image: image || session.image || null,
-              website: website || session.website || "",
-              twitter: twitter || session.twitter || "",
-              github: github || session.github || "",
-              revenue: revenue || session.revenue || "",
-              totalVotes: productsList
-                .filter((p) => p.status === "LIVE" || p.status === "PUBLISHED")
-                .reduce((sum, p) => sum + (p.votes || p.voteCount || 0), 0),
-              productsCount: productsList.filter(
-                (p) => p.status === "LIVE" || p.status === "PUBLISHED"
-              ).length,
-              joinedAt: new Date().toISOString().slice(0, 10),
-              products: productsList
-                .filter((p) => p.status === "LIVE" || p.status === "PUBLISHED")
-                .map((p) => ({
-                  id: p.id,
-                  slug: p.slug,
-                  name: p.name,
-                  tagline: p.tagline,
-                  votes: p.votes || p.voteCount || 0,
-                  launchedAt: p.launchedAt || new Date().toISOString().slice(0, 10),
-                  category: p.category,
-                  revenue: p.revenue,
-                  awards: p.awards || [],
-                })),
-            }}
-            onExitPreview={() => setIsPreviewing(false)}
-          />
+          previewData?.view ? (
+            <FounderProfileContent
+              founder={{
+                ...previewData.view,
+                // Overlay any unsaved edits so what-you-see-is-what-you-publish.
+                name: name || previewData.view.name,
+                title: title || previewData.view.title,
+                bio: bio || previewData.view.bio,
+                image: image || previewData.view.image,
+                website: website || previewData.view.website,
+                twitter: twitter || previewData.view.twitter,
+                github: github || previewData.view.github,
+              }}
+              suggestedFounders={previewData.suggestedFounders || []}
+              onExitPreview={() => setIsPreviewing(false)}
+            />
+          ) : (
+            <div className="w-full py-24 flex items-center justify-center text-xs font-mono text-ink-dim">
+              {previewLoading ? "Loading preview…" : "Preview unavailable."}
+            </div>
+          )
         ) : (
           /* ═══════════════════════════
              DASHBOARD MODE — Edit View
@@ -767,14 +805,14 @@ export default function ProfileClientView({
           <div className="space-y-5 sm:space-y-6">
             {/* Profile Hero Card */}
             <div className="border border-hairline bg-surface/40 p-4 sm:p-6 md:p-8 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-hairline pb-4">
-                <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-hairline pb-4">
+                <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                   <div className="w-12 h-12 sm:w-16 sm:h-16 bg-ink text-void border border-hairline shrink-0 rounded-xs flex items-center justify-center font-mono font-bold text-lg sm:text-2xl overflow-hidden">
                     {image || session.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <img width="64" height="64"
                         src={image || session.image || ""}
-                        alt=""
+                        alt={`${session.name || "Profile"} avatar`}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -783,7 +821,7 @@ export default function ProfileClientView({
                   </div>
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h1 className="font-mono text-lg sm:text-2xl font-bold text-ink truncate">
+                      <h1 className="font-mono text-lg sm:text-2xl font-bold text-ink truncate leading-tight">
                         {session.name}
                       </h1>
                       <span className="text-xs font-mono text-ink-dim shrink-0">
@@ -800,15 +838,32 @@ export default function ProfileClientView({
                 </div>
 
                 {isRevenueVerified && (
-                  <div className="text-left sm:text-right shrink-0 space-y-1">
-                    <div className="text-xs font-mono text-ink-faint uppercase">
-                      VERIFIED REVENUE
+                  <div className="shrink-0 border border-verified/40 bg-void/60 rounded-xs px-3 py-2 sm:px-3.5 sm:py-2.5 flex flex-col sm:items-end gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-ink-faint uppercase tracking-wider">
+                        Verified Revenue
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {(connectedProviders.length > 0
+                          ? connectedProviders.map((p) => {
+                              const raw = (p.provider || "").toString();
+                              return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+                            })
+                          : ["Stripe"]
+                        ).map((name) => (
+                          <div
+                            key={name}
+                            title={`Verified via ${name}`}
+                            aria-label={`Verified via ${name}`}
+                            className="w-5 h-5 border border-verified/40 bg-surface rounded-xs flex items-center justify-center"
+                          >
+                            <PaymentProviderLogo id={name} className="w-3 h-3" />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="text-lg font-mono font-bold text-ink">
+                    <div className="text-lg sm:text-xl font-mono font-bold text-ink leading-none">
                       {session.revenue}
-                    </div>
-                    <div className="text-[10px] font-mono px-2 py-0.5 border border-verified/50 text-verified bg-void uppercase inline-block">
-                      ✓ Stripe Verified
                     </div>
                   </div>
                 )}
@@ -886,14 +941,102 @@ export default function ProfileClientView({
               </div>
             </div>
 
-            {/* ─── TAB 1: MY LAUNCHED PRODUCTS ─── */}
+            {/* ─── TAB 1: MY PRODUCTS (drafts on top, launched below) ─── */}
             {activeTab === "products" && (
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-6 sm:space-y-8">
+                {draftProducts.length > 0 && (
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-hairline pb-2 gap-1">
+                      <h2 className="font-mono text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                        <span>My Drafts</span>
+                        <span className="text-[10px] text-ink-faint font-normal">
+                          ({draftProducts.length} Saved)
+                        </span>
+                      </h2>
+                    </div>
+                    <div className="space-y-3">
+                      {draftProducts.map((d) => {
+                        const submissionId = (d as MyProduct).submissionId;
+                        return (
+                          <div
+                            key={d.id}
+                            className="p-4 sm:p-5 border border-dashed border-ink-faint/40 bg-surface/20 space-y-3 transition-colors hover:border-ink-faint"
+                          >
+                            <div className="flex items-start gap-3 sm:gap-3.5">
+                              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs sm:text-sm text-ink overflow-hidden relative">
+                                {d.logoUrl ? (
+                                  <img
+                                    width="64"
+                                    height="64"
+                                    src={d.logoUrl}
+                                    alt={d.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span>{(d.name || "??").substring(0, 2).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-mono text-sm sm:text-base font-bold text-ink truncate">
+                                    {d.name || "Untitled draft"}
+                                  </span>
+                                  <span className="font-mono text-[10px] font-bold text-ink-dim border border-hairline px-2 py-0.5 uppercase tracking-wider shrink-0">
+                                    Draft
+                                  </span>
+                                </div>
+                                {d.tagline && (
+                                  <p className="text-xs text-ink-dim line-clamp-2">{d.tagline}</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-hairline/60">
+                              <div className="text-[10px] font-mono text-ink-faint uppercase">
+                                Not scheduled · publish to queue via edit → Submit
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {submissionId && (
+                                  <Link
+                                    href={`/submit?edit=sub:${submissionId}`}
+                                    className="px-3 py-1.5 text-[11px] font-mono font-bold border border-signal/50 bg-signal/10 text-signal hover:bg-signal/20 uppercase tracking-wider transition-colors"
+                                  >
+                                    Continue Editing →
+                                  </Link>
+                                )}
+                                {submissionId && (
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!confirm(`Delete draft "${d.name || "Untitled"}"? This can't be undone.`)) return;
+                                      try {
+                                        const { deleteMyDraft } = await import("@/app/actions/submissions");
+                                        await deleteMyDraft(submissionId);
+                                        setProductsList((prev) => prev.filter((x) => x.id !== d.id));
+                                      } catch (err) {
+                                        console.error("[delete-draft] failed", err);
+                                        alert("Could not delete draft — please try again.");
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 text-[11px] font-mono font-bold border border-hairline bg-void text-ink-dim hover:text-signal hover:border-signal/50 uppercase tracking-wider transition-colors cursor-pointer"
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3 sm:space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-hairline pb-2 gap-1">
                   <h2 className="font-mono text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-2">
                     <span>My Launched Products</span>
                     <span className="text-[10px] text-ink-faint font-normal">
-                      ({productsList.length} Total)
+                      ({nonDraftProducts.length} Total)
                     </span>
                   </h2>
                   <Link
@@ -904,7 +1047,7 @@ export default function ProfileClientView({
                   </Link>
                 </div>
                 <div className="space-y-4">
-                  {productsList.length === 0 && loadingProducts && (
+                  {nonDraftProducts.length === 0 && loadingProducts && (
                     <div className="space-y-3">
                       {[1, 2].map((n) => (
                         <div key={n} className="p-4 sm:p-5 border border-hairline bg-surface/20 space-y-3 animate-pulse">
@@ -921,7 +1064,7 @@ export default function ProfileClientView({
                       ))}
                     </div>
                   )}
-                  {productsList.length === 0 && !loadingProducts && (
+                  {nonDraftProducts.length === 0 && !loadingProducts && (
                     <div className="border border-hairline bg-surface/30 p-6 sm:p-8 text-center space-y-3">
                       <div className="text-xs font-bold uppercase tracking-wider text-ink-dim">
                         No products launched yet
@@ -938,7 +1081,7 @@ export default function ProfileClientView({
                       </Link>
                     </div>
                   )}
-                  {productsList.map((p) => {
+                  {nonDraftProducts.map((p) => {
                     const isEmbedOpen = activeEmbedProductId === p.id;
                     const isEditing = editingProduct?.id === p.id;
                     const status = (p as MyProduct).status;
@@ -962,7 +1105,7 @@ export default function ProfileClientView({
                             {/* Minimal Product Logo */}
                             <div className="w-10 h-10 sm:w-11 sm:h-11 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs sm:text-sm text-ink overflow-hidden relative">
                               {p.logoUrl ? (
-                                <img
+                                <img width="64" height="64"
                                   src={p.logoUrl}
                                   alt={p.name}
                                   className="w-full h-full object-cover"
@@ -1274,6 +1417,7 @@ export default function ProfileClientView({
                     );
                   })}
                 </div>
+                </div>
               </div>
             )}
 
@@ -1347,7 +1491,7 @@ export default function ProfileClientView({
                               <div className="flex items-start gap-3 min-w-0 flex-1">
                                 <div className="w-10 h-10 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden relative rounded-xs">
                                   {slot.product?.logoUrl ? (
-                                    <img
+                                    <img width="64" height="64"
                                       src={slot.product.logoUrl}
                                       alt={slot.product.name}
                                       className="w-full h-full object-cover"
@@ -1487,7 +1631,7 @@ export default function ProfileClientView({
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <div className="w-8 h-8 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden rounded-xs">
                                 {p.logoUrl ? (
-                                  <img src={p.logoUrl} alt={p.name} className="w-full h-full object-cover" />
+                                  <img width="64" height="64" src={p.logoUrl} alt={p.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <span>{p.name.substring(0, 2).toUpperCase()}</span>
                                 )}
@@ -1822,7 +1966,7 @@ export default function ProfileClientView({
                       <div className="w-16 h-16 rounded-xs bg-void border border-hairline overflow-hidden flex items-center justify-center shrink-0">
                         {image ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img
+                          <img width="64" height="64"
                             src={image}
                             alt="Profile"
                             className="w-full h-full object-cover"

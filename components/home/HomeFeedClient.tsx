@@ -818,10 +818,11 @@ export default function HomeFeedClient({
                           {/* Product Logo */}
                           <div className="w-10 h-10 sm:w-11 sm:h-11 bg-surface border border-hairline flex-shrink-0 rounded-xs flex items-center justify-center font-mono text-[10px] sm:text-xs font-bold text-ink-dim overflow-hidden relative">
                             {prod.logoUrl ? (
-                              <img
+                              <img width="64" height="64"
                                 src={prod.logoUrl}
                                 alt={prod.name}
-                                loading="lazy"
+                                loading={catRank === 1 ? "eager" : "lazy"}
+                                fetchPriority={catRank === 1 ? "high" : "auto"}
                                 decoding="async"
                                 className="w-full h-full object-cover"
                               />
@@ -911,7 +912,7 @@ export default function HomeFeedClient({
                     {/* Product Logo with Fallback to Initials */}
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-surface border border-hairline flex-shrink-0 rounded-xs flex items-center justify-center font-mono text-[10px] sm:text-xs font-bold text-ink-dim overflow-hidden relative">
                       {prod.logoUrl ? (
-                        <img
+                        <img width="64" height="64"
                           src={prod.logoUrl}
                           alt={prod.name}
                           loading="lazy"

@@ -6,8 +6,9 @@ import {
   getCategoriesWithCounts,
 } from "@/lib/queries/categories";
 import CategoryClientView from "./CategoryClientView";
+import { organizationNode, websiteNode, breadcrumb, ORG_ID, WEBSITE_ID, SITE_NAME } from "@/lib/seo/schema";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 300;
 
 /* ───────────── Static Params for build ───────────── */
 
@@ -64,20 +65,11 @@ export async function generateMetadata({
       type: "website",
       url: canonicalUrl,
       siteName: "The Launch Feed",
-      images: [
-        {
-          url: `${siteUrl}/icon.svg`,
-          width: 1200,
-          height: 630,
-          alt: `${category.name} on The Launch Feed`,
-        },
-      ],
     },
     twitter: {
       card: "summary_large_image",
       title: `${category.name} - The Launch Feed`,
       description: desc,
-      images: [`${siteUrl}/icon.svg`],
       creator: "@thelaunchfeed",
     },
     robots: {
@@ -108,47 +100,47 @@ export default async function CategoryPage({
   const allCategories = await getCategoriesWithCounts();
   const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
 
+  const categoryUrl = `${siteUrl}/category/${category.slug}`;
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
+      organizationNode(),
+      websiteNode(),
       {
         "@type": "CollectionPage",
-        "@id": `${siteUrl}/category/${category.slug}`,
-        name: `${category.name} Products`,
-        description: `Curated directory of ${category.name} software and tools launched on The Launch Feed.`,
-        url: `${siteUrl}/category/${category.slug}`,
+        "@id": `${categoryUrl}#page`,
+        name: `${category.name} Products — ${SITE_NAME}`,
+        description: `Curated directory of ${category.name} software and tools launched on ${SITE_NAME}.`,
+        url: categoryUrl,
+        isPartOf: { "@id": WEBSITE_ID },
+        publisher: { "@id": ORG_ID },
+        breadcrumb: { "@id": `${categoryUrl}#breadcrumb` },
         mainEntity: {
           "@type": "ItemList",
+          numberOfItems: category.products.length,
+          itemListOrder: "https://schema.org/ItemListOrderDescending",
           itemListElement: category.products.map((p, idx) => ({
             "@type": "ListItem",
             position: idx + 1,
-            name: p.name,
             url: `${siteUrl}/product/${p.slug}`,
+            item: {
+              "@type": "SoftwareApplication",
+              name: p.name,
+              url: `${siteUrl}/product/${p.slug}`,
+              applicationCategory: category.name,
+              ...((p as any).logoUrl ? { image: (p as any).logoUrl } : {}),
+              ...((p as any).tagline ? { description: (p as any).tagline } : {}),
+            },
           })),
         },
       },
       {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: "Home",
-            item: siteUrl,
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: "Categories",
-            item: `${siteUrl}/`,
-          },
-          {
-            "@type": "ListItem",
-            position: 3,
-            name: category.name,
-            item: `${siteUrl}/category/${category.slug}`,
-          },
-        ],
+        ...breadcrumb([
+          { name: "Home", url: siteUrl },
+          { name: "Categories", url: `${siteUrl}/` },
+          { name: category.name, url: categoryUrl },
+        ]),
+        "@id": `${categoryUrl}#breadcrumb`,
       },
     ],
   };

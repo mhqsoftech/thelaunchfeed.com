@@ -26,6 +26,17 @@ type Events = {
       previousRank: number | null;
     };
   };
+  "indexing.submit.requested": {
+    data: {
+      urls: string[];
+      type?: "URL_UPDATED" | "URL_DELETED";
+    };
+  };
+  "indexing.sync.requested": {
+    data?: {
+      limit?: number;
+    };
+  };
 };
 
 export const inngest = new Inngest({

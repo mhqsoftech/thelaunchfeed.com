@@ -33,6 +33,7 @@ export default function PrivacyPolicyPage() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 sm:py-12 px-4 space-y-8 font-mono text-ink">
+      <h1 className="sr-only">Privacy Policy</h1>
       {/* Top Navigation */}
       <div className="flex items-center justify-between">
         <Link

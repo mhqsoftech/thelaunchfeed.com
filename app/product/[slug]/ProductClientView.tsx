@@ -8,6 +8,7 @@ import MainLayoutShell from "@/app/MainLayoutShell";
 import VerifiedRevenueChart from "@/app/components/VerifiedRevenueChart";
 import ProductComments from "@/app/components/ProductComments";
 import EmbeddableAwardWidget, { type EmbedAwardId } from "@/app/components/EmbeddableAwardWidget";
+import PrimaryCTA from "@/components/ui/PrimaryCTA";
 import { slugify, getStoredSession, saveSession, UserSession, formatProductWebsiteUrl } from "@/app/data";
 import { toggleVote, toggleBookmark } from "@/app/actions/interactions";
 import { getAccoladeDetails, type AccoladeItem, type ProductAward } from "@/lib/awards";
@@ -60,6 +61,7 @@ export type ViewProduct = {
   tags?: string[];
   category: string;
   launchedAt: string;
+  updatedAt?: string | null;
   votes: number;
   maker: string;
   makerName: string;
@@ -491,7 +493,7 @@ export default function ProductClientView({
             <div className="flex items-start gap-3.5 sm:gap-4 min-w-0 flex-1">
               <div className="w-13 h-13 sm:w-16 sm:h-16 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono text-lg sm:text-xl font-bold text-ink overflow-hidden relative">
                 {(product as any).logoUrl || (product as any).thumbnailAvif ? (
-                  <img
+                  <img width="64" height="64"
                     src={((product as any).logoUrl || (product as any).thumbnailAvif) as string}
                     alt={product.name}
                     loading="lazy"
@@ -559,15 +561,16 @@ export default function ProductClientView({
                   {product.tagline}
                 </p>
 
-                <div className="flex items-center gap-x-2 gap-y-1 pt-0.5 text-[11px] sm:text-xs font-mono text-ink-faint flex-wrap">
+                <address className="not-italic flex items-center gap-x-2 gap-y-1 pt-0.5 text-[11px] sm:text-xs font-mono text-ink-faint flex-wrap">
                   <span>Maker:</span>
                   <Link
                     href={`/founder/${product.makerUsername || slugify(product.makerName || product.maker)}`}
+                    rel="author"
                     className="flex items-center gap-1.5 text-ink hover:underline font-medium hover:text-signal transition-colors group"
                   >
                     <span className="w-4 h-4 rounded-xs bg-surface border border-hairline flex items-center justify-center font-mono text-[8px] font-bold text-ink-dim overflow-hidden relative shrink-0">
                       {product.makerImage ? (
-                        <img src={product.makerImage} alt={product.makerName} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <img width="64" height="64" src={product.makerImage} alt={product.makerName} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         product.makerName.substring(0, 2).toUpperCase()
                       )}
@@ -575,8 +578,20 @@ export default function ProductClientView({
                     <span>{product.makerName} ({product.maker})</span>
                   </Link>
                   <span>·</span>
-                  <span>Launched {product.launchedAt}</span>
-                </div>
+                  <span>
+                    Launched{" "}
+                    <time dateTime={product.launchedAt}>{product.launchedAt}</time>
+                  </span>
+                  {product.updatedAt && product.updatedAt !== product.launchedAt && (
+                    <>
+                      <span>·</span>
+                      <span>
+                        Updated{" "}
+                        <time dateTime={product.updatedAt}>{product.updatedAt.slice(0, 10)}</time>
+                      </span>
+                    </>
+                  )}
+                </address>
               </div>
             </div>
 
@@ -763,7 +778,7 @@ export default function ProductClientView({
                 className={`${galleryItems.length === 1 ? "w-full aspect-video" : "snap-start shrink-0 w-[240px] sm:w-[320px] h-[170px] sm:h-[190px]"} border border-hairline bg-surface p-2 flex flex-col justify-between cursor-pointer hover:border-ink transition-all relative group overflow-hidden`}
               >
                 {img.url ? (
-                  <img src={img.url} alt={img.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                  <img width="64" height="64" src={img.url} alt={img.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                 ) : (
                   <>
                     <div className="flex items-center justify-between text-ink-faint text-xs font-mono">
@@ -1158,7 +1173,7 @@ export default function ProductClientView({
                 className="w-12 h-12 sm:w-14 sm:h-14 bg-surface border border-hairline rounded-sm flex items-center justify-center font-mono font-bold text-ink shrink-0 overflow-hidden relative group hover:border-signal transition-colors"
               >
                 {product.makerImage ? (
-                  <img
+                  <img width="64" height="64"
                     src={product.makerImage}
                     alt={product.makerName}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -1290,7 +1305,7 @@ export default function ProductClientView({
             </div>
             <div className="w-full max-h-[75vh] bg-surface border border-hairline flex items-center justify-center overflow-hidden p-2">
               {selectedImage.startsWith("http") || selectedImage.startsWith("data:") || selectedImage.startsWith("/") ? (
-                <img
+                <img width="64" height="64"
                   src={selectedImage}
                   alt="High Resolution Screenshot Preview"
                   className="max-h-[70vh] w-auto max-w-full object-contain rounded-xs shadow-lg"
@@ -1305,6 +1320,8 @@ export default function ProductClientView({
         </div>,
         document.body
       )}
+
+      <PrimaryCTA variant="product" className="mt-6" />
 
       {/* Similar Products in Category Section */}
       {similarProducts.length > 0 && (
@@ -1355,7 +1372,7 @@ export default function ProductClientView({
                   <div className="flex items-start justify-between gap-2">
                     <div className="w-9 h-9 bg-surface border border-hairline flex items-center justify-center font-mono font-bold text-xs text-ink shrink-0 overflow-hidden">
                       {sim.logoUrl ? (
-                        <img
+                        <img width="64" height="64"
                           src={sim.logoUrl}
                           alt={sim.name}
                           loading="lazy"

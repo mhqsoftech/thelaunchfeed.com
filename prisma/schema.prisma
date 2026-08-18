@@ -159,6 +159,7 @@ model Submission {
 }
 
 enum SubmissionStatus {
+  DRAFT
   SCHEDULED
   PUBLISHED
   REJECTED
@@ -557,3 +558,60 @@ model AppSetting {
   value     Json
   updatedAt DateTime @updatedAt
 }
+
+// ──────────────────────────────────────────────────────────────────────────────
+// WEB SEARCH INDEXING LOGS  ·  Tracks Google Indexing API & IndexNow submissions
+// Enforces max 200 links/day quota and audits automated/deploy indexing calls.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model WebIndexingLog {
+  id           String   @id @default(cuid())
+  url          String
+  engine       String   @default("GOOGLE")
+  type         String   @default("URL_UPDATED")
+  status       String   @default("SUCCESS")
+  httpStatus   Int?
+  responseBody String?  @db.Text
+  errorMessage String?  @db.Text
+  submittedAt  DateTime @default(now())
+
+  @@index([submittedAt])
+  @@index([status, submittedAt])
+  @@index([engine, submittedAt])
+  @@index([url])
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// DIRECTORY PROSPECT LEADS  ·  Crawled & Imported Founder/Product Contacts
+// Tracks source directory attribution, unique emails, and automated outreach.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model DirectoryLead {
+  id              String              @id @default(cuid())
+  name            String              @default("")
+  email           String              @unique
+  organization    String              @default("")
+  productUrl      String?
+  sourceDirectory String              @default("Product Hunt")
+  sourceUrl       String?
+  status          DirectoryLeadStatus @default(NEW)
+  notes           String?             @db.Text
+  lastEmailedAt   DateTime?
+  emailCount      Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([sourceDirectory])
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+enum DirectoryLeadStatus {
+  NEW
+  EMAILED
+  CONVERTED
+  BOUNCED
+  UNSUBSCRIBED
+}
+
+

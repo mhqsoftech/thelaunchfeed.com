@@ -5,6 +5,7 @@ import Link from "next/link";
 import MainLayoutShell from "@/app/MainLayoutShell";
 import { slugify, getStoredSession, UserSession } from "@/app/data";
 import VerifiedRevenueChart from "@/app/components/VerifiedRevenueChart";
+import PrimaryCTA from "@/components/ui/PrimaryCTA";
 import type { SuggestedFounder } from "@/lib/queries/user";
 import {
   getFounderScore,
@@ -86,7 +87,7 @@ function FounderAvatar({
 
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <img width="64" height="64"
       src={src}
       alt={name}
       loading="lazy"
@@ -216,6 +217,17 @@ export function FounderProfileContent({
               {founder.title && (
                 <p className="font-mono text-xs font-semibold text-signal break-words">
                   {founder.title}
+                </p>
+              )}
+              {founder.joinedAt && (
+                <p className="font-mono text-[11px] text-ink-faint">
+                  Member since{" "}
+                  <time dateTime={founder.joinedAt}>
+                    {new Date(founder.joinedAt).toLocaleDateString("en-US", {
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </time>
                 </p>
               )}
             </div>
@@ -443,7 +455,7 @@ export function FounderProfileContent({
                     <div className="w-10 h-10 sm:w-12 sm:h-12 bg-surface border border-hairline rounded-sm flex items-center justify-center font-mono text-xs sm:text-sm font-bold text-ink shrink-0 overflow-hidden">
                       {prod.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={prod.logoUrl} alt={prod.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        <img width="64" height="64" src={prod.logoUrl} alt={prod.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
                         prod.name.substring(0, 2).toUpperCase()
                       )}
@@ -537,6 +549,7 @@ export function FounderProfileContent({
           </div>
         </div>
       )}
+      <PrimaryCTA variant="founder" />
       {/* Similar / Suggested Founders Carousel */}
       {suggestedFounders && suggestedFounders.length > 0 && (
         <div className="space-y-3 sm:space-y-4 pt-2">

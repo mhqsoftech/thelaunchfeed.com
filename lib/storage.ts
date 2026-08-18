@@ -1,4 +1,6 @@
+import "server-only";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+export { getNeonStorageUrl } from "@/lib/storage-url";
 
 /**
  * Neon Object Storage S3 Client configuration
@@ -55,21 +57,6 @@ export async function uploadToNeonStorage(
   // Neon S3 endpoint: https://<endpoint>/<bucket>/<key> or direct public URL structure
   const baseEndpoint = endpoint?.endsWith("/") ? endpoint.slice(0, -1) : endpoint;
   return `${baseEndpoint}/${bucketName}/${cleanKey}`;
-}
-
-const DEFAULT_STORAGE_URL = "https://br-frosty-moon-ayumx59h.storage.c-5.us-east-2.aws.neon.tech/thelaunchfeed";
-
-/**
- * Returns the public URL for a key stored in the Neon Object Storage bucket.
- */
-export function getNeonStorageUrl(key: string): string {
-  const cleanKey = key.replace(/^\/+/, "");
-  const baseBucketUrl =
-    process.env.NEXT_PUBLIC_STORAGE_BUCKET_URL ||
-    (endpoint
-      ? `${endpoint.replace(/\/+$/, "")}/${process.env.AWS_S3_BUCKET_NAME || "thelaunchfeed"}`
-      : DEFAULT_STORAGE_URL);
-  return `${baseBucketUrl.replace(/\/+$/, "")}/${cleanKey}`;
 }
 
 /**

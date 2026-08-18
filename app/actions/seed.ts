@@ -26,43 +26,58 @@ import { ALL_SECTIONS } from "@/lib/sections";
 export async function getDatabaseStatus(): Promise<DatabaseStatus> {
   await requireAdmin();
 
-  const [
-    productsCount,
-    liveProductsCount,
-    archivedProductsCount,
-    submissionsCount,
-    usersCount,
-    votesCount,
-    commentsCount,
-    categoriesCount,
-    delistRow,
-  ] = await Promise.all([
-    prisma.product.count(),
-    prisma.product.count({ where: { status: "LIVE" } }),
-    prisma.product.count({ where: { status: "ARCHIVED" } }),
-    prisma.submission.count(),
-    prisma.user.count(),
-    prisma.vote.count(),
-    prisma.comment.count(),
-    prisma.category.count(),
-    prisma.appSetting.findUnique({ where: { key: "feed.delisted_sections" } }),
-  ]);
+  try {
+    const [
+      productsCount,
+      liveProductsCount,
+      archivedProductsCount,
+      submissionsCount,
+      usersCount,
+      votesCount,
+      commentsCount,
+      categoriesCount,
+      delistRow,
+    ] = await Promise.all([
+      prisma.product.count().catch(() => 0),
+      prisma.product.count({ where: { status: "LIVE" } }).catch(() => 0),
+      prisma.product.count({ where: { status: "ARCHIVED" } }).catch(() => 0),
+      prisma.submission.count().catch(() => 0),
+      prisma.user.count().catch(() => 0),
+      prisma.vote.count().catch(() => 0),
+      prisma.comment.count().catch(() => 0),
+      prisma.category.count().catch(() => 0),
+      prisma.appSetting.findUnique({ where: { key: "feed.delisted_sections" } }).catch(() => null),
+    ]);
 
-  const delistedSections: string[] = Array.isArray(delistRow?.value)
-    ? (delistRow.value as string[])
-    : [];
+    const delistedSections: string[] = Array.isArray(delistRow?.value)
+      ? (delistRow.value as string[])
+      : [];
 
-  return {
-    productsCount,
-    liveProductsCount,
-    archivedProductsCount,
-    submissionsCount,
-    usersCount,
-    votesCount,
-    commentsCount,
-    categoriesCount,
-    delistedSections,
-  };
+    return {
+      productsCount,
+      liveProductsCount,
+      archivedProductsCount,
+      submissionsCount,
+      usersCount,
+      votesCount,
+      commentsCount,
+      categoriesCount,
+      delistedSections,
+    };
+  } catch (e) {
+    console.error("[getDatabaseStatus] error:", e);
+    return {
+      productsCount: 0,
+      liveProductsCount: 0,
+      archivedProductsCount: 0,
+      submissionsCount: 0,
+      usersCount: 0,
+      votesCount: 0,
+      commentsCount: 0,
+      categoriesCount: 0,
+      delistedSections: [],
+    };
+  }
 }
 
 /**
