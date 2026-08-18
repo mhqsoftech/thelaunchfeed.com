@@ -26,6 +26,7 @@ export type ViewFounder = {
   mrrCents?: number;
   totalRevenueCents?: number;
   revenueProvider?: string;
+  verifiedProviders?: Array<{ name: string; mrrCents: number; totalRevenueCents: number }>;
   totalVotes: number;
   productsCount?: number;
   joinedAt: string;
@@ -330,11 +331,32 @@ export function FounderProfileContent({
         </div>
 
         {founder.revenue && founder.revenue !== "$0" && founder.revenue !== "$0 / mo" && (
-          <div className="border border-signal/40 bg-void p-3.5 sm:p-4 col-span-1 sm:col-span-3">
-            <div className="text-[10px] font-mono text-ink-faint uppercase tracking-wider font-bold">
-              Verified Revenue
+          <div className="border border-signal/40 bg-void p-3.5 sm:p-4 col-span-1 sm:col-span-3 space-y-2">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="text-[10px] font-mono text-ink-faint uppercase tracking-wider font-bold flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5 text-signal" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 1L14.7 3.5H18.3L19.1 7.1L22 9.3L20.8 12.8L22 16.3L19.1 18.5L18.3 22.1H14.7L12 24.6L9.3 22.1H5.7L4.9 18.5L2 16.3L3.2 12.8L2 9.3L4.9 7.1L5.7 3.5H9.3L12 1Z" fill="currentColor"/>
+                  <path d="M8.5 12.5L11 15L16 9.5" stroke="var(--color-void)" strokeWidth="2.5" strokeLinecap="square" strokeLinejoin="miter" fill="none"/>
+                </svg>
+                Verified Revenue {founder.verifiedProviders && founder.verifiedProviders.length > 1 ? "(Combined)" : ""}
+              </div>
+              {founder.verifiedProviders && founder.verifiedProviders.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {founder.verifiedProviders.map((p) => (
+                    <span
+                      key={p.name}
+                      className="text-[9px] font-mono px-2 py-0.5 border border-signal/40 bg-void text-signal uppercase font-bold flex items-center gap-1"
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="square" strokeLinejoin="miter" d="M5 13l4 4L19 7" />
+                      </svg>
+                      {p.name}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="text-xl sm:text-2xl font-mono font-bold mt-1 text-signal whitespace-nowrap">
+            <div className="text-xl sm:text-2xl font-mono font-bold text-signal whitespace-nowrap">
               {founder.revenue}
             </div>
           </div>
@@ -358,6 +380,15 @@ export function FounderProfileContent({
           mrrCents={founder.mrrCents}
           totalRevenueCents={founder.totalRevenueCents}
           providerName={founder.revenueProvider || "Stripe"}
+          series={
+            founder.verifiedProviders && founder.verifiedProviders.length > 0
+              ? founder.verifiedProviders.map((p) => ({
+                  providerName: p.name,
+                  mrrCents: p.mrrCents,
+                  totalRevenueCents: p.totalRevenueCents,
+                }))
+              : undefined
+          }
         />
       )}
 

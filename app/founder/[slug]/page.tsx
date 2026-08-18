@@ -110,6 +110,7 @@ export default async function FounderPage({
   let verifiedTotalRevenueCents = 0;
   let verifiedMrrFormatted = "";
   let verifiedProviderName = "Stripe";
+  let verifiedProviders: Array<{ name: string; mrrCents: number; totalRevenueCents: number }> = [];
 
   // Skip assumed/mock revenue from founder pages.
   // Only display revenue if the user explicitly opted-in to public revenue verification
@@ -128,6 +129,27 @@ export default async function FounderPage({
         const dollars = verifiedMrrCents / 100;
         verifiedMrrFormatted = `$${Number.isInteger(dollars) ? dollars : dollars.toFixed(2)} / mo`;
       }
+    }
+
+    // Build per-provider breakdown by joining verified product revenues with their connection's provider
+    if (f.revenueConnections && f.revenueConnections.length > 0) {
+      const connById = new Map<string, string>();
+      for (const c of f.revenueConnections) connById.set(c.id, c.provider);
+      const byProvider = new Map<string, { mrrCents: number; totalRevenueCents: number }>();
+      for (const r of verifiedRevenues) {
+        const prov = connById.get((r as any).connectionId);
+        if (!prov) continue;
+        const key = prov.charAt(0).toUpperCase() + prov.slice(1).toLowerCase();
+        const cur = byProvider.get(key) || { mrrCents: 0, totalRevenueCents: 0 };
+        cur.mrrCents += r.mrrCents || 0;
+        cur.totalRevenueCents += r.totalRevenueCents || 0;
+        byProvider.set(key, cur);
+      }
+      verifiedProviders = Array.from(byProvider.entries()).map(([name, v]) => ({
+        name,
+        mrrCents: v.mrrCents,
+        totalRevenueCents: v.totalRevenueCents,
+      }));
     }
 
     if (f.revenueConnections && f.revenueConnections.length > 0) {
@@ -172,6 +194,7 @@ export default async function FounderPage({
     mrrCents: verifiedMrrCents,
     totalRevenueCents: verifiedTotalRevenueCents,
     revenueProvider: verifiedProviderName,
+    verifiedProviders,
     title: f.title || "",
     totalVotes,
     productsCount: f.products.length,

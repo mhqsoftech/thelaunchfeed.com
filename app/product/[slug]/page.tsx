@@ -167,6 +167,7 @@ export default async function ProductPage({
     mrrCents,
     totalRevenueCents,
     revenueProvider,
+    isRevenueVerified,
   };
 
 

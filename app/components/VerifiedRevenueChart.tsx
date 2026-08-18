@@ -8,6 +8,13 @@ export interface MonthlyHistoryPoint {
   amountFormatted?: string;
 }
 
+export interface RevenueSeries {
+  providerName: string;
+  mrrCents: number;
+  totalRevenueCents?: number;
+  history?: MonthlyHistoryPoint[];
+}
+
 export interface VerifiedRevenueChartProps {
   revenueFormatted: string; // e.g. "$28.56 / mo" or "$14.2K / mo"
   mrrCents?: number;
@@ -15,8 +22,18 @@ export interface VerifiedRevenueChartProps {
   history?: MonthlyHistoryPoint[];
   momGrowth?: string;
   providerName?: string; // e.g. "Dodo Payments" or "Stripe"
+  series?: RevenueSeries[]; // per-provider breakdown; when >=2, renders multi-line chart
   className?: string;
 }
+
+const SERIES_COLORS = [
+  "var(--color-signal)",
+  "#8b5cf6",
+  "#f59e0b",
+  "#ec4899",
+  "#22d3ee",
+  "#84cc16",
+];
 
 function formatCentsValue(cents: number): string {
   if (cents <= 0) return "$0";
@@ -37,53 +54,56 @@ export default function VerifiedRevenueChart({
   history,
   momGrowth,
   providerName = "Stripe",
+  series,
   className = "",
 }: VerifiedRevenueChartProps) {
-  // Derive points data from verified history, or calculate based on exact calendar months
-  const pointsData = useMemo(() => {
-    if (history && history.length >= 2) {
-      return history.map((h) => ({
-        month: h.month,
-        amountCents: h.amountCents || 0,
-        label: h.amountFormatted || formatCentsValue(h.amountCents || 0),
-      }));
-    }
-
+  const activeSeries = useMemo(() => {
+    if (series && series.length > 0) return series;
+    return [{ providerName, mrrCents: mrrCents ?? 0, totalRevenueCents, history }];
+  }, [series, providerName, mrrCents, totalRevenueCents, history]);
+  const isMulti = activeSeries.length > 1;
+  const seriesData = useMemo(() => {
+    const monthNames = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
     const now = new Date();
-    const months: Array<{ month: string; amountCents: number; label: string }> = [];
-    const monthNames = [
-      "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
-    ];
-
-    // Compute active verified cents from mrrCents or revenueFormatted
-    let parsedMrrCents = mrrCents ?? 0;
-    if (parsedMrrCents === 0 && revenueFormatted) {
-      const match = revenueFormatted.match(/[\d.]+/);
-      if (match) {
-        const val = parseFloat(match[0]);
-        if (revenueFormatted.includes("K")) {
-          parsedMrrCents = Math.round(val * 1000 * 100);
-        } else {
-          parsedMrrCents = Math.round(val * 100);
-        }
+    return activeSeries.map((s) => {
+      if (s.history && s.history.length >= 2) {
+        return {
+          providerName: s.providerName,
+          points: s.history.map((h) => ({
+            month: h.month,
+            amountCents: h.amountCents || 0,
+            label: h.amountFormatted || formatCentsValue(h.amountCents || 0),
+          })),
+        };
       }
-    }
+      const months: Array<{ month: string; amountCents: number; label: string }> = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const amount = i === 0 ? s.mrrCents ?? 0 : 0;
+        months.push({
+          month: monthNames[d.getMonth()],
+          amountCents: amount,
+          label: formatCentsValue(amount),
+        });
+      }
+      return { providerName: s.providerName, points: months };
+    });
+  }, [activeSeries]);
 
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = monthNames[d.getMonth()];
-      // Current month holds the verified MRR, prior months reflect baseline
-      const amount = i === 0 ? parsedMrrCents : 0;
-      months.push({
-        month: label,
-        amountCents: amount,
-        label: formatCentsValue(amount),
-      });
-    }
-
-    return months;
-  }, [history, mrrCents, revenueFormatted]);
+  // Primary series (aggregate) drives axis labels, MoM growth and total
+  const pointsData = useMemo(() => {
+    if (!isMulti) return seriesData[0].points;
+    // Sum across providers per month position
+    const first = seriesData[0].points;
+    return first.map((_, i) => {
+      const summed = seriesData.reduce((sum, s) => sum + (s.points[i]?.amountCents || 0), 0);
+      return {
+        month: first[i].month,
+        amountCents: summed,
+        label: formatCentsValue(summed),
+      };
+    });
+  }, [seriesData, isMulti]);
 
   // Compute exact 6-month or cumulative total revenue
   const calculatedTotalCents = useMemo(() => {
@@ -118,29 +138,38 @@ export default function VerifiedRevenueChart({
   const paddingX = 45;
   const paddingY = 32;
 
-  const maxVal = Math.max(...pointsData.map((p) => p.amountCents), 100);
+  const allValues = isMulti
+    ? seriesData.flatMap((s) => s.points.map((p) => p.amountCents))
+    : pointsData.map((p) => p.amountCents);
+  const maxVal = Math.max(...allValues, 100);
   const minVal = 0;
 
-  const points = pointsData.map((pt, i) => {
-    const val = pt.amountCents;
-    const x = paddingX + (i * (width - 2 * paddingX)) / (pointsData.length - 1);
-    const y =
-      height - paddingY - ((val - minVal) / (maxVal - minVal)) * (height - 2 * paddingY);
-    return { x, y, val, month: pt.month, label: pt.label };
-  });
+  const toPoints = (arr: Array<{ month: string; amountCents: number; label: string }>) =>
+    arr.map((pt, i) => {
+      const x = paddingX + (i * (width - 2 * paddingX)) / (arr.length - 1);
+      const y = height - paddingY - ((pt.amountCents - minVal) / (maxVal - minVal)) * (height - 2 * paddingY);
+      return { x, y, val: pt.amountCents, month: pt.month, label: pt.label };
+    });
 
-  // Construct SVG path string for smooth line
-  const dPath = points.reduce((acc, pt, i) => {
-    if (i === 0) return `M ${pt.x} ${pt.y}`;
-    const prev = points[i - 1];
-    const cx1 = prev.x + (pt.x - prev.x) / 2;
-    const cy1 = prev.y;
-    const cx2 = prev.x + (pt.x - prev.x) / 2;
-    const cy2 = pt.y;
-    return `${acc} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${pt.x} ${pt.y}`;
-  }, "");
+  const points = toPoints(pointsData);
+  const seriesRendered = seriesData.map((s, idx) => ({
+    providerName: s.providerName,
+    color: SERIES_COLORS[idx % SERIES_COLORS.length],
+    points: toPoints(s.points),
+  }));
 
-  // Area path for gradient fill beneath line
+  const buildPath = (pts: { x: number; y: number }[]) =>
+    pts.reduce((acc, pt, i) => {
+      if (i === 0) return `M ${pt.x} ${pt.y}`;
+      const prev = pts[i - 1];
+      const cx1 = prev.x + (pt.x - prev.x) / 2;
+      const cy1 = prev.y;
+      const cx2 = prev.x + (pt.x - prev.x) / 2;
+      const cy2 = pt.y;
+      return `${acc} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${pt.x} ${pt.y}`;
+    }, "");
+
+  const dPath = buildPath(points);
   const lastPt = points[points.length - 1];
   const firstPt = points[0];
   const areaPath = `${dPath} L ${lastPt.x} ${height - paddingY} L ${firstPt.x} ${height - paddingY} Z`;
@@ -158,11 +187,18 @@ export default function VerifiedRevenueChart({
             Verified Monthly Revenue (Live Gateway Telemetry)
           </h3>
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-signal font-bold bg-void px-2.5 py-1 border border-signal/40 uppercase shrink-0 self-start sm:self-auto">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-            <path strokeLinecap="square" strokeLinejoin="miter" d="M5 13l4 4L19 7" />
-          </svg>
-          <span>{providerName} Live API Mesh</span>
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {(isMulti ? activeSeries.map((s) => s.providerName) : [providerName]).map((name) => (
+            <div
+              key={name}
+              className="flex items-center gap-1.5 text-[10px] text-signal font-bold bg-void px-2.5 py-1 border border-signal/40 uppercase shrink-0"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="square" strokeLinejoin="miter" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>{name} Verified</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -215,20 +251,34 @@ export default function VerifiedRevenueChart({
             );
           })}
 
-          {/* Area Fill */}
-          <path d={areaPath} fill="url(#revenueGradient)" />
+          {/* Area Fill (aggregate) */}
+          {!isMulti && <path d={areaPath} fill="url(#revenueGradient)" />}
 
-          {/* Smooth Revenue Trend Line */}
-          <path
-            d={dPath}
-            fill="none"
-            stroke="var(--color-signal)"
-            strokeWidth="3"
-            strokeLinecap="square"
-            strokeLinejoin="miter"
-          />
+          {isMulti ? (
+            seriesRendered.map((s) => (
+              <path
+                key={s.providerName}
+                d={buildPath(s.points)}
+                fill="none"
+                stroke={s.color}
+                strokeWidth="2.5"
+                strokeLinecap="square"
+                strokeLinejoin="miter"
+                opacity="0.95"
+              />
+            ))
+          ) : (
+            <path
+              d={dPath}
+              fill="none"
+              stroke="var(--color-signal)"
+              strokeWidth="3"
+              strokeLinecap="square"
+              strokeLinejoin="miter"
+            />
+          )}
 
-          {/* Data Points & Labels */}
+          {/* Data Points & Labels (aggregate axis) */}
           {points.map((pt, i) => (
             <g key={i} className="group cursor-pointer">
               {/* Vertical dotted guide */}
@@ -275,8 +325,24 @@ export default function VerifiedRevenueChart({
         </svg>
       </div>
 
+      {isMulti && (
+        <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono border-t border-hairline pt-2">
+          {seriesRendered.map((s) => (
+            <div key={s.providerName} className="flex items-center gap-1.5">
+              <span className="inline-block w-3 h-0.5" style={{ background: s.color }} />
+              <span className="text-ink-dim uppercase font-bold">{s.providerName}</span>
+              <span className="text-ink">
+                {formatCentsValue(activeSeries.find((a) => a.providerName === s.providerName)?.mrrCents || 0)} / mo
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[10px] text-ink-faint border-t border-hairline pt-2">
-        <span>Verified telemetry: Direct Gateway Audit via {providerName}</span>
+        <span>
+          Verified telemetry: Direct Gateway Audit via {isMulti ? activeSeries.map((s) => s.providerName).join(" + ") : providerName}
+        </span>
         <span className="text-signal font-bold shrink-0">✓ Realtime Verified</span>
       </div>
     </div>

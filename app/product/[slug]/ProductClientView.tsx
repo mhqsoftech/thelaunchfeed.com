@@ -74,6 +74,7 @@ export type ViewProduct = {
   mrrCents?: number;
   totalRevenueCents?: number;
   revenueProvider?: string;
+  isRevenueVerified?: boolean;
   dailyRank?: number | null;
   weeklyRank?: number | null;
   monthlyRank?: number | null;
@@ -534,11 +535,16 @@ export default function ProductClientView({
                     )
                   ))}
 
-                  {/* Verified MRR pill if not already included in wonAccolades */}
-                  {mrrText && !wonAccolades.some((a) => a.id === "revenue") && (
+                  {/* Verified MRR pill — only when revenue has actually been verified via a payment provider */}
+                  {product.isRevenueVerified && product.revenue && !wonAccolades.some((a) => a.id === "revenue") && (
                     <span className="text-[10px] font-mono px-2 py-0.5 border border-signal/40 bg-void text-signal uppercase font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-signal shrink-0 animate-pulse" />
-                      Verified MRR {mrrText}
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="square" strokeLinejoin="miter" d="M5 13l4 4L19 7" />
+                      </svg>
+                      Verified MRR {product.revenue}
+                      {product.revenueProvider && (
+                        <span className="text-ink-dim">· {product.revenueProvider}</span>
+                      )}
                     </span>
                   )}
                 </div>
@@ -781,13 +787,13 @@ export default function ProductClientView({
           </div>
         </div>
 
-        {/* Live Revenue Line Chart */}
-        {mrrText && (
+        {/* Verified Revenue Line Chart — only when the founder has verified this product's revenue */}
+        {product.isRevenueVerified && product.revenue && (
           <VerifiedRevenueChart
-            revenueFormatted={mrrText}
+            revenueFormatted={product.revenue}
             mrrCents={product.mrrCents}
             totalRevenueCents={product.totalRevenueCents}
-            providerName={product.revenueProvider || `${pricingPartnerName} API`}
+            providerName={product.revenueProvider || "Stripe"}
           />
         )}
 
