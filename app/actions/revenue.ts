@@ -188,8 +188,14 @@ export async function getPaymentApiKeys() {
   });
 
   return connections.map((conn) => {
-    // Decrypt the stored access token to retrieve the original API key
-    const decryptedKey = decryptPaymentApiKey(conn.accessToken);
+    // Decrypt the stored access token to retrieve the original API key.
+    // Isolate per-row so one un-decryptable connection doesn't 500 the list.
+    let decryptedKey = "";
+    try {
+      decryptedKey = decryptPaymentApiKey(conn.accessToken);
+    } catch (err) {
+      console.error(`[revenue] decrypt failed for connection ${conn.id}:`, err);
+    }
     const mrrCents = conn.mrrCents || conn.revenues.reduce((s, r) => s + (r.mrrCents || 0), 0);
 
     const fmt = (cents: number) =>
@@ -246,7 +252,13 @@ export async function getPaymentApiKey(provider: string) {
 
   if (!conn) return null;
 
-  const decryptedKey = decryptPaymentApiKey(conn.accessToken);
+  let decryptedKey = "";
+  let decryptError: string | null = null;
+  try {
+    decryptedKey = decryptPaymentApiKey(conn.accessToken);
+  } catch (err: any) {
+    decryptError = err?.message || "decryption failed";
+  }
 
   return {
     id: conn.id,
@@ -255,6 +267,7 @@ export async function getPaymentApiKey(provider: string) {
     status: conn.status,
     lastSyncedAt: conn.lastSyncedAt?.toISOString(),
     apiKey: decryptedKey,
+    decryptError,
     apiKeyMasked: decryptedKey.length > 8
       ? `${decryptedKey.slice(0, 6)}...${decryptedKey.slice(-4)}`
       : decryptedKey,

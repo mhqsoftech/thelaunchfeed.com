@@ -573,31 +573,66 @@ export async function broadcastProductLaunch(
 
   const results: BroadcastLogItem["results"] = {};
 
-  // 1. X / Twitter
+  // Time-box each channel so one slow provider (Telegram / X hanging) cannot
+  // exceed Inngest's step timeout and force a retry that duplicates every
+  // *already-succeeded* broadcast.
+  const withTimeout = <T>(p: Promise<T>, label: string, ms = 10_000): Promise<T> =>
+    Promise.race([
+      p,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`${label}: timed out after ${ms}ms`)), ms)
+      ),
+    ]);
+
+  // Every disabled channel gets an explicit "not configured" entry so the
+  // broadcast log tells operators why a channel produced no output, instead
+  // of an empty results object indistinguishable from "everything failed."
+  const tasks: Array<Promise<void>> = [];
+
   if (config.x.enabled) {
     const xText = `🚀 NEW LAUNCH ON THE LAUNCH FEED\n\n${product.name} — ${product.tagline}\n👤 Maker: ${makerDisplay}\n\n⚡ 360° Specs, Architecture & Upvote:\n${productUrl}\n\n#buildinpublic #indiehackers ${hashtags}`.trim();
-    results.x = await sendXBroadcast(xText, config.x);
+    tasks.push(
+      withTimeout(sendXBroadcast(xText, config.x), "x")
+        .then((r) => { results.x = r; })
+        .catch((e) => { results.x = { success: false, message: e.message || String(e) }; })
+    );
+  } else {
+    results.x = { success: false, message: "channel not enabled" };
   }
 
-  // 2. Telegram
   if (config.telegram.enabled) {
     const tgHtml = `🚀 <b>NEW LAUNCH ON THE LAUNCH FEED</b>\n\n<b>${product.name}</b>\n<i>${product.tagline}</i>\n\n👤 <b>Maker:</b> ${makerDisplay}\n📁 <b>Category:</b> ${product.category || "Software"}\n\n⚡ <b>Full 360° Specs &amp; Upvote:</b>\n<a href="${productUrl}">${productUrl}</a>\n\n#launch #${product.category?.toLowerCase() || "tech"}`;
-    results.telegram = await sendTelegramBroadcast(tgHtml, config.telegram);
+    tasks.push(
+      withTimeout(sendTelegramBroadcast(tgHtml, config.telegram), "telegram")
+        .then((r) => { results.telegram = r; })
+        .catch((e) => { results.telegram = { success: false, message: e.message || String(e) }; })
+    );
+  } else {
+    results.telegram = { success: false, message: "channel not enabled" };
   }
 
-  // 3. WhatsApp
   if (config.whatsapp.enabled) {
     const waText = `🚀 *NEW LAUNCH ON THE LAUNCH FEED*\n\n*${product.name}*\n_${product.tagline}_\n\n👤 *Maker:* ${makerDisplay}\n\n⚡ *Explore 360° Architecture Specs & Upvote:*\n${productUrl}`;
-    results.whatsapp = await sendWhatsAppBroadcast(waText, config.whatsapp);
+    tasks.push(
+      withTimeout(sendWhatsAppBroadcast(waText, config.whatsapp), "whatsapp")
+        .then((r) => { results.whatsapp = r; })
+        .catch((e) => { results.whatsapp = { success: false, message: e.message || String(e) }; })
+    );
+  } else {
+    results.whatsapp = { success: false, message: "channel not enabled" };
   }
 
-  // 4. Bluesky (native AT Protocol) — free, no rate-tier gating
   if (config.bluesky?.enabled) {
     const bskyText = `🚀 New launch: ${product.name} — ${product.tagline}\nBy ${makerDisplay}\n${productUrl}\n${hashtags}`.trim();
-    results.bluesky = await sendBlueskyBroadcast(bskyText, config.bluesky);
+    tasks.push(
+      withTimeout(sendBlueskyBroadcast(bskyText, config.bluesky), "bluesky")
+        .then((r) => { results.bluesky = r; })
+        .catch((e) => { results.bluesky = { success: false, message: e.message || String(e) }; })
+    );
+  } else {
+    results.bluesky = { success: false, message: "channel not enabled" };
   }
 
-  // 5. Free Custom Webhook (Make.com / Zapier / n8n)
   if (config.webhook?.enabled && config.webhook.webhookUrl) {
     const webhookPayload = {
       event: "product.launched",
@@ -610,8 +645,16 @@ export async function broadcastProductLaunch(
       text: `🚀 NEW LAUNCH: ${product.name} — ${product.tagline}\n\n👤 Maker: ${makerDisplay}\n⚡ Upvote & View Specs: ${productUrl}\n\n#buildinpublic #indiehackers ${hashtags}`,
       timestamp: new Date().toISOString(),
     };
-    results.webhook = await sendWebhookBroadcast(webhookPayload, config.webhook);
+    tasks.push(
+      withTimeout(sendWebhookBroadcast(webhookPayload, config.webhook), "webhook")
+        .then((r) => { results.webhook = r; })
+        .catch((e) => { results.webhook = { success: false, message: e.message || String(e) }; })
+    );
+  } else {
+    results.webhook = { success: false, message: "channel not enabled" };
   }
+
+  await Promise.allSettled(tasks);
 
   const logItem: BroadcastLogItem = {
     id: `bcast-${Date.now()}-${product.id.slice(0, 6)}`,

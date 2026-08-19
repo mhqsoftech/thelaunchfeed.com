@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { DOTO_FONT_BASE64 } from "@/lib/badgeFont";
 
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -38,6 +47,9 @@ export async function GET(
   } catch {}
 
   const votes = product?.voteCount || 1;
+  // details.revenue is user-controlled; the actual escaping happens at every
+  // <text> interpolation site below (via escapeXml), which keeps future edits
+  // safe even if new user-controlled fields flow into mainText/subText.
   const revenue = product?.details?.revenue ? String(product.details.revenue) : null;
 
   // Configuration for Award Text, Subtitle, Stat Pill, and Custom Vector Icon
@@ -351,7 +363,7 @@ export async function GET(
   const rightPill = hasPill
     ? `<g transform="translate(${pillTranslateX}, 13)">
     <rect x="0" y="0" width="${pillWidth}" height="22" rx="3" fill="${statBg}" stroke="${statBorder}" stroke-width="1" />
-    <text x="${pillWidth / 2}" y="14.5" class="stat-pill" fill="${statTextCol}" text-anchor="middle">${statText}</text>
+    <text x="${pillWidth / 2}" y="14.5" class="stat-pill" fill="${statTextCol}" text-anchor="middle">${escapeXml(statText || "")}</text>
   </g>`
     : "";
 
@@ -400,8 +412,8 @@ export async function GET(
 
   <!-- Middle Content & Robotic Brand Title -->
   <g transform="translate(58, 0)">
-    <text x="0" y="18" class="mono-label" fill="${accent}">${mainText}</text>
-    <text x="0" y="34" class="brand-robot-title" fill="${textPrimary}">${subText}</text>
+    <text x="0" y="18" class="mono-label" fill="${accent}">${escapeXml(mainText)}</text>
+    <text x="0" y="34" class="brand-robot-title" fill="${textPrimary}">${escapeXml(subText)}</text>
   </g>
 
   <!-- Right Pill Badge -->

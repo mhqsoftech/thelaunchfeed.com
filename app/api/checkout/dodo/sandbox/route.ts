@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { PlacementTier, PLACEMENT_TIERS } from "@/lib/dodopayments";
 
+// Every interpolation into the HTML template below runs through this — a
+// product name containing `</div><script>…</script>` would otherwise execute
+// on thelaunchfeed.com origin for any visitor loaded with that productId in
+// the URL.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const purchaseId = searchParams.get("purchaseId");
@@ -173,30 +186,30 @@ export async function GET(req: Request) {
     </div>
 
     <div class="product-box">
-      <div class="product-name">${displayName}</div>
-      <div class="product-tag">${tierConfig.headline} · 30 Days Duration</div>
+      <div class="product-name">${escapeHtml(displayName)}</div>
+      <div class="product-tag">${escapeHtml(tierConfig.headline)} · 30 Days Duration</div>
     </div>
 
     <div style="font-size: 0.82rem; color: var(--muted); line-height: 1.5;">
-      ✓ Placement: <strong>${tierConfig.name}</strong><br>
+      ✓ Placement: <strong>${escapeHtml(tierConfig.name)}</strong><br>
       ✓ Duration: <strong>30 Continuous Days Active</strong><br>
       ✓ Activated seamlessly when product goes live on The Launch Feed
     </div>
 
     <div class="price-row">
       <span>Total Amount</span>
-      <span class="total-price">${tierConfig.priceFormatted} USD</span>
+      <span class="total-price">${escapeHtml(tierConfig.priceFormatted)} USD</span>
     </div>
 
     <form method="POST" action="/api/checkout/dodo/verify">
-      <input type="hidden" name="purchaseId" value="${purchase.id}" />
-      <input type="hidden" name="productId" value="${productId || ""}" />
-      <input type="hidden" name="submissionId" value="${submissionId || ""}" />
+      <input type="hidden" name="purchaseId" value="${escapeHtml(purchase.id)}" />
+      <input type="hidden" name="productId" value="${escapeHtml(productId || "")}" />
+      <input type="hidden" name="submissionId" value="${escapeHtml(submissionId || "")}" />
       <input type="hidden" name="tier" value="${tierNum}" />
-      <input type="hidden" name="returnTo" value="${returnTo}" />
+      <input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}" />
       <input type="hidden" name="paymentId" value="dodo_pay_${Date.now()}" />
       <button type="submit" class="btn">
-        Pay ${tierConfig.priceFormatted} via Dodo Payments →
+        Pay ${escapeHtml(tierConfig.priceFormatted)} via Dodo Payments →
       </button>
     </form>
 

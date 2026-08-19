@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { assertSafeUrl } from "@/lib/ssrf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+const MAX_IMAGE_BYTES = 8_000_000;
 
 /**
  * Captures a 1200×630 screenshot of a given URL.
@@ -15,16 +18,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "url parameter required" }, { status: 400 });
   }
 
-  let target: URL;
-  try {
-    target = new URL(raw);
-  } catch {
-    return NextResponse.json({ error: "invalid url" }, { status: 400 });
+  const safety = await assertSafeUrl(raw);
+  if (!safety.ok) {
+    return NextResponse.json({ error: safety.reason }, { status: 400 });
   }
-  if (target.protocol !== "https:" && target.protocol !== "http:") {
-    return NextResponse.json({ error: "invalid protocol" }, { status: 400 });
-  }
-
+  const target = safety.url;
   const targetUrl = target.toString();
   const TIMEOUT_MS = 20000;
 
@@ -48,6 +46,7 @@ export async function GET(req: Request) {
     const ct = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
     if (ct.startsWith("image/")) {
       const buf = await res.arrayBuffer();
+      if (buf.byteLength > MAX_IMAGE_BYTES) return null;
       if (buf.byteLength > 100) {
         return new NextResponse(buf, {
           status: 200,
@@ -89,7 +88,9 @@ export async function GET(req: Request) {
     if (res.ok) {
       const json = await res.json();
       const screenshotUrl = json?.data?.screenshot?.url;
-      if (screenshotUrl) {
+      // Microlink returns a CDN URL — still validate before we fetch it, so a
+      // compromised or spoofed response can't turn this into an SSRF vector.
+      if (screenshotUrl && (await assertSafeUrl(screenshotUrl)).ok) {
         const imgRes = await fetchWithTimeout(screenshotUrl, 10000);
         if (imgRes.ok) {
           const img = await extractImage(imgRes);

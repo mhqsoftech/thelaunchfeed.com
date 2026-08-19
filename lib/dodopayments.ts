@@ -198,13 +198,20 @@ export async function activatePlacementSlot({
   // Idempotency: if this purchase already activated a slot, return it.
   // Prevents duplicate PAID rows when verify is called more than once
   // (React strict-mode double-effect, page reloads, webhook + return url race).
+  // Backed by a unique index on FeaturedSlot.purchaseId, so racing writers
+  // hit P2002 and re-read here instead of both creating a slot.
+  const findExisting = async () =>
+    purchase?.id
+      ? prisma.featuredSlot.findFirst({
+          where: { purchaseId: purchase.id },
+          include: {
+            product: { select: { id: true, name: true, slug: true, tagline: true, logoUrl: true } },
+          },
+        })
+      : null;
+
   if (purchase?.id) {
-    const existingByPurchase = await prisma.featuredSlot.findFirst({
-      where: { purchaseId: purchase.id },
-      include: {
-        product: { select: { id: true, name: true, slug: true, tagline: true, logoUrl: true } },
-      },
-    });
+    const existingByPurchase = await findExisting();
     if (existingByPurchase) {
       invalidateSlotsCache();
       return existingByPurchase;
@@ -255,23 +262,34 @@ export async function activatePlacementSlot({
       });
       const nextOrder = (lastSlot?.order ?? -1) + 1;
 
-      const newSlot = await prisma.featuredSlot.create({
-        data: {
-          kind: "PAID",
-          position: config.slotPosition,
-          order: nextOrder,
-          productId: product.id,
-          startsAt,
-          endsAt,
-          purchaseId: purchase?.id,
-        },
-        include: {
-          product: { select: { id: true, name: true, slug: true, tagline: true, logoUrl: true } },
-        },
-      });
-
-      invalidateSlotsCache();
-      return newSlot;
+      try {
+        const newSlot = await prisma.featuredSlot.create({
+          data: {
+            kind: "PAID",
+            position: config.slotPosition,
+            order: nextOrder,
+            productId: product.id,
+            startsAt,
+            endsAt,
+            purchaseId: purchase?.id,
+          },
+          include: {
+            product: { select: { id: true, name: true, slug: true, tagline: true, logoUrl: true } },
+          },
+        });
+        invalidateSlotsCache();
+        return newSlot;
+      } catch (err: any) {
+        // Concurrent activation raced us; re-read the winning slot.
+        if (err?.code === "P2002") {
+          const winner = await findExisting();
+          if (winner) {
+            invalidateSlotsCache();
+            return winner;
+          }
+        }
+        throw err;
+      }
     }
   }
 
@@ -304,24 +322,34 @@ export async function activatePlacementSlot({
       });
       const nextOrder = (lastSlot?.order ?? -1) + 1;
 
-      const newSlot = await prisma.featuredSlot.create({
-        data: {
-          kind: "PAID",
-          position: config.slotPosition,
-          order: nextOrder,
-          productId: sub.publishedProductId || null,
-          customName: sub.name,
-          customTagline: sub.tagline,
-          customLogoUrl: sub.logoUrl,
-          customUrl: `/product/${slugify(sub.name)}`,
-          startsAt,
-          endsAt,
-          purchaseId: purchase?.id,
-        },
-      });
-
-      invalidateSlotsCache();
-      return newSlot;
+      try {
+        const newSlot = await prisma.featuredSlot.create({
+          data: {
+            kind: "PAID",
+            position: config.slotPosition,
+            order: nextOrder,
+            productId: sub.publishedProductId || null,
+            customName: sub.name,
+            customTagline: sub.tagline,
+            customLogoUrl: sub.logoUrl,
+            customUrl: `/product/${slugify(sub.name)}`,
+            startsAt,
+            endsAt,
+            purchaseId: purchase?.id,
+          },
+        });
+        invalidateSlotsCache();
+        return newSlot;
+      } catch (err: any) {
+        if (err?.code === "P2002") {
+          const winner = await findExisting();
+          if (winner) {
+            invalidateSlotsCache();
+            return winner;
+          }
+        }
+        throw err;
+      }
     }
   }
 

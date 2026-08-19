@@ -52,25 +52,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 2. If not found in public tables, sync from neon_auth schema
-    if (!sessionUser) {
-      const synced = await syncNeonAuthSession(cookieToken || undefined);
+    // 2. If not found in public tables, sync from neon_auth schema —
+    //    ONLY when the caller presented a token. Never look up "most recent
+    //    session" without a token: that logs the visitor in as whoever last
+    //    signed in on the platform (account takeover).
+    if (!sessionUser && cookieToken) {
+      const synced = await syncNeonAuthSession(cookieToken);
       if (synced) {
         sessionUser = synced.user;
         sessionToken = synced.token;
-      }
-    }
-
-    // 3. Fallback: check most recent session in public Session table
-    if (!sessionUser) {
-      const foundRecent = await prisma.session.findFirst({
-        where: { expiresAt: { gt: new Date() } },
-        include: { user: true },
-        orderBy: { createdAt: "desc" },
-      });
-      if (foundRecent?.user) {
-        sessionUser = foundRecent.user;
-        sessionToken = foundRecent.token;
       }
     }
 

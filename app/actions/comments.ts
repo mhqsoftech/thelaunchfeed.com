@@ -12,15 +12,12 @@ const PostSchema = z.object({
   parentId: z.string().optional(),
 });
 
-const commentsCache = new Map<string, { data: any[]; timestamp: number }>();
-const COMMENTS_CACHE_TTL_MS = 60_000; // 60s
-
-export async function invalidateCommentsCache(slug?: string) {
-  if (slug) {
-    commentsCache.delete(slug.toLowerCase().trim());
-  } else {
-    commentsCache.clear();
-  }
+// In-process cache removed: on serverless (Vercel) each lambda instance owns
+// its own Map, so an invalidation on one instance does not reach the others
+// — users saw stale comments until the TTL elapsed. Rely on Next's per-path
+// revalidation via revalidatePath() at the call sites instead.
+export async function invalidateCommentsCache(_slug?: string) {
+  return;
 }
 
 export async function listCommentsForSlug(productSlug: string): Promise<
@@ -35,10 +32,6 @@ export async function listCommentsForSlug(productSlug: string): Promise<
   >
 > {
   const normSlug = productSlug.toLowerCase().trim();
-  const cached = commentsCache.get(normSlug);
-  if (cached && Date.now() - cached.timestamp < COMMENTS_CACHE_TTL_MS) {
-    return cached.data;
-  }
 
   const product = await prisma.product.findUnique({
     where: { slug: normSlug },
@@ -86,7 +79,6 @@ export async function listCommentsForSlug(productSlug: string): Promise<
     isFounder: founderIds.has(r.userId) || founderIds.has(r.user.id),
   }));
 
-  commentsCache.set(normSlug, { data: result, timestamp: Date.now() });
   return result;
 }
 

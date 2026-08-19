@@ -21,6 +21,15 @@ const TOPIC_LABELS: Record<string, string> = {
   feedback: "Feedback & Feature Suggestions",
 };
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendContactMessage(input: ContactFormData) {
   const parsed = ContactSchema.safeParse(input);
   if (!parsed.success) {
@@ -28,9 +37,45 @@ export async function sendContactMessage(input: ContactFormData) {
     return { success: false, error: err };
   }
 
-  const { name, email, topic, message } = parsed.data;
+  const rawData = parsed.data;
+
+  // Rate limit — same email cannot submit more than 5 messages per hour, and
+  // no more than 20 total contact-form sends per hour globally, so the
+  // endpoint cannot be turned into an email spam relay via the user-receipt
+  // send path.
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  try {
+    const [perEmail, global] = await Promise.all([
+      prisma.emailLog.count({
+        where: {
+          templateId: "contact-form",
+          toEmail: rawData.email,
+          createdAt: { gte: oneHourAgo },
+        },
+      }),
+      prisma.emailLog.count({
+        where: { templateId: "contact-form", createdAt: { gte: oneHourAgo } },
+      }),
+    ]);
+    if (perEmail >= 5 || global >= 20) {
+      return { success: false, error: "Too many contact form submissions. Please try again later." };
+    }
+  } catch {
+    // If the rate-limit check fails, fall through — do not block legitimate
+    // users because of a transient DB blip.
+  }
+
+  // Two views of the same fields — raw for header use (from/to/replyTo/subject
+  // are ASCII contexts, not HTML), and escaped for interpolation into the
+  // email HTML body. Keeping them named so downstream code can pick correctly.
+  const rawName = rawData.name;
+  const rawEmail = rawData.email;
+  const name = escapeHtml(rawName);
+  const email = escapeHtml(rawEmail);
+  const topic = rawData.topic;
+  const message = rawData.message;
   const topicLabel = TOPIC_LABELS[topic] || topic;
-  const subject = `[Contact Form] ${topicLabel} — ${name || email}`;
+  const subject = `[Contact Form] ${topicLabel} — ${rawName || rawEmail}`;
   const timestamp = new Date().toISOString();
 
   // 1. Admin / Desk Notification Email Template (Clean Light Theme)
@@ -218,7 +263,7 @@ ${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
       const res = await resend.emails.send({
         from: fromAddress,
         to: targetEmail,
-        replyTo: email,
+        replyTo: rawEmail,
         subject,
         html: adminHtml,
       });
@@ -229,8 +274,8 @@ ${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
           const fallbackRes = await resend.emails.send({
             from: "onboarding@resend.dev",
             to: targetEmail,
-            replyTo: email,
-            subject: `[Contact Form] ${topicLabel} from ${email}`,
+            replyTo: rawEmail,
+            subject: `[Contact Form] ${topicLabel} from ${rawEmail}`,
             html: adminHtml,
           });
           if (fallbackRes.data?.id) {
@@ -253,7 +298,7 @@ ${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
       try {
         await resend.emails.send({
           from: fromAddress,
-          to: email,
+          to: rawEmail,
           subject: `Received: ${topicLabel} — The Launch Feed`,
           html: userReceiptHtml,
         });
@@ -269,8 +314,11 @@ ${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
 
   // Always record into EmailLog so admins can inspect in dashboard (with retry on cold connection)
   const logData = {
-    toEmail: targetEmail,
-    templateId: "contact_dispatch",
+    // toEmail records the SENDER so per-sender rate limits (see the counts
+    // at the top of this function) actually match, and the admin inbox stays
+    // findable via meta.adminTarget.
+    toEmail: rawEmail,
+    templateId: "contact-form",
     subject,
     html: adminHtml,
     status: emailStatus,
@@ -279,8 +327,9 @@ ${message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}
     errorMessage,
     triggerEvent: "contact_form",
     meta: {
-      senderName: name || null,
-      senderEmail: email,
+      senderName: rawName || null,
+      senderEmail: rawEmail,
+      adminTarget: targetEmail,
       topic,
       topicLabel,
       message,

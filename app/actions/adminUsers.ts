@@ -221,22 +221,70 @@ export async function createUserAdminAction(data: {
 /**
  * Delete a user and clean up / reassign dependencies
  */
-export async function deleteUserAdminAction(userId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteUserAdminAction(
+  userId: string,
+  options?: { confirmDestructive?: boolean }
+): Promise<{
+  success: boolean;
+  error?: string;
+  summary?: { productsToDelete: number; votes: number; comments: number; needsConfirmation?: boolean };
+}> {
   const currentAdmin = await requireAdmin();
   if (currentAdmin.id === userId) {
     return { success: false, error: "You cannot delete your own active admin account." };
   }
 
-  // Clean up user sessions and accounts first
+  // Product.ownerId has onDelete: Cascade — deleting a user silently wipes
+  // every product they've ever launched (and via further cascades, every
+  // vote/comment/slot/purchase). Compute a summary first and require an
+  // explicit confirmation flag if the delete would destroy any products.
+  const [productsCount, votes, comments, productIds] = await Promise.all([
+    prisma.product.count({ where: { ownerId: userId } }),
+    prisma.vote.findMany({ where: { userId }, select: { productId: true } }),
+    prisma.comment.findMany({ where: { userId }, select: { productId: true } }),
+    prisma.product.findMany({ where: { ownerId: userId }, select: { id: true } }),
+  ]);
+
+  const summary = {
+    productsToDelete: productsCount,
+    votes: votes.length,
+    comments: comments.length,
+  };
+
+  if (productsCount > 0 && !options?.confirmDestructive) {
+    return {
+      success: false,
+      error: `This user owns ${productsCount} product(s). Their products, and every vote/comment/slot/purchase on those products, will be deleted. Re-call with confirmDestructive: true to proceed.`,
+      summary: { ...summary, needsConfirmation: true },
+    };
+  }
+
+  // Products that the departing user voted on / commented on — but that they
+  // do NOT own — need their denormalized voteCount / commentCount decremented
+  // to match reality after the delete.
+  const ownedIds = new Set(productIds.map((p) => p.id));
+  const otherVotes = votes.filter((v) => !ownedIds.has(v.productId)).map((v) => v.productId);
+  const otherComments = comments.filter((c) => !ownedIds.has(c.productId)).map((c) => c.productId);
+
+  const voteDelta = otherVotes.reduce<Map<string, number>>((m, id) => m.set(id, (m.get(id) ?? 0) + 1), new Map());
+  const commentDelta = otherComments.reduce<Map<string, number>>((m, id) => m.set(id, (m.get(id) ?? 0) + 1), new Map());
+
   await prisma.$transaction([
     prisma.session.deleteMany({ where: { userId } }),
     prisma.account.deleteMany({ where: { userId } }),
     prisma.vote.deleteMany({ where: { userId } }),
     prisma.comment.deleteMany({ where: { userId } }),
+    // Fix denormalized counters on the surviving products.
+    ...Array.from(voteDelta.entries()).map(([id, delta]) =>
+      prisma.product.update({ where: { id }, data: { voteCount: { decrement: delta } } })
+    ),
+    ...Array.from(commentDelta.entries()).map(([id, delta]) =>
+      prisma.product.update({ where: { id }, data: { commentCount: { decrement: delta } } })
+    ),
     prisma.user.delete({ where: { id: userId } }),
   ]);
 
   revalidatePath("/admin");
   revalidatePath("/founders");
-  return { success: true };
+  return { success: true, summary };
 }

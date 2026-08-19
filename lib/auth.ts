@@ -29,27 +29,17 @@ export function invalidateUserSessionCache(userId?: string) {
 export const getCurrentUser = cache(async function getCurrentUser(): Promise<User | null> {
   try {
     const cookieStore = await cookies();
-    const allCookies = cookieStore.getAll();
 
-    let token =
+    // Only trust cookies we explicitly own. The old "any cookie whose name
+    // contains 'session' or 'token'" heuristic picked up CSRF cookies, analytics
+    // cookies, and other unrelated values, then treated them as auth secrets.
+    const token =
       cookieStore.get("tlf.session_token")?.value ||
       cookieStore.get("__Secure-tlf.session_token")?.value ||
       cookieStore.get("better-auth.session_token")?.value ||
       cookieStore.get("__Secure-better-auth.session_token")?.value ||
       cookieStore.get("neon-auth.session_token")?.value ||
-      cookieStore.get("__Secure-neon-auth.session_token")?.value ||
-      cookieStore.get("authjs.session-token")?.value ||
-      cookieStore.get("__Secure-authjs.session-token")?.value ||
-      cookieStore.get("session_token")?.value ||
-      cookieStore.get("auth_session")?.value;
-
-    if (!token) {
-      const match = allCookies.find((c) =>
-        c.name.toLowerCase().includes("session") ||
-        c.name.toLowerCase().includes("token")
-      );
-      if (match) token = match.value;
-    }
+      cookieStore.get("__Secure-neon-auth.session_token")?.value;
 
     // Fast-path: if no auth session cookie exists, the visitor is unauthenticated.
     if (!token) return null;
@@ -75,6 +65,9 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Use
     const dotSplit = cleanToken.split(".")[0];
     const rawSplit = token.split(".")[0];
 
+    // Match by TOKEN only. session.id is a database primary key that leaks in
+    // logs and audit trails — treating it as an authenticator lets anyone with
+    // a leaked id impersonate the user.
     const session = await prisma.session.findFirst({
       where: {
         OR: [
@@ -83,11 +76,6 @@ export const getCurrentUser = cache(async function getCurrentUser(): Promise<Use
           { token: cleanToken },
           { token: dotSplit },
           { token: rawSplit },
-          { id: token },
-          { id: decoded },
-          { id: cleanToken },
-          { id: dotSplit },
-          { id: rawSplit },
         ],
         expiresAt: { gt: new Date() },
       },

@@ -53,7 +53,30 @@ const CreateSchema = z.object({
   makerHandle: z.string().min(1),
   logoUrl: imageString.optional().or(z.literal("")),
   screenshots: z.array(imageString).max(8).optional(),
-  videoUrl: z.string().optional().or(z.literal("")),
+  videoUrl: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (v) => {
+        if (!v) return true;
+        try {
+          const host = new URL(v).hostname.toLowerCase();
+          return (
+            host === "youtube.com" ||
+            host.endsWith(".youtube.com") ||
+            host === "youtu.be" ||
+            host === "vimeo.com" ||
+            host.endsWith(".vimeo.com") ||
+            host === "loom.com" ||
+            host.endsWith(".loom.com")
+          );
+        } catch {
+          return false;
+        }
+      },
+      { message: "videoUrl must be a YouTube, Vimeo, or Loom URL" }
+    ),
   tags: z.array(z.string().max(60)).max(20).optional(),
   details: z.record(z.string(), z.unknown()).optional(),
   asDraft: z.boolean().optional(),
@@ -151,14 +174,15 @@ export async function resolveCategory(raw: string | undefined | null) {
   });
   if (cat) return cat;
 
-  // 5. If user typed a custom new category, create it with that exact name
+  // 5. Unknown category name — do NOT create one from user input, or the
+  // taxonomy fills up with typos and spam ("Ai Tools", "aitools", ...).
+  // Fall through to the default fallback below; admins can add real new
+  // categories from the admin panel.
   try {
-    return await prisma.category.create({
-      data: {
-        name: trimmed,
-        slug: slug || "general",
-      },
-    });
+    return (
+      (await prisma.category.findFirst({ where: { slug: "dev-tools" } })) ||
+      (await prisma.category.findFirst())
+    );
   } catch {
     return (
       (await prisma.category.findFirst({ where: { slug: "dev-tools" } })) ||
@@ -240,8 +264,11 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
           const row = await prisma.submission.findUnique({ where: { id: existingSubmission.id } });
           if (row) return row;
         }
+        // Do not leak the queued submission's name or owner — enumerating
+        // this endpoint would otherwise reveal every draft/scheduled launch
+        // by URL or product name.
         throw new Error(
-          `A launch for "${existingSubmission.name}" (${domain}) is already queued on The Launch Feed. Duplicate submissions are not permitted.`
+          `A launch is already queued for ${domain}. Duplicate submissions are not permitted.`
         );
       }
     }
@@ -702,7 +729,30 @@ const UpdateFieldsSchema = z.object({
   categorySlug: z.string().optional(),
   logoUrl: imageString.optional().or(z.literal("")),
   screenshots: z.array(imageString).max(8).optional(),
-  videoUrl: z.string().optional().or(z.literal("")),
+  videoUrl: z
+    .string()
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (v) => {
+        if (!v) return true;
+        try {
+          const host = new URL(v).hostname.toLowerCase();
+          return (
+            host === "youtube.com" ||
+            host.endsWith(".youtube.com") ||
+            host === "youtu.be" ||
+            host === "vimeo.com" ||
+            host.endsWith(".vimeo.com") ||
+            host === "loom.com" ||
+            host.endsWith(".loom.com")
+          );
+        } catch {
+          return false;
+        }
+      },
+      { message: "videoUrl must be a YouTube, Vimeo, or Loom URL" }
+    ),
   tags: z.array(z.string().max(60)).max(20).optional(),
   details: z.record(z.string(), z.unknown()).optional(),
 });

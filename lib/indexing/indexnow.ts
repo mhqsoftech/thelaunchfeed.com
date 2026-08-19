@@ -18,7 +18,13 @@ export interface IndexNowResult {
 const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
 
 /**
- * Gets the configured IndexNow key or generates a stable deterministic key
+ * Gets the configured IndexNow key or generates a stable deterministic key.
+ *
+ * IMPORTANT: whatever this returns MUST match — byte-for-byte, with NO trailing
+ * newline — the body of the file served at `${APP_URL}/${key}.txt`. IndexNow
+ * strict-compares them; a stray "\n" from a text editor makes the API 403
+ * with "UserForbiddedToAccessSite". If you rotate this key, `printf '%s' KEY >
+ * public/KEY.txt` (never `echo`, which appends a newline).
  */
 export function getIndexNowKey(): string {
   if (process.env.INDEXNOW_KEY && process.env.INDEXNOW_KEY.trim().length >= 8) {

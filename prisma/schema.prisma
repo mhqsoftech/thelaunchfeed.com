@@ -468,6 +468,7 @@ model FeaturedSlot {
 
   createdAt     DateTime     @default(now())
 
+  @@unique([purchaseId])
   @@index([position, order])
   @@index([kind, position])
   @@index([startsAt, endsAt])
@@ -539,6 +540,7 @@ enum EmailStatus {
   FAILED
   BOUNCED
   COMPLAINED
+  SKIPPED
 }
 
 model AutomationRule {

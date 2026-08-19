@@ -40,13 +40,20 @@ export function encryptPaymentApiKey(apiKey: string): string {
 export function decryptPaymentApiKey(encryptedKey: string): string {
   if (!encryptedKey || encryptedKey.trim() === "") return "";
   if (!isEncryptedToken(encryptedKey)) {
+    // Not our envelope — assume plaintext (legacy row written before encryption).
     return encryptedKey;
   }
   try {
     return decryptToken(encryptedKey);
   } catch (err) {
+    // Fail loud. The previous fallback returned the *ciphertext*, which then
+    // got sent to Stripe/Paddle as the API key and produced cryptic 401s that
+    // masked the real cause (rotated TOKEN_ENCRYPTION_KEY, corruption, tag
+    // mismatch). Throw so the caller can surface a real error to the admin.
     console.error("Failed to decrypt payment API key:", err);
-    return encryptedKey;
+    throw new Error(
+      "Payment API key could not be decrypted. TOKEN_ENCRYPTION_KEY may have rotated or the stored value is corrupted."
+    );
   }
 }
 

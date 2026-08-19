@@ -49,6 +49,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
-  return POST(req);
+// GET intentionally omitted. Cron callers use bearer tokens on POST; browser
+// admins go through the admin UI (also POST). Exposing GET turned this into a
+// CSRF handle — any page with <img src="…/api/indexing/sync"> triggered a
+// 200-URL re-submission on the signed-in admin's daily indexing quota.
+export async function GET() {
+  return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405, headers: { Allow: "POST" } });
 }

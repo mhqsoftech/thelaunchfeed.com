@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { safeFetch } from "@/lib/ssrf";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,26 +12,13 @@ export async function GET(req: Request) {
   const raw = new URL(req.url).searchParams.get("url");
   if (!raw) return NextResponse.json({ error: "url required" }, { status: 400 });
 
-  let target: URL;
   try {
-    target = new URL(raw);
-  } catch {
-    return NextResponse.json({ error: "invalid url" }, { status: 400 });
-  }
-  if (target.protocol !== "https:" && target.protocol !== "http:") {
-    return NextResponse.json({ error: "invalid protocol" }, { status: 400 });
-  }
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-  try {
-    const upstream = await fetch(target.toString(), {
-      signal: ctrl.signal,
+    const upstream = await safeFetch(raw, {
+      timeoutMs: TIMEOUT_MS,
       headers: {
         "user-agent": "TheLaunchFeedBot/1.0 (+https://thelaunchfeed.com/bot)",
         accept: "image/*",
       },
-      redirect: "follow",
     });
     if (!upstream.ok) {
       return NextResponse.json({ error: `upstream ${upstream.status}` }, { status: 502 });
@@ -50,9 +38,11 @@ export async function GET(req: Request) {
         "cache-control": "public, max-age=3600",
       },
     });
-  } catch {
+  } catch (err: any) {
+    const msg = err?.message || "fetch failed";
+    if (msg.startsWith("ssrf:")) {
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
     return NextResponse.json({ error: "fetch failed" }, { status: 504 });
-  } finally {
-    clearTimeout(timer);
   }
 }

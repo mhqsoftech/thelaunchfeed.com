@@ -66,12 +66,18 @@ export async function sendAndLog(input: {
   }
 
   try {
-    const res = await resend.emails.send({
-      from: FROM,
-      to: input.to,
-      subject,
-      html,
-    });
+    // Idempotency-key uses the EmailLog id so an Inngest step retry after a
+    // transient error does not deliver the same message twice — Resend
+    // deduplicates within a 24-hour window on this header.
+    const res = await resend.emails.send(
+      {
+        from: FROM,
+        to: input.to,
+        subject,
+        html,
+      },
+      { idempotencyKey: log.id }
+    );
     await prisma.emailLog.update({
       where: { id: log.id },
       data: {
@@ -106,7 +112,30 @@ export const emailSend = inngest.createFunction(
       const enabled = await step.run("check-rule", () =>
         isAutomationEnabled(templateId)
       );
-      if (!enabled) return { skipped: true };
+      if (!enabled) {
+        // Write a SKIPPED EmailLog so the admin can see *why* a founder
+        // never received an expected notification, instead of the send
+        // silently disappearing.
+        await step.run("log-skipped", async () => {
+          try {
+            const tpl = getTemplate(templateId as any);
+            await prisma.emailLog.create({
+              data: {
+                toEmail: to,
+                toUserId,
+                templateId,
+                subject: tpl.subject((vars ?? {}) as TemplateVars),
+                html: "",
+                status: "SKIPPED",
+                triggerEvent: trigger,
+                errorMessage: `automation disabled for template "${templateId}"`,
+                meta: (vars ?? {}) as any,
+              },
+            });
+          } catch {}
+        });
+        return { skipped: true, reason: "automation-disabled" };
+      }
     }
 
     return step.run("send", () =>
@@ -197,7 +226,12 @@ export const publishDue = inngest.createFunction(
     const now = new Date();
     const publishedIds: string[] = [];
     for (const sub of due) {
-      await step.run(`publish-${sub.id}`, async () => {
+      // Return the new product id from the step so it survives Inngest
+      // memoization on retries — a side-effect push into an outer array
+      // would be lost when the step body is skipped on a replayed attempt,
+      // causing product.launched events (and thus broadcast + founder
+      // email) to never fire.
+      const pid = await step.run(`publish-${sub.id}`, async () => {
         const product = await prisma.product.create({
           data: {
             slug: await ensureUniqueSlug(slugify(sub.name)),
@@ -238,8 +272,9 @@ export const publishDue = inngest.createFunction(
             publishedProductId: product.id,
           },
         });
-        publishedIds.push(product.id);
+        return product.id;
       });
+      if (pid) publishedIds.push(pid);
     }
 
     // Broadcast a launch email per newly-published product to every user.
@@ -514,8 +549,12 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
         // If in top 3, send winner email to founder
         if (rank <= 3) {
           const isFirst = rank === 1;
+          const rankTemplateId = isFirst ? "rank-first" : "rank-top3";
+          // Respect the admin's AutomationRule toggle for rank emails, same
+          // as launch / comment templates — direct sendAndLog would bypass it.
+          if (!(await isAutomationEnabled(rankTemplateId))) continue;
           await sendAndLog({
-            templateId: isFirst ? "rank-first" : "rank-top3",
+            templateId: rankTemplateId,
             to: p.owner.email,
             toUserId: p.owner.id,
             trigger: isFirst ? "on-rank-first" : "on-rank-change",
@@ -591,8 +630,12 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
 
         if (rank <= 3) {
           const isFirst = rank === 1;
+          const rankTemplateId = isFirst ? "rank-first" : "rank-top3";
+          // Respect the admin's AutomationRule toggle for rank emails, same
+          // as launch / comment templates — direct sendAndLog would bypass it.
+          if (!(await isAutomationEnabled(rankTemplateId))) continue;
           await sendAndLog({
-            templateId: isFirst ? "rank-first" : "rank-top3",
+            templateId: rankTemplateId,
             to: p.owner.email,
             toUserId: p.owner.id,
             trigger: isFirst ? "on-rank-first" : "on-rank-change",
@@ -667,8 +710,10 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
 
         if (rank <= 3 && !p.owner.isSeed) {
           const isFirst = rank === 1;
+          const rankTemplateId = isFirst ? "rank-first" : "rank-top3";
+          if (!(await isAutomationEnabled(rankTemplateId))) continue;
           await sendAndLog({
-            templateId: isFirst ? "rank-first" : "rank-top3",
+            templateId: rankTemplateId,
             to: p.owner.email,
             toUserId: p.owner.id,
             trigger: isFirst ? "on-rank-first" : "on-rank-change",
@@ -775,8 +820,11 @@ export const periodicDirectoryOutreachSync = inngest.createFunction(
   { cron: "0 */4 * * *" },
   async ({ step }) => {
     const result = await step.run("dispatch-auto-outreach", async () => {
-      const { triggerAutoOutreachBatchAction } = await import("@/app/actions/leads");
-      return await triggerAutoOutreachBatchAction();
+      // Use the no-auth internal — the admin-gated wrapper would throw here
+      // because Inngest handlers have no session cookie, silently failing the
+      // cron every tick.
+      const { triggerAutoOutreachBatchInternal } = await import("@/app/actions/leads");
+      return await triggerAutoOutreachBatchInternal();
     });
 
     return result;
@@ -808,8 +856,8 @@ export const periodicDailyDirectoryCrawler = inngest.createFunction(
 
       // If within target hour (or if forced), run the crawl sweep
       if (currentHour === targetHour) {
-        const { runDailyDirectoryCrawlBatchAction } = await import("@/app/actions/leads");
-        return await runDailyDirectoryCrawlBatchAction(config.selectedDirectoryIds);
+        const { runDailyDirectoryCrawlBatchInternal } = await import("@/app/actions/leads");
+        return await runDailyDirectoryCrawlBatchInternal(config.selectedDirectoryIds);
       }
 
       return {

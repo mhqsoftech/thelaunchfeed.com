@@ -296,8 +296,20 @@ export async function sendOutreachCampaignAction(
   leadIds: string[],
   options?: { testEmail?: string; overrideSubject?: string }
 ) {
-  const admin = await requireAdmin();
+  await requireAdmin();
+  return _sendOutreachCampaignInternal(leadIds, options);
+}
 
+/**
+ * Internal (no auth) worker used by admin-gated wrappers and by Inngest crons
+ * that have no cookie context and therefore can't satisfy requireAdmin().
+ * MUST NOT be re-exported to client code — it is only invoked from other
+ * server-side functions in this file and from Inngest handlers.
+ */
+async function _sendOutreachCampaignInternal(
+  leadIds: string[],
+  options?: { testEmail?: string; overrideSubject?: string }
+) {
   if (!leadIds || leadIds.length === 0) {
     throw new Error("No leads selected for outreach");
   }
@@ -469,7 +481,14 @@ export async function sendTestOutreachEmailAction(recipientEmail: string, sample
  */
 export async function triggerAutoOutreachBatchAction() {
   await requireAdmin();
+  return triggerAutoOutreachBatchInternal();
+}
 
+/**
+ * Internal (no auth) — called by Inngest crons which have no session cookie
+ * and cannot satisfy requireAdmin(). Do not re-export to client code.
+ */
+export async function triggerAutoOutreachBatchInternal() {
   const setting = await prisma.appSetting.findUnique({
     where: { key: "auto_outreach_config" },
   });
@@ -489,7 +508,7 @@ export async function triggerAutoOutreachBatchAction() {
     return { count: 0, message: "No new unemailed directory leads found." };
   }
 
-  const result = await sendOutreachCampaignAction(pendingLeads.map((l: any) => l.id));
+  const result = await _sendOutreachCampaignInternal(pendingLeads.map((l: any) => l.id));
   return { ...result, count: pendingLeads.length };
 }
 
@@ -642,6 +661,16 @@ export async function updateAutoCrawlerConfigAction(config: Partial<AutoCrawlerC
  * Executes a full automated daily directory crawl batch across all saved directories
  */
 export async function runDailyDirectoryCrawlBatchAction(selectedDirIds?: string[]) {
+  await requireAdmin();
+  return runDailyDirectoryCrawlBatchInternal(selectedDirIds);
+}
+
+/**
+ * Internal (no auth) — called from the Inngest cron. Do not re-export to
+ * client code; heavy work that must not be triggerable by unauthenticated
+ * or non-admin callers.
+ */
+export async function runDailyDirectoryCrawlBatchInternal(selectedDirIds?: string[]) {
   // Load custom directories
   const customSetting = await prisma.appSetting.findUnique({
     where: { key: "custom_directories" },
@@ -758,7 +787,10 @@ export async function runDailyDirectoryCrawlBatchAction(selectedDirIds?: string[
       : DEFAULT_AUTO_CONFIG;
 
     if (outreachConfig.enabled && outreachConfig.autoSendOnCrawl && newLeadsSaved > 0) {
-      await triggerAutoOutreachBatchAction();
+      // Use the no-auth internal — this path also runs from the Inngest cron
+      // via runDailyDirectoryCrawlBatchAction and would otherwise fail its
+      // requireAdmin() check silently.
+      await triggerAutoOutreachBatchInternal();
     }
   } catch {}
 

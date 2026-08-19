@@ -115,22 +115,20 @@ export type CrawlResult = {
 };
 
 async function fetchWithTimeout(url: string): Promise<Response | null> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  // SSRF guard — crawler accepts user-supplied URLs. Reject anything that
+  // resolves to a private / reserved IP, and follow redirects manually so an
+  // attacker-controlled origin can't 302 into the internal network.
   try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
+    const { safeFetch } = await import("@/lib/ssrf");
+    return await safeFetch(url, {
+      timeoutMs: FETCH_TIMEOUT_MS,
       headers: {
         "user-agent": USER_AGENT,
         accept: "text/html,application/xhtml+xml",
       },
-      redirect: "follow",
     });
-    return res;
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

@@ -64,8 +64,12 @@ async function performSignOut(req: NextRequest) {
   return response;
 }
 
-export async function GET(req: NextRequest) {
-  return performSignOut(req);
+// GET is not allowed — an `<img src="…/sign-out">` on any site could log the
+// user out (CSRF via GET). POST-only avoids that; the header-based Accept
+// check for text/html only applied when someone navigated here, and we no
+// longer support that flow.
+export async function GET() {
+  return NextResponse.json({ error: "METHOD_NOT_ALLOWED" }, { status: 405, headers: { Allow: "POST" } });
 }
 
 export async function POST(req: NextRequest) {

@@ -11,31 +11,18 @@ export interface NeonAuthSessionRow {
   image: string | null;
 }
 
-export async function syncNeonAuthSession(token?: string): Promise<{ user: User; token: string } | null> {
+export async function syncNeonAuthSession(token: string): Promise<{ user: User; token: string } | null> {
+  if (!token) return null;
   try {
-    let rows: NeonAuthSessionRow[] = [];
-
-    if (token) {
-      const clean = decodeURIComponent(token).replace(/^s:/, "").split(".")[0];
-      rows = await prisma.$queryRaw<NeonAuthSessionRow[]>`
-        SELECT s.token, s."userId", s."expiresAt", u.id as "neonUserId", u.email, u.name, u.image
-        FROM neon_auth.session s
-        JOIN neon_auth.user u ON s."userId" = u.id
-        WHERE (s.token = ${token} OR s.token = ${clean}) AND s."expiresAt" > NOW()
-        ORDER BY s."createdAt" DESC
-        LIMIT 1
-      `;
-    } else {
-      // Find the most recent active session created in neon_auth
-      rows = await prisma.$queryRaw<NeonAuthSessionRow[]>`
-        SELECT s.token, s."userId", s."expiresAt", u.id as "neonUserId", u.email, u.name, u.image
-        FROM neon_auth.session s
-        JOIN neon_auth.user u ON s."userId" = u.id
-        WHERE s."expiresAt" > NOW()
-        ORDER BY s."createdAt" DESC
-        LIMIT 1
-      `;
-    }
+    const clean = decodeURIComponent(token).replace(/^s:/, "").split(".")[0];
+    const rows = await prisma.$queryRaw<NeonAuthSessionRow[]>`
+      SELECT s.token, s."userId", s."expiresAt", u.id as "neonUserId", u.email, u.name, u.image
+      FROM neon_auth.session s
+      JOIN neon_auth.user u ON s."userId" = u.id
+      WHERE (s.token = ${token} OR s.token = ${clean}) AND s."expiresAt" > NOW()
+      ORDER BY s."createdAt" DESC
+      LIMIT 1
+    `;
 
     if (!rows || rows.length === 0) return null;
     const row = rows[0];
