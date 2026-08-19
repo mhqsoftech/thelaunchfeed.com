@@ -128,11 +128,19 @@ export default async function FounderPage({
 }) {
   const { slug } = await params;
   const cleanSlug = decodeURIComponent(slug).trim();
+  const slugKey = cleanSlug.replace(/^@/, "").trim().toLowerCase();
   let built = await buildFounderViewWithSuggested(cleanSlug);
   if (!built) {
     const currentUsername = await resolveHistoricalUsername(cleanSlug);
     if (currentUsername) permanentRedirect(`/founder/${currentUsername}`);
     notFound();
+  }
+  // Canonicalisation — getPublicProfile matches by email prefix and name
+  // too, so a fuzzy hit on an old handle would leave BOTH URLs returning 200
+  // and Google would flag them as duplicate content. Always send the browser
+  // (and crawlers) to the founder's live username.
+  if (built.view.username && built.view.username.toLowerCase() !== slugKey) {
+    permanentRedirect(`/founder/${built.view.username}`);
   }
   const { view, suggestedFounders } = built;
   // Fetch the raw profile once more for schema-only fields (email domain, etc.)
