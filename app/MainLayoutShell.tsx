@@ -592,7 +592,7 @@ export default function MainLayoutShell({
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pt-3 pr-1">
+                <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between gap-4 pt-3 pr-1">
                   {railCategoryGroups.length > 0
                     ? railCategoryGroups.map((group) => (
                         <div key={group.name} className="space-y-1.5">
@@ -1189,7 +1189,7 @@ export default function MainLayoutShell({
             </div>
 
             {rightRailTab === "categories" ? (
-              <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pt-3 pr-1">
+              <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between gap-1.5 pt-3 pr-1">
                 {categories.map((cat) => (
                   <Link
                     key={cat.slug}
@@ -1212,7 +1212,7 @@ export default function MainLayoutShell({
               </div>
             ) : (
               /* ── Top 10 Builders / Founders View ── */
-              <div className="flex-1 overflow-y-auto no-scrollbar space-y-1.5 pt-3 pr-1">
+              <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between gap-1.5 pt-3 pr-1">
                 {topFounders.length > 0
                   ? topFounders.slice(0, 10).map((f, i) => (
                       <Link
