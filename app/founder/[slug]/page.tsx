@@ -1,9 +1,33 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { getPublicProfile } from "@/lib/queries/user";
 import { buildFounderViewWithSuggested } from "@/lib/queries/founderView";
+import { prisma } from "@/lib/db";
 import FounderClientView from "./FounderClientView";
 import { organizationNode, websiteNode, breadcrumb, ORG_ID, WEBSITE_ID, SITE_NAME } from "@/lib/seo/schema";
+
+/**
+ * Every historical handle a founder has used is kept in UsernameRedirect.
+ * If the slug isn't a live handle but matches a past one, 308 to the current
+ * URL so inbound links (SEO, social cards, embeds) never break on rename.
+ * Returns null when no redirect applies, letting the caller notFound().
+ */
+async function resolveHistoricalUsername(cleanSlug: string): Promise<string | null> {
+  const key = cleanSlug.replace(/^@/, "").trim().toLowerCase();
+  if (!key) return null;
+  const redirect = await prisma.usernameRedirect.findFirst({
+    where: { oldUsername: { equals: key, mode: "insensitive" } },
+    select: { userId: true },
+  });
+  if (!redirect) return null;
+  const current = await prisma.user.findUnique({
+    where: { id: redirect.userId },
+    select: { username: true, isProfilePublic: true },
+  });
+  if (!current || !current.isProfilePublic) return null;
+  if (current.username.toLowerCase() === key) return null;
+  return current.username;
+}
 
 export const revalidate = 300;
 
@@ -14,7 +38,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const cleanSlug = decodeURIComponent(slug).trim();
-  const founder = await getPublicProfile(cleanSlug);
+  let founder = await getPublicProfile(cleanSlug);
+  if (!founder) {
+    const currentUsername = await resolveHistoricalUsername(cleanSlug);
+    if (currentUsername) founder = await getPublicProfile(currentUsername);
+  }
   if (!founder) {
     return {
       title: "Founder Not Found - The Launch Feed",
@@ -31,8 +59,13 @@ export async function generateMetadata({
     ? `${title}${founder.bio.slice(0, 160)}... ${productSummary}`
     : `${name} (${handle}) founder profile on The Launch Feed. ${title}${productSummary} Explore launched products, specifications, and community rankings.`;
 
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com";
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
   const canonicalUrl = `${siteUrl}/founder/${founder.username}`;
+  // Use the founder's profile picture so every share card carries their face.
+  const shareImage = founder.image || `${siteUrl}/og-default.png`;
+  const absoluteShareImage = shareImage.startsWith("http")
+    ? shareImage
+    : `${siteUrl}${shareImage.startsWith("/") ? "" : "/"}${shareImage}`;
   return {
     title: `${name} - The Launch Feed`,
     description,
@@ -60,12 +93,20 @@ export async function generateMetadata({
       title: `${name} - The Launch Feed`,
       description,
       siteName: "The Launch Feed",
+      images: [
+        {
+          url: absoluteShareImage,
+          alt: `${name} (${handle}) on The Launch Feed`,
+        },
+      ],
     },
     twitter: {
-      card: "summary_large_image",
+      // Founder cards read best as a square avatar next to text.
+      card: founder.image ? "summary" : "summary_large_image",
       title: `${name} - The Launch Feed`,
       description,
       creator: founder.twitterHandle ? `@${founder.twitterHandle.replace(/^@/, "")}` : undefined,
+      images: [absoluteShareImage],
     },
     robots: {
       index: true,
@@ -87,8 +128,12 @@ export default async function FounderPage({
 }) {
   const { slug } = await params;
   const cleanSlug = decodeURIComponent(slug).trim();
-  const built = await buildFounderViewWithSuggested(cleanSlug);
-  if (!built) notFound();
+  let built = await buildFounderViewWithSuggested(cleanSlug);
+  if (!built) {
+    const currentUsername = await resolveHistoricalUsername(cleanSlug);
+    if (currentUsername) permanentRedirect(`/founder/${currentUsername}`);
+    notFound();
+  }
   const { view, suggestedFounders } = built;
   // Fetch the raw profile once more for schema-only fields (email domain, etc.)
   const f = await getPublicProfile(cleanSlug);

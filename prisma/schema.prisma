@@ -616,4 +616,21 @@ enum DirectoryLeadStatus {
   UNSUBSCRIBED
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// USERNAME REDIRECT  ·  every past handle a founder has used is kept here, so
+// /founder/<old> continues to resolve with a 308 to /founder/<current>.
+// Prevents inbound links (SEO, social, embeds) from 404-ing when a founder
+// changes their username, and doubles as the "already-taken" guard — a new
+// username must collide with neither an active User.username nor an old
+// UsernameRedirect.oldUsername (case-insensitive).
+// ──────────────────────────────────────────────────────────────────────────────
+model UsernameRedirect {
+  id          String   @id @default(cuid())
+  oldUsername String   @unique
+  userId      String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
 

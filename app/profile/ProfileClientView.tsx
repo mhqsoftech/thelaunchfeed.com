@@ -13,7 +13,7 @@ import {
   slugify,
 } from "@/app/data";
 import { authClient } from "@/lib/auth-client";
-import { updateProfile, listMyProducts, type MyProduct } from "@/app/actions/profile";
+import { updateProfile, updateUsername, checkUsernameAvailability, listMyProducts, type MyProduct } from "@/app/actions/profile";
 import { savePaymentApiKey, getPaymentApiKeys, deletePaymentApiKey } from "@/app/actions/revenue";
 import { resubmitSubmission } from "@/app/actions/submissions";
 import { listCategories } from "@/app/actions/categories";
@@ -91,6 +91,61 @@ export default function ProfileClientView({
   const [imageError, setImageError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Username editing — kept separate from the rest of the settings form so
+  // the confirm/error flow doesn't interfere with in-flight profile edits.
+  const [usernameInput, setUsernameInput] = useState("");
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSuccess, setUsernameSuccess] = useState<string | null>(null);
+  // Availability gate — the "Update Handle" button stays disabled until the
+  // caller has explicitly checked availability for the *exact* text in the
+  // input, so a rapid rename after a stale check can't slip through. Editing
+  // the input clears this state; only a fresh check can re-enable submit.
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [availability, setAvailability] = useState<{
+    forInput: string;
+    status: "available" | "taken" | "invalid" | "unchanged";
+    reason?: string;
+  } | null>(null);
+
+  // Quality score for the username input — drives the sophistication bar.
+  // 0 = blank, 1 = invalid, 2 = ok, 3 = good, 4 = great. Long handles are
+  // capped down: anything past 15 chars stops being "great", past 20 stops
+  // being "good", past 25 is treated as poor even if syntactically valid —
+  // long handles look junky in a URL and hurt shareability.
+  const usernameQuality = (() => {
+    const raw = usernameInput.trim().replace(/^@/, "").toLowerCase();
+    if (!raw) return { score: 0, label: "" };
+    const validFormat = /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])$/.test(raw);
+    if (!validFormat) return { score: 1, label: "Invalid" };
+    const letters = raw.replace(/[^a-z]/g, "").length;
+    const hasDoubleSep = /[-_]{2,}/.test(raw);
+    const startsLetter = /^[a-z]/.test(raw);
+    const letterHeavy = letters / raw.length >= 0.6;
+
+    let score = 2; // valid format alone earns "ok"
+    if (raw.length >= 5 && raw.length <= 15) score++;
+    if (startsLetter && !hasDoubleSep && letterHeavy) score++;
+
+    // Length penalty — long handles are technically allowed but discouraged.
+    if (raw.length > 25) score = Math.min(score, 1);
+    else if (raw.length > 20) score = Math.min(score, 2);
+    else if (raw.length > 15) score = Math.min(score, 3);
+
+    const finalScore = Math.min(score, 4);
+    // Label prioritises the reason for the cap so the user knows *why* they
+    // aren't at "Great" yet — otherwise a 27-char handle just says "OK" and
+    // gives no hint that shortening it will move the needle.
+    let label: string;
+    if (raw.length > 25) label = "Too long";
+    else if (raw.length > 20) label = "Shorten it";
+    else if (finalScore === 4) label = "Great";
+    else if (finalScore === 3) label = "Good";
+    else if (finalScore === 2) label = "OK";
+    else label = "Invalid";
+    return { score: finalScore, label };
+  })();
 
   // Rejected-product resubmission form state (keyed by submissionId)
   const [resubmitOpenFor, setResubmitOpenFor] = useState<string | null>(null);
@@ -311,6 +366,112 @@ export default function ProfileClientView({
     setGithub(s.github || "");
     setApiKey(s.apiKey || "");
     setImage(s.image || "");
+    // Seed the handle input with the current handle, lowercased so the
+    // equality guards on the availability + update buttons treat the
+    // untouched default as "no change" and keep both disabled until the
+    // user actually types something different.
+    setUsernameInput((s.handle || "").replace(/^@/, "").toLowerCase());
+  };
+
+  const handleCheckAvailability = async () => {
+    if (!session || checkingAvailability) return;
+    const next = usernameInput.trim().replace(/^@/, "").toLowerCase();
+    if (!next) return;
+    setUsernameError(null);
+    setUsernameSuccess(null);
+    setAvailability(null);
+    setCheckingAvailability(true);
+    try {
+      const result = await checkUsernameAvailability(next);
+      setAvailability({
+        forInput: result.username,
+        status: result.status,
+        reason: "reason" in result ? result.reason : undefined,
+      });
+      if (result.status === "available") {
+        // Small burst anchored to the button — dynamic import keeps confetti
+        // out of the initial profile bundle and off the SSR path.
+        try {
+          const { default: confetti } = await import("canvas-confetti");
+          const btn = document.getElementById("username-check-btn");
+          const rect = btn?.getBoundingClientRect();
+          const origin =
+            rect && window.innerWidth > 0
+              ? {
+                  x: (rect.left + rect.width / 2) / window.innerWidth,
+                  y: (rect.top + rect.height / 2) / window.innerHeight,
+                }
+              : { x: 0.5, y: 0.5 };
+          confetti({
+            particleCount: 60,
+            spread: 60,
+            startVelocity: 35,
+            ticks: 120,
+            scalar: 0.8,
+            origin,
+            colors: ["#00D97E", "#D6002A", "#0A0A0A", "#F5F5F5"],
+            disableForReducedMotion: true,
+          });
+        } catch {
+          /* confetti is decorative — never let a load failure surface */
+        }
+      }
+    } catch (err) {
+      setUsernameError(
+        err instanceof Error ? err.message : "Could not check availability",
+      );
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
+
+  const pendingHandle = usernameInput.trim().replace(/^@/, "").toLowerCase();
+  const currentHandle = (session?.handle || "").replace(/^@/, "").toLowerCase();
+  // Keep the full record when it is still valid for the current input, so
+  // callers can read `.status` — using `&&` with a comparison would collapse
+  // this to a boolean and silently break every status-driven branch below.
+  const availabilityFresh =
+    availability && availability.forInput === pendingHandle ? availability : null;
+  const canUpdateHandle =
+    !savingUsername &&
+    !!pendingHandle &&
+    pendingHandle !== currentHandle &&
+    availabilityFresh?.status === "available";
+
+  const handleSaveUsername = async () => {
+    if (!session || savingUsername) return;
+    setUsernameError(null);
+    setUsernameSuccess(null);
+    const next = usernameInput.trim().replace(/^@/, "").toLowerCase();
+    const current = (session.handle || "").replace(/^@/, "").toLowerCase();
+    if (!next || next === current) return;
+    setSavingUsername(true);
+    try {
+      const { username, previousUsername } = await updateUsername(next);
+      // Refresh the canonical session so all downstream views (avatar,
+      // handle chip, share links) pick up the new @handle immediately.
+      let refreshed: UserSession = { ...session, handle: `@${username}` };
+      try {
+        const meRes = await fetch("/api/me", { cache: "no-store" });
+        if (meRes.ok) {
+          const meData = (await meRes.json()) as { session: UserSession | null };
+          if (meData?.session) refreshed = meData.session;
+        }
+      } catch {}
+      saveSession(refreshed);
+      setSession(refreshed);
+      setUsernameInput(username);
+      setUsernameSuccess(
+        `Handle updated to @${username}. /founder/${previousUsername} will permanently redirect here.`,
+      );
+      setTimeout(() => setUsernameSuccess(null), 6000);
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "Could not update username";
+      // Server encodes a stable code prefix; strip it for the human-facing text.
+      setUsernameError(raw.replace(/^USERNAME_[A-Z_]+:\s*/, ""));
+    } finally {
+      setSavingUsername(false);
+    }
   };
 
   const seedFormOnce = (s: UserSession) => {
@@ -779,17 +940,23 @@ export default function ProfileClientView({
         {isPreviewing ? (
           previewData?.view ? (
             <FounderProfileContent
-              founder={{
-                ...previewData.view,
+              founder={(() => {
                 // Overlay any unsaved edits so what-you-see-is-what-you-publish.
-                name: name || previewData.view.name,
-                title: title || previewData.view.title,
-                bio: bio || previewData.view.bio,
-                image: image || previewData.view.image,
-                website: website || previewData.view.website,
-                twitter: twitter || previewData.view.twitter,
-                github: github || previewData.view.github,
-              }}
+                const pendingHandle = usernameInput.trim().replace(/^@/, "").toLowerCase();
+                const nextUsername = pendingHandle || previewData.view.username;
+                return {
+                  ...previewData.view,
+                  name: name || previewData.view.name,
+                  title: title || previewData.view.title,
+                  bio: bio || previewData.view.bio,
+                  image: image || previewData.view.image,
+                  website: website || previewData.view.website,
+                  twitter: twitter || previewData.view.twitter,
+                  github: github || previewData.view.github,
+                  username: nextUsername,
+                  handle: `@${nextUsername}`,
+                };
+              })()}
               suggestedFounders={previewData.suggestedFounders || []}
               onExitPreview={() => setIsPreviewing(false)}
             />
@@ -2018,6 +2185,159 @@ export default function ProfileClientView({
                           Upload under 400 KB (stored inline) or paste any https URL.
                         </p>
                       </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-ink uppercase flex items-center justify-between gap-2">
+                        <span>Username / Public Handle</span>
+                        <span className="text-[9px] font-normal text-ink-faint uppercase tracking-wider">
+                          /founder/{(session?.handle || "").replace(/^@/, "") || "your-handle"}
+                        </span>
+                      </label>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="flex-1 flex items-center border border-hairline bg-void focus-within:border-ink">
+                          <span className="px-2 text-ink-faint text-xs font-mono select-none">@</span>
+                          <input
+                            type="text"
+                            value={usernameInput}
+                            onChange={(e) => {
+                              setUsernameError(null);
+                              setUsernameSuccess(null);
+                              // Any edit invalidates the last availability
+                              // result — the user must re-check before the
+                              // submit button reopens.
+                              setAvailability(null);
+                              setUsernameInput(
+                                e.target.value.replace(/^@/, "").toLowerCase().replace(/[^a-z0-9_-]/g, ""),
+                              );
+                            }}
+                            placeholder="your-handle"
+                            className="flex-1 bg-transparent px-1 py-2 text-xs font-mono text-ink focus:outline-none placeholder:text-ink-faint"
+                            maxLength={30}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            id="username-check-btn"
+                            type="button"
+                            onClick={handleCheckAvailability}
+                            // Disable until the input is genuinely different
+                            // from the seeded default — checking your own
+                            // current handle would only ever return
+                            // "unchanged" and wastes a round-trip.
+                            disabled={
+                              !session ||
+                              checkingAvailability ||
+                              !pendingHandle ||
+                              !currentHandle ||
+                              pendingHandle === currentHandle ||
+                              !!availabilityFresh
+                            }
+                            className={`flex-1 sm:flex-initial px-4 py-2 text-[10px] uppercase font-bold border transition-colors cursor-pointer disabled:cursor-not-allowed ${
+                              availabilityFresh?.status === "available"
+                                ? "border-verified/60 bg-verified/10 text-verified disabled:opacity-100"
+                                : availabilityFresh &&
+                                    (availabilityFresh.status === "taken" ||
+                                      availabilityFresh.status === "invalid")
+                                  ? "border-signal/60 bg-signal/10 text-signal disabled:opacity-100"
+                                  : "border-hairline bg-void hover:bg-surface disabled:opacity-40"
+                            }`}
+                          >
+                            {checkingAvailability
+                              ? "Checking…"
+                              : availabilityFresh?.status === "available"
+                                ? "✓ Available"
+                                : availabilityFresh?.status === "taken" ||
+                                    availabilityFresh?.status === "invalid"
+                                  ? "✕ Not Available"
+                                  : "Check Availability"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSaveUsername}
+                            disabled={!canUpdateHandle}
+                            className="flex-1 sm:flex-initial px-4 py-2 text-[10px] uppercase font-bold border border-hairline bg-surface hover:bg-signal hover:text-surface hover:border-signal disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                          >
+                            {savingUsername ? "Updating…" : "Update Handle"}
+                          </button>
+                        </div>
+                      </div>
+                      {availabilityFresh && availabilityFresh.status !== "available" && (
+                        <p
+                          className={`text-[10px] font-mono ${
+                            availabilityFresh.status === "unchanged"
+                              ? "text-ink-faint"
+                              : "text-signal"
+                          }`}
+                        >
+                          {availabilityFresh.status === "unchanged"
+                            ? "That is already your handle."
+                            : availabilityFresh.reason}
+                        </p>
+                      )}
+                      {availabilityFresh?.status === "available" && (
+                        <p className="text-[10px] font-mono text-verified">
+                          ✓ @{availabilityFresh.forInput} is available — you can update now.
+                        </p>
+                      )}
+                      {/* Sophistication meter — 4 segments fill from blank
+                          through red → amber → lime → green as the handle
+                          gets stronger. Row wraps on mobile so the label
+                          stays legible even at narrow widths. */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div
+                          className="flex gap-1 flex-1 min-w-[140px]"
+                          role="progressbar"
+                          aria-label="Username quality"
+                          aria-valuemin={0}
+                          aria-valuemax={4}
+                          aria-valuenow={usernameQuality.score}
+                        >
+                          {[1, 2, 3, 4].map((tier) => {
+                            const filled = usernameQuality.score >= tier;
+                            // Stay inside the site palette: signal (red) for
+                            // weak, ink for the middle band, verified (green)
+                            // only when the handle is genuinely great.
+                            const colour = !filled
+                              ? "bg-hairline"
+                              : usernameQuality.score <= 1
+                                ? "bg-signal"
+                                : usernameQuality.score === 2
+                                  ? "bg-signal/70"
+                                  : usernameQuality.score === 3
+                                    ? "bg-ink"
+                                    : "bg-verified";
+                            return (
+                              <span
+                                key={tier}
+                                className={`h-1 flex-1 rounded-sm transition-colors duration-200 ${colour}`}
+                              />
+                            );
+                          })}
+                        </div>
+                        <span
+                          className={`text-[10px] font-mono uppercase tracking-wider shrink-0 font-bold ${
+                            usernameQuality.score === 0
+                              ? "text-ink-faint"
+                              : usernameQuality.score <= 2
+                                ? "text-signal"
+                                : usernameQuality.score === 3
+                                  ? "text-ink"
+                                  : "text-verified"
+                          }`}
+                        >
+                          {usernameQuality.label || "—"}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-ink-faint font-mono">
+                        3–30 lowercase letters, digits, - or _. Old handles keep permanently redirecting here — no broken links.
+                      </p>
+                      {usernameError && (
+                        <p className="text-[10px] text-signal font-mono">{usernameError}</p>
+                      )}
+                      {usernameSuccess && (
+                        <p className="text-[10px] text-verified font-mono">{usernameSuccess}</p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">

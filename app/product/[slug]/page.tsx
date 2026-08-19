@@ -27,6 +27,13 @@ export async function generateMetadata({
   const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
   const canonicalUrl = `${siteUrl}/product/${product.slug}`;
   const description = product.description || product.tagline || `${product.name} on The Launch Feed. Discover technical architecture, 360° product specs, and community upvotes.`;
+  // Prefer the first screenshot for a large social card, fall back to the
+  // product logo so at minimum the product's mark shows up in every share.
+  const shareImage =
+    (Array.isArray(product.screenshots) && product.screenshots[0]) ||
+    product.logoUrl ||
+    `${siteUrl}/og-default.png`;
+  const absoluteShareImage = shareImage.startsWith("http") ? shareImage : `${siteUrl}${shareImage.startsWith("/") ? "" : "/"}${shareImage}`;
   return {
     title: `${product.name} - The Launch Feed`,
     description,
@@ -50,12 +57,19 @@ export async function generateMetadata({
       title: `${product.name} - The Launch Feed`,
       description,
       siteName: "The Launch Feed",
+      images: [
+        {
+          url: absoluteShareImage,
+          alt: `${product.name} — ${product.tagline || "on The Launch Feed"}`,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title: `${product.name} - The Launch Feed`,
       description,
       creator: product.owner.twitterHandle ? `@${product.owner.twitterHandle.replace(/^@/, "")}` : "@thelaunchfeed",
+      images: [absoluteShareImage],
     },
     robots: {
       index: true,

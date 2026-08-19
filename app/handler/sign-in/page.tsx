@@ -77,7 +77,8 @@ function SignInInner() {
     let cancelled = false;
 
     async function checkAuth() {
-      // 1. First check local session
+      // Better Auth sets a first-party session cookie on OAuth return, so a
+      // single /api/me poll is sufficient.
       try {
         const meRes = await fetch("/api/me", { cache: "no-store" });
         if (meRes.ok) {
@@ -89,50 +90,6 @@ function SignInInner() {
           }
         }
       } catch {}
-
-      // 2. Check if Neon Auth has an active session from recent OAuth redirect.
-      //    Retry a few times — the session may take a moment to propagate after
-      //    the OAuth callback redirect chain completes.
-      const neonAuthUrl = process.env.NEXT_PUBLIC_NEON_AUTH_URL;
-      if (neonAuthUrl) {
-        for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
-          if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
-          try {
-            const neonSessionRes = await fetch(`${neonAuthUrl}/get-session`, {
-              credentials: "include",
-              headers: {
-                Origin: window.location.origin,
-              },
-            });
-
-            if (neonSessionRes.ok) {
-              const neonData = await neonSessionRes.json();
-              if (neonData?.session?.token && !cancelled) {
-                // Sync to local Next.js cookies and PostgreSQL
-                const syncRes = await fetch("/api/auth/sync-session", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    sessionToken: neonData.session.token,
-                    userId: neonData.user?.id,
-                  }),
-                });
-
-                if (syncRes.ok) {
-                  const syncData = await syncRes.json();
-                  if (syncData?.session && !cancelled) {
-                    saveSession(syncData.session);
-                    window.location.href = returnTo;
-                    return;
-                  }
-                }
-                // Sync found a token but sync-session failed — stop retrying
-                break;
-              }
-            }
-          } catch {}
-        }
-      }
 
       if (!cancelled) setIsChecking(false);
     }
@@ -298,8 +255,20 @@ function SignInInner() {
   async function onSocial(provider: "google" | "github") {
     resetError();
     setStatus("loading");
-    // Direct browser redirect via server-side OAuth initiator
-    window.location.href = `/api/auth/social?provider=${provider}&after_auth_return_to=${encodeURIComponent(returnTo)}`;
+    // Better Auth handles OAuth entirely on our own domain — the session
+    // cookie is set first-party on return, so /api/me picks it up without
+    // any cross-origin session handoff.
+    const { error } = await authClient.signIn.social({
+      provider,
+      callbackURL: returnTo,
+    });
+    if (error) {
+      setStatus("error");
+      setMessage({
+        kind: "error",
+        text: error.message || `${provider} sign-in could not be initiated.`,
+      });
+    }
   }
 
   /* ─────────── UI ─────────── */

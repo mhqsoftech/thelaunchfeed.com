@@ -311,32 +311,15 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
     return sub;
   }
 
-  // Fire the "product submitted" email + inngest event AS A BACKGROUND job so
-  // the client sees the queued-launch screen instantly. If Resend or the inngest
-  // producer is slow, it must not block the server action from returning.
+  // Fire the "submission.created" event AS A BACKGROUND job. The Inngest
+  // handler owns the "product-submitted" email — sending it inline here too
+  // caused every founder to receive the queued-launch confirmation twice.
   (async () => {
-    try {
-      const { sendAndLog } = await import("@/lib/inngest/functions");
-      await sendAndLog({
-        templateId: "product-submitted",
-        to: user.email,
-        toUserId: user.id,
-        trigger: "on-submit",
-        vars: {
-          productName: sub.name,
-          productSlug: slugify(sub.name),
-          userName: user.name || user.username,
-          slotExpiresOn: sub.scheduledFor.toISOString().slice(0, 10),
-        },
-      });
-    } catch (e) {
-      console.error("[submission-email] failed:", e);
-    }
     try {
       const { inngest } = await import("@/lib/inngest");
       await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
-    } catch {
-      // Inngest not wired in this env — email already dispatched above.
+    } catch (e) {
+      console.error("[submission:inngest] failed:", e);
     }
   })().catch((e) => console.error("[submission:background] failed:", e));
 
@@ -940,27 +923,10 @@ export async function resubmitSubmission(input: ResubmitInput): Promise<Submissi
   });
 
   try {
-    const { sendAndLog } = await import("@/lib/inngest/functions");
-    await sendAndLog({
-      templateId: "product-submitted",
-      to: user.email,
-      toUserId: user.id,
-      trigger: "on-submit",
-      vars: {
-        productName: sub.name,
-        productSlug: slugify(sub.name),
-        userName: user.name || user.username,
-        slotExpiresOn: sub.scheduledFor.toISOString().slice(0, 10),
-      },
-    });
-  } catch (e) {
-    console.error("[resubmit-email] failed:", e);
-  }
-  try {
     const { inngest } = await import("@/lib/inngest");
     await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
-  } catch {
-    /* Inngest not wired */
+  } catch (e) {
+    console.error("[resubmit:inngest] failed:", e);
   }
 
   revalidatePath("/admin");

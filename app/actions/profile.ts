@@ -119,6 +119,180 @@ export async function updateProfile(input: UpdateProfileInput) {
 }
 
 /**
+ * Change the caller's public handle. A username can be updated freely as long
+ * as (a) it satisfies the format rules and (b) nobody currently holds it AND
+ * nobody has ever held it before (via UsernameRedirect). The old handle is
+ * recorded so /founder/<old> continues to serve as a permanent redirect to the
+ * new one — inbound links from social, embeds, and search never break.
+ *
+ * Errors surface a stable code so the client can render a specific message
+ * without depending on the wording:
+ *  - USERNAME_INVALID
+ *  - USERNAME_TAKEN
+ *  - USERNAME_UNCHANGED
+ */
+
+// Reserved words the platform uses in routes/subpaths — a founder can't
+// squat on these even if the User table is technically empty of them.
+const RESERVED_USERNAMES = new Set([
+  "admin", "administrator", "api", "app", "assets", "auth", "billing", "blog",
+  "category", "checkout", "comments", "contact", "dashboard", "docs",
+  "founder", "founders", "handler", "help", "legal", "login", "logout",
+  "me", "moderator", "moderators", "new", "notifications", "onboarding",
+  "pricing", "privacy", "product", "products", "profile", "public",
+  "root", "search", "settings", "signin", "signout", "signup", "sitemap",
+  "static", "submit", "support", "system", "team", "terms", "test",
+  "thelaunchfeed", "user", "users", "verify", "webhook", "webhooks",
+  "www",
+]);
+
+const USERNAME_RE = /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])$/;
+
+function normalizeUsername(raw: string): string {
+  return raw.replace(/^@/, "").trim().toLowerCase();
+}
+
+/**
+ * Read-only availability check used by the settings UI before a rename.
+ * Runs the same rules as updateUsername but never writes — the client uses
+ * it to gate the "Update Handle" button so the user gets an explicit go/no-go
+ * before they commit. Returns a stable status string so the caller can render
+ * a specific message without parsing prose.
+ */
+export type UsernameAvailability =
+  | { username: string; status: "available" }
+  | { username: string; status: "unchanged" }
+  | { username: string; status: "invalid"; reason: string }
+  | { username: string; status: "taken"; reason: string };
+
+export async function checkUsernameAvailability(
+  rawUsername: string,
+): Promise<UsernameAvailability> {
+  const user = await requireUser();
+  const next = normalizeUsername(rawUsername);
+
+  if (!USERNAME_RE.test(next) || RESERVED_USERNAMES.has(next)) {
+    return {
+      username: next,
+      status: "invalid",
+      reason:
+        "Use 3–30 lowercase letters, digits, - or _ (not at the ends). Reserved words aren't allowed.",
+    };
+  }
+
+  if (next === user.username.toLowerCase()) {
+    return { username: next, status: "unchanged" };
+  }
+
+  const [clashUser, clashRedirect] = await Promise.all([
+    prisma.user.findFirst({
+      where: {
+        username: { equals: next, mode: "insensitive" },
+        NOT: { id: user.id },
+      },
+      select: { id: true },
+    }),
+    prisma.usernameRedirect.findFirst({
+      where: {
+        oldUsername: { equals: next, mode: "insensitive" },
+        NOT: { userId: user.id },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  if (clashUser || clashRedirect) {
+    return {
+      username: next,
+      status: "taken",
+      reason: `"${next}" is already in use.`,
+    };
+  }
+
+  return { username: next, status: "available" };
+}
+
+export async function updateUsername(rawUsername: string): Promise<{
+  username: string;
+  previousUsername: string;
+}> {
+  const user = await requireUser();
+  const next = normalizeUsername(rawUsername);
+
+  if (!USERNAME_RE.test(next) || RESERVED_USERNAMES.has(next)) {
+    const err = new Error(
+      "USERNAME_INVALID: Use 3–30 chars, lowercase letters/digits with - or _ (not at the ends), and not a reserved word.",
+    );
+    throw err;
+  }
+
+  const current = user.username.toLowerCase();
+  if (next === current) {
+    throw new Error("USERNAME_UNCHANGED: That is already your handle.");
+  }
+
+  // Uniqueness must ignore case AND account for every historical handle,
+  // otherwise recycling an old username of another founder would silently
+  // hijack any redirect they had in place.
+  const [clashUser, clashRedirect] = await Promise.all([
+    prisma.user.findFirst({
+      where: {
+        username: { equals: next, mode: "insensitive" },
+        NOT: { id: user.id },
+      },
+      select: { id: true },
+    }),
+    prisma.usernameRedirect.findFirst({
+      where: {
+        oldUsername: { equals: next, mode: "insensitive" },
+        NOT: { userId: user.id },
+      },
+      select: { id: true },
+    }),
+  ]);
+  if (clashUser || clashRedirect) {
+    throw new Error(`USERNAME_TAKEN: "${next}" is already in use.`);
+  }
+
+  const previous = user.username;
+
+  await prisma.$transaction(async (tx) => {
+    // Free the redirect row that may be pointing at `next` if the caller
+    // previously used and abandoned it — they own it and are re-taking it.
+    await tx.usernameRedirect.deleteMany({
+      where: {
+        userId: user.id,
+        oldUsername: { equals: next, mode: "insensitive" },
+      },
+    });
+
+    await tx.user.update({
+      where: { id: user.id },
+      data: { username: next },
+    });
+
+    // Record the vacated handle so /founder/<previous> keeps resolving.
+    // upsert covers the case where `previous` is already in the table from
+    // an earlier rename — its userId is the same, so nothing changes.
+    await tx.usernameRedirect.upsert({
+      where: { oldUsername: previous },
+      create: { oldUsername: previous, userId: user.id },
+      update: { userId: user.id },
+    });
+  });
+
+  const { invalidateProfileCache } = await import("@/lib/queries/user");
+  invalidateProfileCache();
+
+  revalidatePath("/profile");
+  revalidatePath(`/founder/${previous}`);
+  revalidatePath(`/founder/${next}`);
+  revalidatePath("/founders");
+
+  return { username: next, previousUsername: previous };
+}
+
+/**
  * Products the signed-in user has actually launched. Returns [] when they
  * haven't published anything — the profile page must render an empty state
  * in that case, never fake placeholders.
