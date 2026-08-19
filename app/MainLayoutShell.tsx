@@ -1183,7 +1183,7 @@ export default function MainLayoutShell({
                   >
                     <path strokeLinecap="square" strokeLinejoin="miter" d="M12 19V5M5 12l7-7 7 7" />
                   </svg>
-                  <span>10 Founders</span>
+                  <span>50 Founders</span>
                 </button>
               </div>
             </div>
@@ -1211,10 +1211,10 @@ export default function MainLayoutShell({
                 ))}
               </div>
             ) : (
-              /* ── Top 10 Builders / Founders View ── */
+              /* ── Top 50 Builders / Founders View ── */
               <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between gap-1.5 pt-3 pr-1">
                 {topFounders.length > 0
-                  ? topFounders.slice(0, 10).map((f, i) => (
+                  ? topFounders.slice(0, 50).map((f, i) => (
                       <Link
                         key={f.id || f.username}
                         href={`/founder/${f.username}`}

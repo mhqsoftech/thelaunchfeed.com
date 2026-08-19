@@ -78,7 +78,7 @@ export async function GET() {
     // All categories with live product counts for right rail
     getCategoriesWithCounts().catch(() => []),
     // Top 10 builders/founders for right rail
-    getTopFounders(10).catch(() => []),
+    getTopFounders(50).catch(() => []),
     // Directory Embeds for footer marquee
     prisma.appSetting
       .findUnique({ where: { key: "site.directory_embeds" } })
@@ -134,7 +134,7 @@ export async function GET() {
     weeklyProducts: weeklyProducts.map(shapeProduct),
     monthlyProducts: monthlyProducts.map(shapeProduct),
     categories: mappedCategories,
-    topFounders: (topFounders || []).slice(0, 10),
+    topFounders: (topFounders || []).slice(0, 50),
     directoryEmbeds,
   };
 

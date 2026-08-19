@@ -248,7 +248,12 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
 
   for (const p of staticPages) {
     const fullUrl = `${appUrl}${p.path}`;
-    const logInfo = logMap.get(fullUrl);
+    // Match the trailing-slash normaliser applied to log rows above,
+    // otherwise the homepage "/" builds "https://…/" while logs are stored
+    // as "https://…" and the lookup misses — homepage stays stuck on
+    // "Not Submitted" regardless of how many times admin resubmits.
+    const logKey = fullUrl.replace(/\/+$/, "") || appUrl;
+    const logInfo = logMap.get(logKey);
     allEntries.push({
       id: `static-${p.path}`,
       url: fullUrl,

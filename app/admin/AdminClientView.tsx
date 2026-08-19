@@ -44,6 +44,7 @@ type AdminUser = {
 // Fallback empty arrays used before /api/admin/summary responds.
 const ALL_PRODUCTS: AdminProduct[] = [];
 const DEMO_USERS: (AdminUser & { subscriptions: never[]; upvotedProductIds: string[]; savedProductIds: string[] })[] = [];
+import { listMyProducts, type MyProduct } from "@/app/actions/profile";
 import { TEMPLATES, getTemplate, EmailTemplateId, TemplateVars } from "./emailTemplates";
 import SubmissionTimer from "@/app/components/SubmissionTimer";
 import ThemedSelect from "./ThemedSelect";
@@ -130,8 +131,7 @@ type Tab =
   | "founder"
   | "emails"
   | "automation"
-  | "seed"
-  | "settings";
+  | "seed";
 
 function TabIcon({ id, className = "w-4 h-4 shrink-0" }: { id: Tab; className?: string }) {
   switch (id) {
@@ -263,13 +263,6 @@ function TabIcon({ id, className = "w-4 h-4 shrink-0" }: { id: Tab; className?: 
           <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
         </svg>
       );
-    case "settings":
-      return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      );
   }
 }
 
@@ -294,7 +287,6 @@ const TABS: {
   { id: "emails", label: "Compose email", group: "comms" },
   { id: "automation", label: "Automation", group: "comms" },
   { id: "seed", label: "Seed Data", group: "system" },
-  { id: "settings", label: "Settings", group: "system" },
 ];
 
 const GROUP_LABEL: Record<string, string> = {
@@ -737,7 +729,6 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
             {tab === "emails" && <EmailsTab session={session} />}
             {tab === "automation" && <AutomationTab />}
             {tab === "seed" && <SeedDataTab />}
-            {tab === "settings" && <SettingsTab adminEmail={adminEmail} />}
           </div>
         </main>
       </div>
@@ -3047,12 +3038,46 @@ function ModerationTab() {
 /* ─────────────────────────── FounderTab ─────────────────────────── */
 
 function FounderTab({ session }: { session: UserSession }) {
-  const founderSlug = slugify(session.name);
-  const myProducts = ALL_PRODUCTS.filter(
-    (p) =>
-      p.maker.toLowerCase() === session.handle.toLowerCase() ||
-      p.makerName.toLowerCase() === session.name.toLowerCase()
-  );
+  // The admin's own handle drives the founder URL — never slugify(name), which
+  // fuzzy-matches other users when a display name collides. session.handle is
+  // the canonical @username kept in sync with /api/me.
+  const founderSlug = (session.handle || "").replace(/^@/, "").trim();
+
+  const [myProducts, setMyProducts] = useState<MyProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    listMyProducts()
+      .then((rows) => {
+        if (!cancelled) setMyProducts(rows);
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err instanceof Error ? err.message : "Failed to load products");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const statusStyle = (status: MyProduct["status"]) => {
+    switch (status) {
+      case "LIVE":
+        return "border-verified/50 text-verified bg-verified/10";
+      case "SCHEDULED":
+        return "border-signal/50 text-signal bg-signal/10";
+      case "DRAFT":
+        return "border-hairline text-ink-dim bg-surface";
+      case "REJECTED":
+        return "border-signal text-signal bg-signal/20";
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -3113,29 +3138,48 @@ function FounderTab({ session }: { session: UserSession }) {
       <div className="border border-hairline">
         <SectionTitle>My products ({myProducts.length})</SectionTitle>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[580px]">
+          <table className="w-full text-sm min-w-[640px]">
           <tbody>
-            {myProducts.map((p) => (
+            {loading && (
+              <tr>
+                <td colSpan={6} className="px-3 py-4 text-center text-ink-dim text-sm">Loading your products…</td>
+              </tr>
+            )}
+            {!loading && loadError && (
+              <tr>
+                <td colSpan={6} className="px-3 py-4 text-center text-signal text-sm">{loadError}</td>
+              </tr>
+            )}
+            {!loading && !loadError && myProducts.map((p) => (
               <tr key={p.id} className="border-t border-hairline first:border-t-0">
                 <td className="px-3 py-2.5 font-bold">{p.name}</td>
-                <td className="px-3 py-2.5 text-xs text-ink-dim truncate max-w-[280px]">{p.tagline}</td>
+                <td className="px-3 py-2.5 text-xs text-ink-dim truncate max-w-[260px]">{p.tagline}</td>
                 <td className="px-3 py-2.5 uppercase text-xs font-bold text-ink-dim">{p.category}</td>
-                <td className="px-3 py-2.5 tabular-nums text-right font-bold">{p.votes}</td>
+                <td className="px-3 py-2.5">
+                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 border ${statusStyle(p.status)}`}>
+                    {p.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5 tabular-nums text-right font-bold">{p.status === "LIVE" ? p.votes : "—"}</td>
                 <td className="px-3 py-2.5 text-right">
-                  <Link
-                    href={`/product/${slugify(p.name)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs uppercase font-bold underline underline-offset-2 hover:text-signal"
-                  >
-                    view ↗
-                  </Link>
+                  {p.status === "LIVE" && p.slug ? (
+                    <Link
+                      href={`/product/${p.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs uppercase font-bold underline underline-offset-2 hover:text-signal"
+                    >
+                      view ↗
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-ink-faint uppercase">—</span>
+                  )}
                 </td>
               </tr>
             ))}
-            {myProducts.length === 0 && (
+            {!loading && !loadError && myProducts.length === 0 && (
               <tr>
-                <td className="px-3 py-4 text-center text-ink-dim text-sm">
+                <td colSpan={6} className="px-3 py-4 text-center text-ink-dim text-sm">
                   No products yet. Submit your first one.
                 </td>
               </tr>
@@ -3703,35 +3747,6 @@ function RevenueTab() {
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ─────────────────────────── SettingsTab ─────────────────────────── */
-
-function SettingsTab({ adminEmail }: { adminEmail: string }) {
-  return (
-    <div className="space-y-4">
-      <div className="border border-hairline p-5">
-        <div className="text-xs uppercase font-bold text-ink-dim mb-2">Admin identity</div>
-        <div className="text-sm">
-          Configured admin email: <span className="font-bold">{adminEmail}</span>
-        </div>
-        <p className="text-xs text-ink-dim mt-2 leading-relaxed">
-          Set via the <span className="text-ink font-bold">ADMIN_EMAIL</span> environment variable. Only
-          the signed-in Stack user whose email matches this value can view the console. Edge
-          middleware enforces this before the route renders.
-        </p>
-      </div>
-      <div className="border border-hairline p-5">
-        <div className="text-xs uppercase font-bold text-ink-dim mb-2">Backend</div>
-        <ul className="text-sm text-ink-dim space-y-1.5">
-          <li>· Neon Postgres via Prisma (schema in prisma/schema.prisma).</li>
-          <li>· Stack Auth (Neon Auth) at /handler/*.</li>
-          <li>· Inngest at /api/inngest (cron, publish, email fanout, rank change).</li>
-          <li>· Resend for outbound email.</li>
-        </ul>
       </div>
     </div>
   );

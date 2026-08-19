@@ -11,6 +11,7 @@ export function publicUserSelect() {
     title: true,
     image: true,
     bio: true,
+    emailVerified: true,
     isProfilePublic: true,
     showRevenuePublic: true,
     websiteUrl: true,

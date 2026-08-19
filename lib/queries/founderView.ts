@@ -102,6 +102,7 @@ export async function buildFounderView(username: string): Promise<ViewFounder | 
     title: f.title || "",
     totalVotes,
     productsCount: f.products.length,
+    emailVerified: Boolean((f as any).emailVerified),
     joinedAt: new Date(f.createdAt).toISOString().slice(0, 10),
     products: f.products.map((p: any) => {
       const productAwards = awardsMap.get(p.id) || ["launch"];
