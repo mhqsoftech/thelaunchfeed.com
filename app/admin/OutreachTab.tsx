@@ -193,20 +193,32 @@ export default function OutreachTab() {
     }
   };
 
-  // Save automation settings
-  const handleSaveAutoConfig = async () => {
+  // Save automation settings — persists the full autoConfig via the admin
+  // action. Used by both the explicit "Save Settings" button and the
+  // per-toggle auto-persist below so any UI change reaches the DB immediately.
+  const persistAutoConfig = async (next: AutoOutreachConfig): Promise<AutoOutreachConfig | null> => {
     try {
       setSavingConfig(true);
       setError(null);
-      setSuccessMsg(null);
-      const updated = await updateAutoOutreachConfigAction(autoConfig);
+      const updated = await updateAutoOutreachConfigAction(next);
       setAutoConfig(updated);
-      setSuccessMsg("Automatic outreach configuration updated successfully.");
-      await loadData();
+      return updated;
     } catch (err: any) {
       setError(err?.message || "Failed to update auto outreach configuration");
+      return null;
     } finally {
       setSavingConfig(false);
+    }
+  };
+
+  const handleSaveAutoConfig = async () => {
+    try {
+      setSuccessMsg(null);
+      const updated = await persistAutoConfig(autoConfig);
+      if (updated) setSuccessMsg("Automatic outreach configuration updated successfully.");
+      await loadData();
+    } finally {
+      // persistAutoConfig manages savingConfig; nothing else to reset.
     }
   };
 
@@ -1442,8 +1454,16 @@ export default function OutreachTab() {
               </div>
               <button
                 type="button"
-                onClick={() => setAutoConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
-                className={`px-3 py-1 text-xs font-bold uppercase transition-colors cursor-pointer border ${
+                disabled={savingConfig}
+                onClick={async () => {
+                  // Persist immediately — do not rely on the user clicking
+                  // the separate "Save Settings" button. Every observed report
+                  // of "the toggle doesn't work" traced back to this.
+                  const next = { ...autoConfig, enabled: !autoConfig.enabled };
+                  setAutoConfig(next);
+                  await persistAutoConfig(next);
+                }}
+                className={`px-3 py-1 text-xs font-bold uppercase transition-colors cursor-pointer border disabled:opacity-60 ${
                   autoConfig.enabled
                     ? "bg-emerald-500 text-black border-emerald-500"
                     : "bg-surface text-ink-dim border-hairline"
@@ -1463,10 +1483,13 @@ export default function OutreachTab() {
               </div>
               <button
                 type="button"
-                onClick={() =>
-                  setAutoConfig((prev) => ({ ...prev, autoSendOnCrawl: !prev.autoSendOnCrawl }))
-                }
-                className={`px-3 py-1 text-xs font-bold uppercase transition-colors cursor-pointer border ${
+                disabled={savingConfig}
+                onClick={async () => {
+                  const next = { ...autoConfig, autoSendOnCrawl: !autoConfig.autoSendOnCrawl };
+                  setAutoConfig(next);
+                  await persistAutoConfig(next);
+                }}
+                className={`px-3 py-1 text-xs font-bold uppercase transition-colors cursor-pointer border disabled:opacity-60 ${
                   autoConfig.autoSendOnCrawl
                     ? "bg-signal text-surface border-signal"
                     : "bg-surface text-ink-dim border-hairline"

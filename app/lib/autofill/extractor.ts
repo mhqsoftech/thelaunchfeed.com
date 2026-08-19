@@ -454,7 +454,6 @@ export async function extractProduct(
     body: JSON.stringify({
       model: MODEL,
       temperature: 0.1,
-      max_tokens: MAX_OUTPUT_TOKENS,
       max_completion_tokens: MAX_OUTPUT_TOKENS,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -469,7 +468,17 @@ export async function extractProduct(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`OpenAI ${res.status}: ${text.slice(0, 400)}`);
+    console.error(`[AI Autofill] OpenAI API error (${res.status}):`, text);
+    let errorMessage = `AI extraction failed (OpenAI HTTP ${res.status})`;
+    try {
+      const parsedError = JSON.parse(text);
+      if (parsedError?.error?.message) {
+        errorMessage = `AI service error: ${parsedError.error.message}`;
+      }
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMessage);
   }
 
   const data = (await res.json()) as { choices?: { message?: { content?: string }; finish_reason?: string }[] };
