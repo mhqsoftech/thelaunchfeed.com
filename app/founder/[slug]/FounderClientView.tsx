@@ -206,8 +206,11 @@ export function FounderProfileContent({
                 <span className="text-[11px] font-mono px-2 py-0.5 border border-hairline text-ink-dim shrink-0">
                   {founder.handle}
                 </span>
+                {/* Badge text-size + padding match the handle chip above so
+                    all three pills sit on the same baseline at the same
+                    height, whether the maker is verified or not. */}
                 {founder.emailVerified ? (
-                  <span className="text-[9px] font-mono px-2 py-0.5 border border-signal/40 text-signal bg-void uppercase font-bold inline-flex items-center gap-1 shrink-0">
+                  <span className="text-[11px] font-mono px-2 py-0.5 border border-signal/40 text-signal bg-void uppercase font-bold inline-flex items-center gap-1 shrink-0 leading-none">
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M12 1L14.7 3.5H18.3L19.1 7.1L22 9.3L20.8 12.8L22 16.3L19.1 18.5L18.3 22.1H14.7L12 24.6L9.3 22.1H5.7L4.9 18.5L2 16.3L3.2 12.8L2 9.3L4.9 7.1L5.7 3.5H9.3L12 1Z" fill="currentColor"/>
                       <path d="M8.5 12.5L11 15L16 9.5" stroke="var(--color-void)" strokeWidth="2.5" strokeLinecap="square" strokeLinejoin="miter" fill="none"/>
@@ -215,10 +218,7 @@ export function FounderProfileContent({
                     VERIFIED MAKER
                   </span>
                 ) : (
-                  // Founders who have not verified their email — never claim
-                  // "verified" on the public profile. Neutral ink-dim styling
-                  // to signal "not-yet-verified" without shaming the user.
-                  <span className="text-[9px] font-mono px-2 py-0.5 border border-hairline text-ink-dim bg-surface uppercase font-bold inline-flex items-center gap-1 shrink-0">
+                  <span className="text-[11px] font-mono px-2 py-0.5 border border-hairline text-ink-dim bg-surface uppercase font-bold inline-flex items-center gap-1 shrink-0 leading-none">
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                       <circle cx="12" cy="12" r="10" strokeLinecap="square" />
                       <path d="M12 8v4M12 16h.01" strokeLinecap="square" />
