@@ -63,6 +63,8 @@ function SignInInner() {
 
   const resetError = () => setMessage(null);
 
+  const [isChecking, setIsChecking] = useState(true);
+
   useEffect(() => {
     const errorParam = search.get("error");
     if (errorParam) {
@@ -88,41 +90,51 @@ function SignInInner() {
         }
       } catch {}
 
-      // 2. Check if Neon Auth has an active session from recent OAuth redirect
+      // 2. Check if Neon Auth has an active session from recent OAuth redirect.
+      //    Retry a few times — the session may take a moment to propagate after
+      //    the OAuth callback redirect chain completes.
       const neonAuthUrl = process.env.NEXT_PUBLIC_NEON_AUTH_URL;
       if (neonAuthUrl) {
-        try {
-          const neonSessionRes = await fetch(`${neonAuthUrl}/get-session`, {
-            credentials: "include",
-            headers: {
-              Origin: window.location.origin,
-            },
-          });
+        for (let attempt = 0; attempt < 3 && !cancelled; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
+          try {
+            const neonSessionRes = await fetch(`${neonAuthUrl}/get-session`, {
+              credentials: "include",
+              headers: {
+                Origin: window.location.origin,
+              },
+            });
 
-          if (neonSessionRes.ok) {
-            const neonData = await neonSessionRes.json();
-            if (neonData?.session?.token && !cancelled) {
-              // Sync to local Next.js cookies and PostgreSQL
-              const syncRes = await fetch("/api/auth/sync-session", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  sessionToken: neonData.session.token,
-                  userId: neonData.user?.id,
-                }),
-              });
+            if (neonSessionRes.ok) {
+              const neonData = await neonSessionRes.json();
+              if (neonData?.session?.token && !cancelled) {
+                // Sync to local Next.js cookies and PostgreSQL
+                const syncRes = await fetch("/api/auth/sync-session", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    sessionToken: neonData.session.token,
+                    userId: neonData.user?.id,
+                  }),
+                });
 
-              if (syncRes.ok) {
-                const syncData = await syncRes.json();
-                if (syncData?.session && !cancelled) {
-                  saveSession(syncData.session);
-                  window.location.href = returnTo;
+                if (syncRes.ok) {
+                  const syncData = await syncRes.json();
+                  if (syncData?.session && !cancelled) {
+                    saveSession(syncData.session);
+                    window.location.href = returnTo;
+                    return;
+                  }
                 }
+                // Sync found a token but sync-session failed — stop retrying
+                break;
               }
             }
-          }
-        } catch {}
+          } catch {}
+        }
       }
+
+      if (!cancelled) setIsChecking(false);
     }
 
     checkAuth();
@@ -293,6 +305,16 @@ function SignInInner() {
   /* ─────────── UI ─────────── */
   const isOtpStep = step === "verify_otp";
   const isForgotStep = step === "forgot";
+
+  if (isChecking) {
+    return (
+      <MainLayoutShell>
+        <div className="w-full flex items-center justify-center py-24">
+          <LaunchFeedLoader size={32} />
+        </div>
+      </MainLayoutShell>
+    );
+  }
 
   return (
     <MainLayoutShell>

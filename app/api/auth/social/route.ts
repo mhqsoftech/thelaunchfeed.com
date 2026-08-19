@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   if (neonAuthUrl) {
     try {
-      const callbackURL = `${origin}/api/auth/callback/neon?after_auth_return_to=${encodeURIComponent(safeReturn)}`;
+      const callbackURL = `${origin}/handler/sign-in?after_auth_return_to=${encodeURIComponent(safeReturn)}`;
 
       const res = await fetch(`${neonAuthUrl}/sign-in/social`, {
         method: "POST",
