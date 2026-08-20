@@ -837,7 +837,7 @@ export const TEMPLATES: EmailTemplate[] = [
         ])}
 
         ${primaryBtn("Read & reply", `${BASE_URL}/product/${esc(v.productSlug ?? "")}#comments`)}
-        ${ghostBtn("Open founder inbox", `${BASE_URL}/profile`)}
+        ${ghostBtn("View your product", `${BASE_URL}/product/${esc(v.productSlug ?? "")}`)}
 
         ${divider()}
         ${tips("Comment reply tips", [
