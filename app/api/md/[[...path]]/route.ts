@@ -19,8 +19,21 @@ const td = new TurndownService({
   bulletListMarker: "-",
   linkStyle: "inlined",
 });
-// Drop assets that carry no textual signal for an agent.
-td.remove(["script", "style", "noscript", "iframe", "svg", "canvas", "video", "audio", "form"]);
+// Drop assets that carry no textual signal for an agent. Cast to satisfy
+// Turndown's DOM-typed signature — its filter accepts any tag name at
+// runtime, but the types are pinned to HTMLElementTagNameMap so SVG /
+// canvas / etc. would fail typecheck without this.
+td.remove([
+  "script",
+  "style",
+  "noscript",
+  "iframe",
+  "svg",
+  "canvas",
+  "video",
+  "audio",
+  "form",
+] as unknown as (keyof HTMLElementTagNameMap)[]);
 
 function extractMainContent(html: string): string {
   // Prefer <main>, then role="main", then <article>. Falls back to <body>
