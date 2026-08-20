@@ -9,9 +9,10 @@ export const alt = "The Launch Feed — category";
 export default async function CategoryOgImage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slug = decodeURIComponent(params.slug).trim();
+  const { slug: rawSlug } = await params;
+  const slug = decodeURIComponent(rawSlug).trim();
   const c = await getCategoryBySlug(slug).catch(() => null);
 
   const name = c?.name || "Category";

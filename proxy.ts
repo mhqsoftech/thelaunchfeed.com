@@ -41,6 +41,11 @@ const EXCLUDE_EXACT = new Set([
 // matcher (image URLs served from app routes, downloads, etc.).
 const ASSET_EXT = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|css|js|mjs|map|woff2?|ttf|otf|pdf|zip|xml|txt|json|mp4|webm|mp3|wav)$/i;
 
+// Next.js metadata file conventions — these routes render binary images
+// (PNG/ICO) even though the URL has no file extension. Converting them
+// to markdown would feed image bytes to Turndown and return garbage.
+const METADATA_ROUTE = /\/(?:opengraph-image|twitter-image|icon|apple-icon|apple-touch-icon)(?:-\w+)?(?:\/|$)/;
+
 function wantsMarkdown(req: NextRequest): boolean {
   if (req.nextUrl.searchParams.get("format") === "md") return true;
 
@@ -62,6 +67,7 @@ function isEligiblePath(pathname: string): boolean {
     return false;
   }
   if (ASSET_EXT.test(pathname)) return false;
+  if (METADATA_ROUTE.test(pathname)) return false;
   return true;
 }
 

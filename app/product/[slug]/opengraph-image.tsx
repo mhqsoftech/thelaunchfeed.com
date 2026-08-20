@@ -9,9 +9,10 @@ export const alt = "The Launch Feed — product launch";
 export default async function ProductOgImage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slug = decodeURIComponent(params.slug).trim();
+  const { slug: rawSlug } = await params;
+  const slug = decodeURIComponent(rawSlug).trim();
   const p = await getProductBySlug(slug).catch(() => null);
 
   const name = p?.name || "The Launch Feed";

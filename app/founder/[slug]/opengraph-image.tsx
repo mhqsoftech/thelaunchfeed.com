@@ -9,9 +9,10 @@ export const alt = "The Launch Feed — founder profile";
 export default async function FounderOgImage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const slug = decodeURIComponent(params.slug).trim();
+  const { slug: rawSlug } = await params;
+  const slug = decodeURIComponent(rawSlug).trim();
   const f = await getPublicProfile(slug).catch(() => null);
 
   const name = f?.name || f?.username || "Founder";
