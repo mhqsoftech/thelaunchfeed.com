@@ -2,27 +2,44 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Content negotiation for AI agents.
+ * Content negotiation for AI agents — auto-applies to every current AND
+ * future public page.
  *
- * When a request explicitly asks for `text/markdown` (either via the Accept
- * header or `?format=md`), we rewrite to an internal render route that
- * fetches the HTML, strips it down to the primary content, and returns
- * clean Markdown. Browsers — which send `text/html,*/*` — never trip the
- * check and continue to see the normal React app.
+ * Requests are converted to Markdown when either:
+ *   - `Accept: text/markdown` is ranked at or above `text/html`, or
+ *   - the `?format=md` query parameter is set.
  *
- * Scope is deliberately narrow: only the public content pages agents
- * actually want to read (leaderboard, product, founder, category).
- * Static files, APIs, admin, and auth routes fall through unchanged.
+ * The matcher below opts EVERY route in by default and excludes only the
+ * paths that must never be markdown-converted: Next.js internals, static
+ * assets, APIs (including the /api/md renderer itself — that would loop),
+ * admin/moderator dashboards, auth flows, sitemaps, and machine-readable
+ * files. Any new content route you add later is covered automatically.
  */
 
-// Path patterns that opt-in to markdown negotiation.
-const MD_PATH_PATTERNS: RegExp[] = [
-  /^\/$/,
-  /^\/product\/[^\/]+\/?$/,
-  /^\/founder\/[^\/]+\/?$/,
-  /^\/category\/[^\/]+\/?$/,
-  /^\/founders\/?$/,
+// Route prefixes that must always fall through untouched.
+const EXCLUDE_PREFIXES = [
+  "/api/",
+  "/admin",
+  "/handler",
+  "/_next/",
+  "/.well-known/",
+  "/static/",
+  "/fonts/",
 ];
+
+// Exact paths that must always fall through untouched.
+const EXCLUDE_EXACT = new Set([
+  "/robots.txt",
+  "/sitemap.xml",
+  "/llms.txt",
+  "/favicon.ico",
+  "/manifest.json",
+  "/manifest.webmanifest",
+]);
+
+// File extensions we never rewrite — belt for anything that slips past the
+// matcher (image URLs served from app routes, downloads, etc.).
+const ASSET_EXT = /\.(?:png|jpe?g|gif|webp|avif|svg|ico|css|js|mjs|map|woff2?|ttf|otf|pdf|zip|xml|txt|json|mp4|webm|mp3|wav)$/i;
 
 function wantsMarkdown(req: NextRequest): boolean {
   if (req.nextUrl.searchParams.get("format") === "md") return true;
@@ -30,22 +47,30 @@ function wantsMarkdown(req: NextRequest): boolean {
   const accept = req.headers.get("accept") || "";
   if (!accept.includes("text/markdown")) return false;
 
-  // Only serve markdown when the caller ranks it above HTML. Browsers send
-  // `text/html,application/xhtml+xml,...` and never include `text/markdown`,
-  // so this check keeps humans on the React app while honouring explicit
-  // agent negotiation like `Accept: text/markdown, text/html;q=0.9`.
+  // Only serve markdown when the caller ranks it at or above HTML. Browsers
+  // send `text/html,application/xhtml+xml,...` and never include
+  // `text/markdown`, so humans stay on the React app; agents that send
+  // `Accept: text/markdown, text/html;q=0.9` get the markdown view.
   const htmlIdx = accept.indexOf("text/html");
   const mdIdx = accept.indexOf("text/markdown");
   return mdIdx !== -1 && (htmlIdx === -1 || mdIdx < htmlIdx);
 }
 
+function isEligiblePath(pathname: string): boolean {
+  if (EXCLUDE_EXACT.has(pathname)) return false;
+  if (EXCLUDE_PREFIXES.some((p) => pathname === p.replace(/\/$/, "") || pathname.startsWith(p))) {
+    return false;
+  }
+  if (ASSET_EXT.test(pathname)) return false;
+  return true;
+}
+
 export function middleware(req: NextRequest) {
+  if (req.method !== "GET" && req.method !== "HEAD") return NextResponse.next();
   if (!wantsMarkdown(req)) return NextResponse.next();
 
   const pathname = req.nextUrl.pathname;
-  if (!MD_PATH_PATTERNS.some((re) => re.test(pathname))) {
-    return NextResponse.next();
-  }
+  if (!isEligiblePath(pathname)) return NextResponse.next();
 
   const url = req.nextUrl.clone();
   url.pathname = `/api/md${pathname.replace(/\/$/, "") || ""}`;
@@ -57,12 +82,12 @@ export function middleware(req: NextRequest) {
   return res;
 }
 
+// Match every path except the ones we can prove should never be converted.
+// Anything that survives this matcher is then filtered by isEligiblePath
+// above, so the two layers combined guarantee no loop, no asset breakage,
+// and no accidental markdown for admin or API responses.
 export const config = {
   matcher: [
-    "/",
-    "/product/:slug*",
-    "/founder/:slug*",
-    "/category/:slug*",
-    "/founders",
+    "/((?!api|_next|admin|handler|\\.well-known|static|fonts|favicon.ico|robots.txt|sitemap.xml|manifest.json|manifest.webmanifest|llms.txt|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|css|js|mjs|map|woff2?|ttf|otf|pdf|zip|xml|txt|json|mp4|webm|mp3|wav)).*)",
   ],
 };

@@ -18,15 +18,21 @@ this feature is agent-only.
 
 ## Supported paths
 
+Every public content route serves Markdown on request. This includes but
+is not limited to:
+
 - `/` — homepage / daily leaderboard
 - `/product/{slug}` — individual product pages
 - `/founder/{username}` — founder profiles
 - `/category/{slug}` — category archives
 - `/founders` — founders directory
+- `/weekly`, `/monthly` — cycle leaderboards
+- Any new page shipped in future releases — no allowlist to keep in sync.
 
-Any other path (assets, APIs, admin, auth) continues to return its native
-content type. Requests for markdown on unsupported paths fall through to
-HTML rather than 404.
+The following routes never serve Markdown and always return their native
+content type: `/api/*`, `/admin*`, `/handler*`, `/.well-known/*`, static
+files (`*.png`, `*.js`, `*.woff2`, …), `robots.txt`, `sitemap.xml`,
+`llms.txt`, `favicon.ico`, and site manifests.
 
 ## Example
 
