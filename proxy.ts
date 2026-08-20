@@ -65,7 +65,7 @@ function isEligiblePath(pathname: string): boolean {
   return true;
 }
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   if (req.method !== "GET" && req.method !== "HEAD") return NextResponse.next();
   if (!wantsMarkdown(req)) return NextResponse.next();
 
