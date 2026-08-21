@@ -27,8 +27,15 @@ export type ViewFounder = {
   mrrCents?: number;
   totalRevenueCents?: number;
   revenueProvider?: string;
-  verifiedProviders?: Array<{ name: string; mrrCents: number; totalRevenueCents: number }>;
+  verifiedProviders?: Array<{
+    name: string;
+    mrrCents: number;
+    totalRevenueCents: number;
+    monthlyHistory?: Array<{ period: string; amountCents: number }>;
+    dailyHistory?: Array<{ period: string; amountCents: number }>;
+  }>;
   totalVotes: number;
+  votesGiven?: number;
   productsCount?: number;
   emailVerified?: boolean;
   joinedAt: string;
@@ -154,7 +161,8 @@ export function FounderProfileContent({
   const scoreInfo = getFounderScore(
     founder.productsCount ?? founder.products.length ?? 0,
     founder.totalVotes ?? 0,
-    founder.joinedAt
+    founder.joinedAt,
+    founder.votesGiven ?? 0
   );
 
   return (
@@ -412,6 +420,8 @@ export function FounderProfileContent({
                   providerName: p.name,
                   mrrCents: p.mrrCents,
                   totalRevenueCents: p.totalRevenueCents,
+                  monthlyHistory: p.monthlyHistory,
+                  dailyHistory: p.dailyHistory,
                 }))
               : undefined
           }

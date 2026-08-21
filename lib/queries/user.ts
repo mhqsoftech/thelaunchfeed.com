@@ -80,6 +80,9 @@ export const getPublicProfile = cache(async function getPublicProfile(rawSlug: s
           category: { select: { slug: true, name: true } },
         },
       },
+      // votes given by this user — feeds the community-participation bonus in
+      // getFounderScore so upvoting other products also moves your own tier.
+      _count: { select: { votes: true } },
     },
   });
 

@@ -147,6 +147,11 @@ export const REVENUE_PROVIDERS: RevenueProviderConfig[] = [
   },
 ];
 
+export interface RevenueHistoryPoint {
+  period: string; // "YYYY-MM" for monthly, "YYYY-MM-DD" for daily
+  amountCents: number;
+}
+
 export interface RevenueTelemetryResult {
   mrrCents: number;
   totalRevenueCents: number;
@@ -156,7 +161,69 @@ export interface RevenueTelemetryResult {
   sdkHandshakeLog: string;
   verifiedTimestamp: string;
   currency: string;
+  monthlyHistory: RevenueHistoryPoint[];
+  dailyHistory: RevenueHistoryPoint[];
+  // True only when the provider's live API answered with real subscription
+  // and/or payment data. When false, the caller MUST refuse to display
+  // "Verified" revenue — the numbers cannot be trusted.
+  liveVerified: boolean;
 }
+
+/**
+ * Bucket a raw list of payments into the last `months` calendar months. Months
+ * with zero payments still appear as `amountCents: 0` so the chart always draws
+ * a full baseline. Timestamps outside the window are ignored.
+ */
+export function bucketPaymentsByMonth(
+  payments: Array<{ tsMs: number; amountCents: number }>,
+  months = 12
+): RevenueHistoryPoint[] {
+  const now = new Date();
+  const buckets: RevenueHistoryPoint[] = [];
+  const keyToIdx = new Map<string, number>();
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    keyToIdx.set(key, buckets.length);
+    buckets.push({ period: key, amountCents: 0 });
+  }
+  for (const p of payments) {
+    const d = new Date(p.tsMs);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const idx = keyToIdx.get(key);
+    if (idx !== undefined) buckets[idx].amountCents += p.amountCents;
+  }
+  return buckets;
+}
+
+export function bucketPaymentsByDay(
+  payments: Array<{ tsMs: number; amountCents: number }>,
+  days = 90
+): RevenueHistoryPoint[] {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const buckets: RevenueHistoryPoint[] = [];
+  const keyToIdx = new Map<string, number>();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(startOfToday.getTime() - i * 86400000);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    keyToIdx.set(key, buckets.length);
+    buckets.push({ period: key, amountCents: 0 });
+  }
+  for (const p of payments) {
+    const d = new Date(p.tsMs);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const idx = keyToIdx.get(key);
+    if (idx !== undefined) buckets[idx].amountCents += p.amountCents;
+  }
+  return buckets;
+}
+
+// Deliberately no synthesized-ramp helpers. If a provider does not expose a
+// per-payment timeline we return empty history arrays and the chart draws
+// zero-value buckets for those periods — an honest picture of what the
+// gateway reports rather than a smoothed guess.
+
 
 export async function fetchLiveRevenueFromSDK(
   providerId: string,
@@ -174,6 +241,9 @@ export async function fetchLiveRevenueFromSDK(
   const currency = "USD";
   let liveApiSuccess = false;
   let logDetails = "";
+  // Live per-payment timeline captured from provider APIs — flows into the
+  // monthly/daily buckets rendered by <VerifiedRevenueChart>.
+  const paymentTimeline: Array<{ tsMs: number; amountCents: number }> = [];
 
   // 1. DODO PAYMENTS
   if (cleanProvider.includes("dodo")) {
@@ -231,13 +301,21 @@ export async function fetchLiveRevenueFromSDK(
                 : [];
             for (const p of pItems) {
               if (p.status === "succeeded") {
-                calculatedPayments += p.total_amount || 0;
+                const amt = p.total_amount || 0;
+                calculatedPayments += amt;
+                const rawTs = p.created_at || p.created || p.createdAt;
+                const ts = rawTs ? new Date(rawTs).getTime() : NaN;
+                if (!Number.isNaN(ts) && amt > 0) {
+                  paymentTimeline.push({ tsMs: ts, amountCents: amt });
+                }
               }
             }
           }
 
-          mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedPayments / 12);
-          totalRevenueCents = calculatedPayments > 0 ? calculatedPayments : calculatedMrr * 6;
+          // MRR reflects ONLY active subscriptions. Total revenue reflects
+          // ONLY successfully-collected payments. No averaging, no projection.
+          mrrCents = calculatedMrr;
+          totalRevenueCents = calculatedPayments;
           subscribersCount = activeSubs;
           logDetails = `Authenticated with Dodo Payments API (${baseUrl.includes("test") ? "Test/Sandbox" : "Live"}). ${activeSubs} active subscriptions | $${(calculatedPayments / 100).toFixed(2)} total revenue.`;
           break;
@@ -291,13 +369,19 @@ export async function fetchLiveRevenueFromSDK(
           const cData = await chargesRes.json();
           for (const c of cData.data || []) {
             if (c.status === "succeeded" && c.paid) {
-              calculatedCharges += c.amount || 0;
+              const amt = c.amount || 0;
+              calculatedCharges += amt;
+              // Stripe returns `created` as unix seconds
+              const ts = typeof c.created === "number" ? c.created * 1000 : NaN;
+              if (!Number.isNaN(ts) && amt > 0) {
+                paymentTimeline.push({ tsMs: ts, amountCents: amt });
+              }
             }
           }
         }
 
-        mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedCharges / 12);
-        totalRevenueCents = calculatedCharges > 0 ? calculatedCharges : calculatedMrr * 12;
+        mrrCents = calculatedMrr;
+        totalRevenueCents = calculatedCharges;
         subscribersCount = activeSubs;
         logDetails = `Authenticated with Stripe API. ${activeSubs} active subscriptions | $${(totalRevenueCents / 100).toFixed(2)} total charges.`;
       }
@@ -354,8 +438,8 @@ export async function fetchLiveRevenueFromSDK(
             }
           }
 
-          mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedTx / 12);
-          totalRevenueCents = calculatedTx > 0 ? calculatedTx : calculatedMrr * 12;
+          mrrCents = calculatedMrr;
+          totalRevenueCents = calculatedTx;
           subscribersCount = activeSubs;
           logDetails = `Authenticated with Paddle Billing (${baseUrl.includes("sandbox") ? "Sandbox" : "Live"}). ${activeSubs} active subscriptions | $${(totalRevenueCents / 100).toFixed(2)} total transactions.`;
           break;
@@ -403,8 +487,8 @@ export async function fetchLiveRevenueFromSDK(
           }
         }
 
-        mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedOrders / 12);
-        totalRevenueCents = calculatedOrders > 0 ? calculatedOrders : calculatedMrr * 12;
+        mrrCents = calculatedMrr;
+        totalRevenueCents = calculatedOrders;
         logDetails = `Authenticated with Polar.sh API. ${subscribersCount} active subscriptions | $${(totalRevenueCents / 100).toFixed(2)} total orders.`;
       }
     } catch (err) {
@@ -456,8 +540,8 @@ export async function fetchLiveRevenueFromSDK(
           }
         }
 
-        mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedOrders / 12);
-        totalRevenueCents = calculatedOrders > 0 ? calculatedOrders : calculatedMrr * 12;
+        mrrCents = calculatedMrr;
+        totalRevenueCents = calculatedOrders;
         subscribersCount = activeSubs;
         logDetails = `Authenticated with Lemon Squeezy API. ${activeSubs} active subscriptions | $${(totalRevenueCents / 100).toFixed(2)} total orders.`;
       }
@@ -503,8 +587,8 @@ export async function fetchLiveRevenueFromSDK(
           }
         }
 
-        mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedPayments / 12);
-        totalRevenueCents = calculatedPayments > 0 ? calculatedPayments : calculatedMrr * 12;
+        mrrCents = calculatedMrr;
+        totalRevenueCents = calculatedPayments;
         subscribersCount = activeSubs;
         logDetails = `Authenticated with Razorpay API. ${activeSubs} active subscriptions | $${(totalRevenueCents / 100).toFixed(2)} captured payments.`;
       }
@@ -543,8 +627,8 @@ export async function fetchLiveRevenueFromSDK(
           }
         }
 
-        mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedSales / 12);
-        totalRevenueCents = calculatedSales > 0 ? calculatedSales : calculatedMrr * 12;
+        mrrCents = calculatedMrr;
+        totalRevenueCents = calculatedSales;
         subscribersCount = activeSubs;
         logDetails = `Authenticated with Gumroad API. ${activeSubs} active subscribers | $${(totalRevenueCents / 100).toFixed(2)} lifetime sales.`;
       }
@@ -587,8 +671,8 @@ export async function fetchLiveRevenueFromSDK(
           }
         }
 
-        mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedTx / 12);
-        totalRevenueCents = calculatedTx > 0 ? calculatedTx : calculatedMrr * 12;
+        mrrCents = calculatedMrr;
+        totalRevenueCents = calculatedTx;
         subscribersCount = activeSubs;
         logDetails = `Authenticated with Paystack API. ${activeSubs} active subscriptions | $${(totalRevenueCents / 100).toFixed(2)} total transactions.`;
       }
@@ -617,7 +701,11 @@ export async function fetchLiveRevenueFromSDK(
           calculatedMrr += Math.round(planAmount);
         }
         mrrCents = calculatedMrr;
-        totalRevenueCents = calculatedMrr * 12;
+        // Chargebee does not expose a lifetime revenue endpoint in this call;
+        // leave it at 0 rather than projecting MRR × 12 (that number is not
+        // real revenue). A future sync that hits the invoices endpoint can
+        // fill this in with actual collected totals.
+        totalRevenueCents = 0;
         logDetails = `Authenticated with Chargebee API. Found ${subscribersCount} active subscriptions.`;
       }
     } catch (err) {
@@ -670,8 +758,8 @@ export async function fetchLiveRevenueFromSDK(
           }
         }
 
-        mrrCents = calculatedMrr > 0 ? calculatedMrr : Math.round(calculatedPayments / 12);
-        totalRevenueCents = calculatedPayments > 0 ? calculatedPayments : calculatedMrr * 12;
+        mrrCents = calculatedMrr;
+        totalRevenueCents = calculatedPayments;
         subscribersCount = activeSubs;
         logDetails = `Authenticated with Square API. ${activeSubs} active subscriptions | $${(totalRevenueCents / 100).toFixed(2)} payments.`;
       }
@@ -749,20 +837,39 @@ export async function fetchLiveRevenueFromSDK(
       const inDollars = mrrCents / 100;
       mrrFormatted = `$${Number.isInteger(inDollars) ? inDollars : inDollars.toFixed(2)} / mo`;
     }
-  } else if (!liveApiSuccess) {
-    // If not able to reach live API with custom dev test key
-    mrrCents = 2200; // $22.00
-    totalRevenueCents = 2200;
-    mrrFormatted = "$22 / mo";
-    subscribersCount = 1;
-    logDetails = `Key verified via ${provider.name} SDK format validation.`;
   }
+  // No placeholder revenue when the live API is unreachable — showing a fake
+  // "$22 / mo" would make the "Verified" badge a lie. If the gateway returned
+  // nothing, mrrCents / totalRevenueCents stay 0 and the connection surfaces
+  // as $0 verified.
 
-  const momGrowth = "+14.2% MoM";
+  // MoM growth from the actual monthly buckets (real numbers only).
+  const momMonthly = paymentTimeline.length > 0
+    ? bucketPaymentsByMonth(paymentTimeline, 12)
+    : [];
+  const momGrowth = (() => {
+    if (momMonthly.length < 2) return "+0.0% MoM";
+    const cur = momMonthly[momMonthly.length - 1].amountCents;
+    const prev = momMonthly[momMonthly.length - 2].amountCents;
+    if (prev === 0 && cur === 0) return "+0.0% MoM";
+    if (prev === 0) return "New Launch";
+    const g = ((cur - prev) / prev) * 100;
+    return `${g >= 0 ? "+" : ""}${g.toFixed(1)}% MoM`;
+  })();
   const log = `[SDK HANDSHAKE OK] Connected via ${provider.sdkName} (${provider.name} API Mesh)
 [CREDENTIAL VALIDATED] Format ${provider.keyPrefix}* verified & active
 [METRICS TELEMETRY] ${logDetails || `${subscribersCount} active subscriptions`}
 [LIVE TELEMETRY RESULT] Verified MRR: ${mrrFormatted} (${momGrowth})`;
+
+  // Real per-payment monthly/daily buckets ONLY. If a provider does not expose
+  // a payment timeline via its API, history stays empty (chart renders zeros)
+  // instead of showing a synthesized ramp.
+  const monthlyHistory = paymentTimeline.length > 0
+    ? bucketPaymentsByMonth(paymentTimeline, 12)
+    : [];
+  const dailyHistory = paymentTimeline.length > 0
+    ? bucketPaymentsByDay(paymentTimeline, 90)
+    : [];
 
   return {
     mrrCents,
@@ -773,6 +880,9 @@ export async function fetchLiveRevenueFromSDK(
     sdkHandshakeLog: log,
     verifiedTimestamp: now,
     currency,
+    monthlyHistory,
+    dailyHistory,
+    liveVerified: liveApiSuccess,
   };
 }
 

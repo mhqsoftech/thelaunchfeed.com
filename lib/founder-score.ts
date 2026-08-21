@@ -89,7 +89,8 @@ export const FOUNDER_LEVELS_BASE: FounderLevelBase[] = [
 export function getFounderScore(
   productsCount: number,
   totalVotes: number,
-  joinedAtStr?: string
+  joinedAtStr?: string,
+  votesGiven: number = 0
 ): {
   points: number;
   currentLevel: FounderLevelBase;
@@ -105,8 +106,16 @@ export function getFounderScore(
     }
   }
 
-  // Scoring matrix: 20 pts per product launched + 2 pts per vote + up to 90 age bonus points
-  const points = (productsCount * 20) + (totalVotes * 2) + Math.min(ageDays, 90);
+  // Scoring matrix:
+  //   20 pts per product launched
+  //   2  pts per upvote RECEIVED on the founder's own products
+  //   1  pt  per upvote GIVEN to other products (community participation)
+  //   up to 90 age-bonus points
+  const points =
+    (productsCount * 20) +
+    (totalVotes * 2) +
+    (votesGiven * 1) +
+    Math.min(ageDays, 90);
 
   let currentLevel = FOUNDER_LEVELS_BASE[0];
   let nextLevel: FounderLevelBase | null = FOUNDER_LEVELS_BASE[1];

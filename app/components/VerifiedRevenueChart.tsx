@@ -9,18 +9,31 @@ export interface MonthlyHistoryPoint {
   amountFormatted?: string;
 }
 
+// Persisted history point shape from the RevenueConnection JSON columns —
+// `period` is "YYYY-MM" for monthly and "YYYY-MM-DD" for daily.
+export interface PeriodHistoryPoint {
+  period: string;
+  amountCents: number;
+}
+
 export interface RevenueSeries {
   providerName: string;
   mrrCents: number;
   totalRevenueCents?: number;
   history?: MonthlyHistoryPoint[];
+  monthlyHistory?: PeriodHistoryPoint[];
+  dailyHistory?: PeriodHistoryPoint[];
 }
+
+export type RevenueGranularity = "month" | "day";
 
 export interface VerifiedRevenueChartProps {
   revenueFormatted: string; // e.g. "$28.56 / mo" or "$14.2K / mo"
   mrrCents?: number;
   totalRevenueCents?: number;
   history?: MonthlyHistoryPoint[];
+  monthlyHistory?: PeriodHistoryPoint[];
+  dailyHistory?: PeriodHistoryPoint[];
   momGrowth?: string;
   providerName?: string; // e.g. "Dodo Payments" or "Stripe"
   series?: RevenueSeries[]; // per-provider breakdown; when >=2, renders multi-line chart
@@ -67,28 +80,69 @@ export default function VerifiedRevenueChart({
   mrrCents,
   totalRevenueCents,
   history,
+  monthlyHistory,
+  dailyHistory,
   momGrowth,
   providerName = "Stripe",
   series,
   className = "",
 }: VerifiedRevenueChartProps) {
+  const [granularity, setGranularity] = useState<RevenueGranularity>("month");
+  const [pickerOpen, setPickerOpen] = useState(false);
+
   const activeSeries = useMemo(() => {
     if (series && series.length > 0) return series;
-    return [{ providerName, mrrCents: mrrCents ?? 0, totalRevenueCents, history }];
-  }, [series, providerName, mrrCents, totalRevenueCents, history]);
+    return [{
+      providerName,
+      mrrCents: mrrCents ?? 0,
+      totalRevenueCents,
+      history,
+      monthlyHistory,
+      dailyHistory,
+    }];
+  }, [series, providerName, mrrCents, totalRevenueCents, history, monthlyHistory, dailyHistory]);
   const isMulti = activeSeries.length > 1;
+
   const seriesData = useMemo(() => {
     const monthNames = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
     const now = new Date();
+    const yearSuffix = (d: Date) => `'${String(d.getFullYear()).slice(2)}`;
+    const monthLabel = (raw: string): string => {
+      const d = new Date(raw);
+      if (!Number.isNaN(d.getTime())) return `${monthNames[d.getMonth()]} ${yearSuffix(d)}`;
+      return raw;
+    };
+    const dayLabel = (raw: string): string => {
+      // raw is "YYYY-MM-DD" — render as "AUG 21"
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return raw;
+      return `${monthNames[d.getMonth()]} ${d.getDate()}`;
+    };
+
     return activeSeries.map((s) => {
-      const yearSuffix = (d: Date) => `'${String(d.getFullYear()).slice(2)}`;
-      const monthLabel = (raw: string): string => {
-        // history point "month" may be an ISO date, "2026-08", or already "AUG"
-        const d = new Date(raw);
-        if (!Number.isNaN(d.getTime())) return `${monthNames[d.getMonth()]} ${yearSuffix(d)}`;
-        return raw;
-      };
-      if (s.history && s.history.length >= 2) {
+      // Prefer real persisted buckets for the current granularity when present.
+      if (granularity === "day" && s.dailyHistory && s.dailyHistory.length >= 2) {
+        return {
+          providerName: s.providerName,
+          points: s.dailyHistory.map((h) => ({
+            month: dayLabel(h.period),
+            amountCents: h.amountCents || 0,
+            label: formatCentsValue(h.amountCents || 0),
+          })),
+        };
+      }
+      if (granularity === "month" && s.monthlyHistory && s.monthlyHistory.length >= 2) {
+        return {
+          providerName: s.providerName,
+          points: s.monthlyHistory.map((h) => ({
+            month: monthLabel(h.period),
+            amountCents: h.amountCents || 0,
+            label: formatCentsValue(h.amountCents || 0),
+          })),
+        };
+      }
+      // Legacy `history` prop (already-formatted month labels)
+      if (granularity === "month" && s.history && s.history.length >= 2) {
         return {
           providerName: s.providerName,
           points: s.history.map((h) => ({
@@ -98,19 +152,33 @@ export default function VerifiedRevenueChart({
           })),
         };
       }
+      // No real history from the gateway — render an honest empty baseline
+      // (all zeros) rather than a synthesized ramp. The MRR + total-revenue
+      // metric cards above still show the live aggregate.
+      if (granularity === "day") {
+        const days: Array<{ month: string; amountCents: number; label: string }> = [];
+        for (let i = 29; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+          days.push({
+            month: `${monthNames[d.getMonth()]} ${d.getDate()}`,
+            amountCents: 0,
+            label: "$0",
+          });
+        }
+        return { providerName: s.providerName, points: days };
+      }
       const months: Array<{ month: string; amountCents: number; label: string }> = [];
-      for (let i = 5; i >= 0; i--) {
+      for (let i = 11; i >= 0; i--) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        const amount = i === 0 ? s.mrrCents ?? 0 : 0;
         months.push({
           month: `${monthNames[d.getMonth()]} ${yearSuffix(d)}`,
-          amountCents: amount,
-          label: formatCentsValue(amount),
+          amountCents: 0,
+          label: "$0",
         });
       }
       return { providerName: s.providerName, points: months };
     });
-  }, [activeSeries]);
+  }, [activeSeries, granularity]);
 
   // Primary series (aggregate) drives axis labels, MoM growth and total
   const pointsData = useMemo(() => {
@@ -127,7 +195,9 @@ export default function VerifiedRevenueChart({
     });
   }, [seriesData, isMulti]);
 
-  // Compute exact 6-month or cumulative total revenue
+  // Verified Total Revenue = all-time combined revenue across every connected
+  // provider (comes from the summed `totalRevenueCents` prop). Fall back to the
+  // sum of visible buckets only when no stored total is available.
   const calculatedTotalCents = useMemo(() => {
     if (typeof totalRevenueCents === "number" && totalRevenueCents > 0) {
       return totalRevenueCents;
@@ -139,20 +209,31 @@ export default function VerifiedRevenueChart({
     return formatCentsValue(calculatedTotalCents);
   }, [calculatedTotalCents]);
 
+  // Current-period revenue = the last visible bucket. Used to swap the top-
+  // card headline in daily mode so a $0-in-last-24h reality is not hidden by
+  // an MRR string that was computed from active subscriptions.
+  const currentPeriodCents = useMemo(() => {
+    if (pointsData.length === 0) return 0;
+    return pointsData[pointsData.length - 1].amountCents;
+  }, [pointsData]);
+
+  const rangeLabel = granularity === "day" ? "Last 90 days" : "Last 12 months";
+
   // Calculate real MoM growth if not provided
   const computedGrowth = useMemo(() => {
-    if (momGrowth && momGrowth.trim().length > 0) {
+    const suffix = granularity === "day" ? "DoD" : "MoM";
+    if (momGrowth && momGrowth.trim().length > 0 && granularity === "month") {
       return momGrowth;
     }
-    if (pointsData.length < 2) return "+0.0% MoM";
+    if (pointsData.length < 2) return `+0.0% ${suffix}`;
     const current = pointsData[pointsData.length - 1].amountCents;
     const prev = pointsData[pointsData.length - 2].amountCents;
-    if (prev === 0 && current === 0) return "+0.0% MoM";
+    if (prev === 0 && current === 0) return `+0.0% ${suffix}`;
     if (prev === 0) return "New Launch";
     const growth = ((current - prev) / prev) * 100;
     const sign = growth >= 0 ? "+" : "";
-    return `${sign}${growth.toFixed(1)}% MoM`;
-  }, [momGrowth, pointsData]);
+    return `${sign}${growth.toFixed(1)}% ${suffix}`;
+  }, [momGrowth, pointsData, granularity]);
 
   // SVG chart dimensions & calculations
   const width = 600;
@@ -245,17 +326,61 @@ export default function VerifiedRevenueChart({
         </div>
       </div>
 
+      {/* Granularity picker — parallelogram-styled dropdown (trustmrr.com style) */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="text-[10px] text-ink-faint uppercase font-bold tracking-wider">
+          Range · {granularity === "month" ? "Last 12 months" : "Last 90 days"}
+        </div>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setPickerOpen((v) => !v)}
+            className="group inline-flex items-center gap-1.5 pl-3 pr-2.5 py-1.5 text-[10px] font-mono font-bold uppercase text-ink bg-void border border-signal/50 hover:border-signal transition-colors cursor-pointer"
+            style={{ clipPath: "polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)" }}
+          >
+            <span className="text-signal">◆</span>
+            <span>{granularity === "month" ? "Monthly" : "Daily"}</span>
+            <svg className={`w-2.5 h-2.5 transition-transform ${pickerOpen ? "rotate-180" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+              <path strokeLinecap="square" d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          {pickerOpen && (
+            <div
+              className="absolute right-0 mt-1 z-20 min-w-[128px] bg-void border border-signal/50 shadow-lg font-mono"
+              style={{ clipPath: "polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%)" }}
+            >
+              {(["month", "day"] as RevenueGranularity[]).map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => { setGranularity(opt); setPickerOpen(false); }}
+                  className={`block w-full text-left px-4 py-1.5 text-[10px] uppercase font-bold cursor-pointer transition-colors ${
+                    granularity === opt ? "bg-signal/15 text-signal" : "text-ink hover:bg-signal/10 hover:text-signal"
+                  }`}
+                >
+                  {opt === "month" ? "Monthly · 12M" : "Daily · 90D"}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Top Metric Cards */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 text-xs">
         <div className="p-2.5 sm:p-3 border border-hairline bg-void/60 space-y-1">
-          <div className="text-[9px] sm:text-[10px] text-ink-faint uppercase font-bold">Verified Current MRR</div>
-          <div className="text-base sm:text-lg font-bold text-signal">{revenueFormatted}</div>
+          <div className="text-[9px] sm:text-[10px] text-ink-faint uppercase font-bold">
+            {granularity === "day" ? "Revenue · Today" : "Verified Current MRR"}
+          </div>
+          <div className="text-base sm:text-lg font-bold text-signal">
+            {granularity === "day" ? formatCentsValue(currentPeriodCents) : revenueFormatted}
+          </div>
           <div className="text-[9px] text-signal font-semibold">{computedGrowth}</div>
         </div>
         <div className="p-2.5 sm:p-3 border border-hairline bg-void/60 space-y-1">
           <div className="text-[9px] sm:text-[10px] text-ink-faint uppercase font-bold">Verified Total Revenue</div>
           <div className="text-base sm:text-lg font-bold text-ink">{totalRevenueFormatted}</div>
-          <div className="text-[9px] text-ink-dim">Direct Gateway Audit</div>
+          <div className="text-[9px] text-ink-dim">All-time · Combined providers</div>
         </div>
         <div className="p-2.5 sm:p-3 border border-hairline bg-void/60 space-y-1 xs:col-span-2 sm:col-span-1">
           <div className="text-[9px] sm:text-[10px] text-ink-faint uppercase font-bold">Cryptographic Status</div>
@@ -352,9 +477,14 @@ export default function VerifiedRevenueChart({
           )}
 
           {/* Data Points & Labels (aggregate axis) */}
+          {(() => null)()}
           {points.map((pt, i) => {
             const isHovered = hoverIdx === i;
             const colWidth = (width - 2 * paddingX) / Math.max(points.length - 1, 1);
+            // Thin labels when there are many points (daily mode) so they stay legible.
+            const labelEvery = Math.max(1, Math.ceil(points.length / 8));
+            const showXLabel = i % labelEvery === 0 || i === points.length - 1;
+            const showValueLabel = !isMulti && (points.length <= 12 || i === points.length - 1 || isHovered);
             return (
               <g key={i} className="cursor-pointer">
                 {/* Vertical hover-hit rectangle spanning full chart height */}
@@ -391,7 +521,7 @@ export default function VerifiedRevenueChart({
                 )}
 
                 {/* Aggregate value above node — only in single-series mode */}
-                {!isMulti && (
+                {showValueLabel && (
                   <text
                     x={pt.x}
                     y={pt.y - 10}
@@ -402,15 +532,17 @@ export default function VerifiedRevenueChart({
                   </text>
                 )}
 
-                {/* Month + year label below baseline */}
-                <text
-                  x={pt.x}
-                  y={height - 8}
-                  textAnchor="middle"
-                  className="fill-ink-dim text-[10px] font-mono uppercase font-bold"
-                >
-                  {pt.month}
-                </text>
+                {/* Month/day label below baseline (thinned when dense) */}
+                {showXLabel && (
+                  <text
+                    x={pt.x}
+                    y={height - 8}
+                    textAnchor="middle"
+                    className="fill-ink-dim text-[10px] font-mono uppercase font-bold"
+                  >
+                    {pt.month}
+                  </text>
+                )}
               </g>
             );
           })}

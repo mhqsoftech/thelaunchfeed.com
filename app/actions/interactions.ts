@@ -14,6 +14,7 @@ import { requireUser } from "@/lib/auth";
 
 import { invalidateFeedCache } from "@/lib/queries/products";
 import { invalidateUserSessionCache } from "@/lib/auth";
+import { invalidateProfileCache } from "@/lib/queries/user";
 
 async function assertLiveProduct(productId: string) {
   const p = await prisma.product.findUnique({
@@ -28,6 +29,11 @@ async function assertLiveProduct(productId: string) {
 export async function toggleVote(productId: string): Promise<{ voted: boolean; voteCount: number }> {
   const user = await requireUser();
   const product = await assertLiveProduct(productId);
+
+  const ownerRow = await prisma.product.findUnique({
+    where: { id: productId },
+    select: { owner: { select: { username: true } } },
+  });
 
   const existing = await prisma.vote.findUnique({
     where: { productId_userId: { productId, userId: user.id } },
@@ -62,7 +68,23 @@ export async function toggleVote(productId: string): Promise<{ voted: boolean; v
 
   invalidateFeedCache();
   invalidateUserSessionCache(user.id);
+  // `getPublicProfile` keeps its own 60-second in-memory cache — bust it here
+  // or founder tier points served from that cache stay stale for up to a minute
+  // after each vote, even after revalidatePath fires.
+  invalidateProfileCache();
   revalidatePath(`/product/${product.slug}`);
+  // Founder tier points depend on total votes across their products — refresh
+  // the owner's public profile + the founders leaderboard so tier updates are
+  // reflected on the next request instead of waiting for ISR to expire.
+  if (ownerRow?.owner?.username) {
+    revalidatePath(`/founder/${ownerRow.owner.username}`);
+  }
+  // The voter's own tier also moves (votes-given bonus), so refresh their
+  // profile page too.
+  if (user.username) {
+    revalidatePath(`/founder/${user.username}`);
+  }
+  revalidatePath("/founders");
   return { voted, voteCount };
 }
 

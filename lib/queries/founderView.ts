@@ -18,7 +18,13 @@ export async function buildFounderView(username: string): Promise<ViewFounder | 
   let verifiedTotalRevenueCents = 0;
   let verifiedMrrFormatted = "";
   let verifiedProviderName = "Stripe";
-  let verifiedProviders: Array<{ name: string; mrrCents: number; totalRevenueCents: number }> = [];
+  let verifiedProviders: Array<{
+    name: string;
+    mrrCents: number;
+    totalRevenueCents: number;
+    monthlyHistory?: Array<{ period: string; amountCents: number }>;
+    dailyHistory?: Array<{ period: string; amountCents: number }>;
+  }> = [];
 
   const activeConns = (f.revenueConnections || []).filter(
     (c: any) => c.status === "ACTIVE" && (c.mrrCents || 0) > 0
@@ -28,10 +34,14 @@ export async function buildFounderView(username: string): Promise<ViewFounder | 
     verifiedProviders = activeConns.map((c: any) => {
       const provKey = c.provider as string;
       const name = provKey.charAt(0).toUpperCase() + provKey.slice(1).toLowerCase();
+      const monthlyHistory = Array.isArray(c.monthlyHistoryJson) ? c.monthlyHistoryJson : undefined;
+      const dailyHistory = Array.isArray(c.dailyHistoryJson) ? c.dailyHistoryJson : undefined;
       return {
         name,
         mrrCents: c.mrrCents || 0,
         totalRevenueCents: c.totalRevenueCents || 0,
+        monthlyHistory,
+        dailyHistory,
       };
     });
     verifiedMrrCents = verifiedProviders.reduce((s, p) => s + p.mrrCents, 0);
@@ -94,6 +104,7 @@ export async function buildFounderView(username: string): Promise<ViewFounder | 
     website: f.websiteUrl || "",
     twitter: f.twitterHandle || "",
     github: f.githubHandle || "",
+    votesGiven: (f as any)._count?.votes ?? 0,
     revenue: verifiedMrrFormatted,
     mrrCents: verifiedMrrCents,
     totalRevenueCents: verifiedTotalRevenueCents,

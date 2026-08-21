@@ -368,6 +368,12 @@ model RevenueConnection {
   currency          String           @default("usd")
   momGrowthPct      Float?
 
+  // Historical buckets used to render the Verified Revenue chart across the
+  // last 12 months / 90 days. Each item is { period: "YYYY-MM" | "YYYY-MM-DD",
+  // amountCents: number }. Populated on every sync from live gateway data.
+  monthlyHistoryJson Json?
+  dailyHistoryJson   Json?
+
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   revenues ProductRevenue[]
 

@@ -68,6 +68,7 @@ export async function GET(req: Request) {
             where: { status: "LIVE" },
             select: { id: true, voteCount: true, name: true, slug: true },
           },
+          _count: { select: { votes: true } },
         },
       }),
     ]);
@@ -88,10 +89,12 @@ export async function GET(req: Request) {
     const formattedFounders = users.map((u) => {
       const productsCount = u.products.length;
       const totalVotes = u.products.reduce((acc, p) => acc + p.voteCount, 0);
+      const votesGiven = (u as any)._count?.votes ?? 0;
       const score = getFounderScore(
         productsCount,
         totalVotes,
-        u.createdAt ? u.createdAt.toISOString() : undefined
+        u.createdAt ? u.createdAt.toISOString() : undefined,
+        votesGiven
       );
 
       return {

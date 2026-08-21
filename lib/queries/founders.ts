@@ -71,6 +71,7 @@ export const getTopFounders = cache(async function getTopFounders(limit: number 
           voteCount: true,
         },
       },
+      _count: { select: { votes: true } },
     },
   });
 
@@ -78,10 +79,12 @@ export const getTopFounders = cache(async function getTopFounders(limit: number 
   const scoredFounders = users.map((u) => {
     const productsCount = u.products.length;
     const totalVotes = u.products.reduce((acc, p) => acc + p.voteCount, 0);
+    const votesGiven = (u as any)._count?.votes ?? 0;
     const scoreInfo = getFounderScore(
       productsCount,
       totalVotes,
-      u.createdAt ? u.createdAt.toISOString() : undefined
+      u.createdAt ? u.createdAt.toISOString() : undefined,
+      votesGiven
     );
 
     return {

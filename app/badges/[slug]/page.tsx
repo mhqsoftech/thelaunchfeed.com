@@ -12,10 +12,36 @@ export async function generateMetadata({
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   const name = product?.name || slug;
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+  const canonicalUrl = `${siteUrl}/badges/${encodeURIComponent(slug)}`;
+  const description = `Official embeddable award badges, leaderboard rankings, and vector SVG trophies for ${name} on The Launch Feed.`;
 
   return {
     title: `${name} Official Badges & Trophies - The Launch Feed`,
-    description: `Official embeddable award badges, leaderboard rankings, and vector SVG trophies for ${name} on The Launch Feed.`,
+    description,
+    alternates: { canonical: canonicalUrl },
+    openGraph: {
+      type: "website",
+      url: canonicalUrl,
+      title: `${name} Official Badges & Trophies - The Launch Feed`,
+      description,
+      siteName: "The Launch Feed",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${name} Official Badges & Trophies - The Launch Feed`,
+      description,
+    },
+    robots: {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        "max-image-preview": "large",
+        "max-snippet": -1,
+      },
+    },
   };
 }
 

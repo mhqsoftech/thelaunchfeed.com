@@ -83,6 +83,32 @@ export async function savePaymentApiKey(input: SaveKeyInput) {
   const mrrCents = telemetryResult.mrrCents;
   const totalRevenueCents = telemetryResult.totalRevenueCents;
 
+  // TRUST GUARANTEE: if the provider's live API didn't actually answer with
+  // real data, we refuse to store anything that could later be rendered as
+  // "Verified Revenue". The connection is marked ERROR and revenue fields are
+  // zeroed. The user has to fix the key / provider setup and re-save before
+  // any number appears on their profile.
+  if (!telemetryResult.liveVerified) {
+    await prisma.revenueConnection.update({
+      where: { id: connection.id },
+      data: {
+        status: "ERROR",
+        mrrCents: 0,
+        arrCents: 0,
+        totalRevenueCents: 0,
+        monthlyHistoryJson: [] as any,
+        dailyHistoryJson: [] as any,
+        lastSyncError: "Live gateway API did not return real data — key rejected or provider unreachable. No revenue stored.",
+      },
+    });
+    // Throw so the caller surfaces the message to the user rather than
+    // silently succeeding with a zero-row (which would still render an
+    // encrypted key and a stored connection, giving a false sense of success).
+    throw new Error(
+      "Could not verify live revenue with the provider. No numbers were stored — trust guardrails prevented a fake 'Verified' badge. Double-check the API key / permissions and try again."
+    );
+  }
+
   // Persist the per-connection aggregate so multiple providers coexist without
   // clobbering each other via the ProductRevenue (productId-unique) rows.
   await prisma.revenueConnection.update({
@@ -92,6 +118,8 @@ export async function savePaymentApiKey(input: SaveKeyInput) {
       arrCents: mrrCents * 12,
       totalRevenueCents,
       currency: "usd",
+      monthlyHistoryJson: telemetryResult.monthlyHistory as any,
+      dailyHistoryJson: telemetryResult.dailyHistory as any,
     },
   });
 
