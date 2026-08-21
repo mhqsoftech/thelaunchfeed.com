@@ -280,22 +280,25 @@ export function LaunchFeedBadge() {
   return (
     <main className="min-h-screen bg-void text-ink font-mono px-3 sm:px-6 lg:px-8 py-4 sm:py-10 max-w-6xl mx-auto space-y-5 sm:space-y-8 w-full overflow-x-hidden">
       {/* Breadcrumb Navigation */}
-      <div className="w-full min-w-0 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-ink-dim border-b border-hairline pb-3 sm:pb-4 flex-wrap">
+      <nav aria-label="Breadcrumb" className="w-full min-w-0 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-ink-dim border-b border-hairline pb-3 sm:pb-4 flex-wrap">
         <Link href="/" className="hover:text-ink transition-colors flex items-center gap-1 shrink-0">
-          <span>←</span>
-          <span>Leaderboards</span>
+          <span>Home</span>
+        </Link>
+        <span className="text-ink-faint shrink-0">/</span>
+        <Link href="/badges" className="hover:text-ink transition-colors shrink-0">
+          Badges
         </Link>
         {isProductSpecific && (
           <>
-            <span>/</span>
+            <span className="text-ink-faint shrink-0">/</span>
             <Link href={`/product/${cleanSlug}`} className="hover:text-signal transition-colors font-bold text-ink truncate max-w-[140px] sm:max-w-[240px] md:max-w-none">
               {productName || cleanSlug}
             </Link>
           </>
         )}
-        <span>/</span>
+        <span className="text-ink-faint shrink-0">/</span>
         <span className="text-ink font-bold truncate">Official Embed Badges</span>
-      </div>
+      </nav>
 
       {/* Hero Header */}
       <div className="w-full border border-hairline bg-surface/30 p-3.5 sm:p-7 space-y-3 sm:space-y-4 rounded-xs min-w-0">

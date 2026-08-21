@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import BadgesClientView from "./BadgesClientView";
+import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Official Embed Badges & Trophies - The Launch Feed",
@@ -23,5 +24,29 @@ export default async function BadgesPage({
     redirect(`/api/badge/${encodeURIComponent(product)}?award=${encodeURIComponent(award)}&download=true`);
   }
 
-  return <BadgesClientView initialProduct={product} initialAward={award} />;
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      organizationNode(),
+      websiteNode(),
+      {
+        ...breadcrumb([
+          { name: "Home", url: siteUrl },
+          { name: "Official Embed Badges", url: `${siteUrl}/badges` },
+        ]),
+        "@id": `${siteUrl}/badges#breadcrumb`,
+      },
+    ],
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <BadgesClientView initialProduct={product} initialAward={award} />
+    </>
+  );
 }

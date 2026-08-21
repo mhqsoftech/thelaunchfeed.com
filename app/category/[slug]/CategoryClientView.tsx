@@ -77,18 +77,26 @@ export default function CategoryClientView({
       <div className="space-y-4">
         {/* Navigation Breadcrumb & Back to Launch Feed — Aligned with Weekly/Monthly Headers */}
         <div className="sticky -top-4 z-30 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
-          <div className="h-10 flex items-end justify-between pb-2.5">
+          <div className="h-10 flex items-center justify-between pb-2.5 gap-3">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim overflow-x-auto no-scrollbar py-0.5 min-w-0">
+              <Link
+                href="/"
+                className="hover:text-ink transition-colors flex items-center gap-1 shrink-0"
+              >
+                <span>Home</span>
+              </Link>
+              <span className="text-ink-faint shrink-0">/</span>
+              <span className="text-ink-dim shrink-0">Categories</span>
+              <span className="text-ink-faint shrink-0">/</span>
+              <span className="text-ink font-semibold uppercase text-[11px] truncate max-w-[180px] sm:max-w-none">{category.name}</span>
+            </nav>
+
             <Link
               href="/"
-              className="text-xs font-mono text-ink-dim hover:text-ink transition-colors flex items-center gap-1.5"
+              className="text-xs font-mono text-ink-dim hover:text-ink transition-colors hidden sm:flex items-center gap-1 shrink-0 text-[11px]"
             >
-              ← Back to Launch Feed
+              ← Leaderboard
             </Link>
-            <div className="flex items-center gap-1.5 text-[11px] font-mono text-ink-faint">
-              <span>Categories</span>
-              <span>/</span>
-              <span className="text-ink font-semibold uppercase">{category.name}</span>
-            </div>
           </div>
         </div>
 

@@ -8,6 +8,7 @@ import {
   getPlatformUrlsAction,
   submitSelectedUrlsAction,
   submitAllUnsubmittedUrlsAction,
+  autoDiscoverAndIndexLiveProductsAction,
   type IndexingOverviewData,
   type IndexingLogEntry,
   type PlatformUrlEntry,
@@ -397,6 +398,26 @@ export default function IndexingTab() {
     }
   };
 
+  // Auto-discover all live products and submit unindexed pages
+  const [autoDiscovering, setAutoDiscovering] = useState(false);
+
+  const handleAutoDiscoverAndIndexProducts = async () => {
+    try {
+      setAutoDiscovering(true);
+      setError(null);
+      setSuccessMsg(null);
+      const res = await autoDiscoverAndIndexLiveProductsAction(batchEngine);
+      setSuccessMsg(
+        `Auto-Discovery Complete: Discovered ${res.totalDiscovered} live product(s). Submitted ${res.submittedCount} URL(s) (${res.batchRes?.googleSubmitted ?? 0} Google, ${res.batchRes?.indexNowSubmitted ?? 0} IndexNow).`
+      );
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || "Auto-discovery failed");
+    } finally {
+      setAutoDiscovering(false);
+    }
+  };
+
   if (loading && !data) {
     return (
       <div className="py-20 flex justify-center items-center">
@@ -491,7 +512,7 @@ export default function IndexingTab() {
         <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full lg:w-auto shrink-0 pt-1 lg:pt-0">
           <button
             onClick={loadData}
-            disabled={loading || isPending}
+            disabled={loading || isPending || autoDiscovering}
             className="h-9 sm:h-8 px-3 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold uppercase transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 text-ink shadow-xs rounded-xs"
             title="Refresh Status"
           >
@@ -499,8 +520,26 @@ export default function IndexingTab() {
             Refresh
           </button>
           <button
+            onClick={handleAutoDiscoverAndIndexProducts}
+            disabled={autoDiscovering || isPending || loading}
+            className="h-9 sm:h-8 px-3 sm:px-4 bg-ink text-surface border border-ink hover:bg-signal hover:border-signal text-xs font-mono font-bold uppercase transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs disabled:opacity-50 rounded-xs"
+            title="Auto-discover all live products and push any unindexed pages to Google & IndexNow"
+          >
+            {autoDiscovering ? (
+              <>
+                <IconRefresh className="w-3.5 h-3.5 animate-spin" />
+                <span>Discovering…</span>
+              </>
+            ) : (
+              <>
+                <IconZap className="w-3.5 h-3.5 text-signal shrink-0" />
+                <span className="truncate">Auto-Index Products</span>
+              </>
+            )}
+          </button>
+          <button
             onClick={handleSyncDeploy}
-            disabled={isPending || quota.remaining <= 0}
+            disabled={isPending || autoDiscovering || quota.remaining <= 0}
             className="h-9 sm:h-8 px-3 sm:px-4 bg-signal text-surface border border-signal hover:opacity-90 text-xs font-mono font-bold uppercase transition-opacity flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs disabled:opacity-50 rounded-xs"
           >
             {isPending ? (
@@ -1102,10 +1141,20 @@ export default function IndexingTab() {
                   Submit Selected ({selectedUrls.length})
                 </button>
 
+                <button
+                  onClick={handleAutoDiscoverAndIndexProducts}
+                  disabled={autoDiscovering || submittingBatch}
+                  className="h-8 px-3 bg-raised hover:bg-surface border border-hairline hover:border-signal text-ink text-xs font-bold uppercase transition-colors flex items-center gap-1.5 rounded-xs cursor-pointer disabled:opacity-40"
+                  title="Auto-discover all live products from the database and submit unindexed pages"
+                >
+                  {autoDiscovering ? <IconRefresh className="w-3.5 h-3.5 animate-spin" /> : <IconZap className="w-3.5 h-3.5 text-signal" />}
+                  Auto-Discover Products
+                </button>
+
                 {unsubmittedCount > 0 && (
                   <button
                     onClick={handleSubmitAllUnsubmitted}
-                    disabled={submittingBatch}
+                    disabled={submittingBatch || autoDiscovering}
                     className="h-8 px-3 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold uppercase transition-colors flex items-center gap-1.5 rounded-xs cursor-pointer disabled:opacity-40 shadow-xs"
                   >
                     {submittingBatch ? <IconRefresh className="w-3.5 h-3.5 animate-spin" /> : <IconZap className="w-3.5 h-3.5" />}

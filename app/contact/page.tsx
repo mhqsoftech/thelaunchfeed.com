@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ContactClientView from "./ContactClientView";
+import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Contact - The Launch Feed",
@@ -28,5 +29,29 @@ export const metadata: Metadata = {
 };
 
 export default function ContactPage() {
-  return <ContactClientView />;
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      organizationNode(),
+      websiteNode(),
+      {
+        ...breadcrumb([
+          { name: "Home", url: siteUrl },
+          { name: "Contact", url: `${siteUrl}/contact` },
+        ]),
+        "@id": `${siteUrl}/contact#breadcrumb`,
+      },
+    ],
+  };
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <ContactClientView />
+    </>
+  );
 }

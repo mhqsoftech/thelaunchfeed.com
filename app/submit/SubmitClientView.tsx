@@ -1600,12 +1600,37 @@ export default function SubmitClientView({
     <>
       {/* Breadcrumb — in edit mode we route back to the profile so the
           user doesn't lose their place; otherwise back to the feed. */}
-      <div className="h-10 flex items-end pb-2.5 border-b border-hairline shrink-0">
+      <div className="h-10 flex items-center justify-between pb-2.5 border-b border-hairline shrink-0 gap-3">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim overflow-x-auto no-scrollbar py-0.5 min-w-0">
+          <Link
+            href="/"
+            className="hover:text-ink transition-colors flex items-center gap-1 shrink-0"
+          >
+            <span>Home</span>
+          </Link>
+          <span className="text-ink-faint shrink-0">/</span>
+          {editTarget ? (
+            <>
+              <Link href="/profile" className="hover:text-ink transition-colors shrink-0">
+                Profile
+              </Link>
+              <span className="text-ink-faint shrink-0">/</span>
+              <span className="text-ink font-semibold truncate max-w-[160px] sm:max-w-none">
+                Edit Launch
+              </span>
+            </>
+          ) : (
+            <span className="text-ink font-semibold shrink-0">
+              Submit Product
+            </span>
+          )}
+        </nav>
+
         <Link
           href={editTarget ? "/profile" : "/"}
-          className="text-xs font-mono text-ink-dim hover:text-ink flex items-center gap-1.5 transition-colors"
+          className="text-xs font-mono text-ink-dim hover:text-ink hidden sm:flex items-center gap-1 shrink-0 text-[11px]"
         >
-          ← {editTarget ? "Back to Profile" : "Back to Launch Feed"}
+          {editTarget ? "← Back to Profile" : "← Feed"}
         </Link>
       </div>
 

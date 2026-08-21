@@ -66,15 +66,18 @@ export default function FoundersClientView({
       <div className="space-y-6 max-w-5xl mx-auto pb-16 font-mono text-ink w-full min-w-0">
         {/* Sticky Sub-Header matching site standard */}
         <div className="sticky -top-4 z-30 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
-          <div className="h-10 flex items-end justify-between pb-2.5 w-full">
-            <Link
-              href="/"
-              className="font-mono text-xs text-ink-dim hover:text-ink transition-colors flex items-center gap-1.5 shrink-0"
-            >
-              <span>←</span>
-              <span>Back to Feed</span>
-            </Link>
-            <div className="flex items-center gap-2">
+          <div className="h-10 flex items-center justify-between pb-2.5 w-full gap-3">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim overflow-x-auto no-scrollbar py-0.5 min-w-0">
+              <Link
+                href="/"
+                className="hover:text-ink transition-colors flex items-center gap-1 shrink-0"
+              >
+                <span>Home</span>
+              </Link>
+              <span className="text-ink-faint shrink-0">/</span>
+              <span className="text-ink font-semibold shrink-0">Founders</span>
+            </nav>
+            <div className="flex items-center gap-2 shrink-0">
               <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 border border-signal/40 bg-signal/5 text-signal rounded-xs">
                 TOP 100 BUILDERS
               </span>

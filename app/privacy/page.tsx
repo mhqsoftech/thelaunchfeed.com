@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
+import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Privacy Policy - The Launch Feed",
@@ -30,29 +31,53 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   const lastUpdated = "August 16, 2026";
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      organizationNode(),
+      websiteNode(),
+      {
+        ...breadcrumb([
+          { name: "Home", url: siteUrl },
+          { name: "Privacy Policy", url: `${siteUrl}/privacy` },
+        ]),
+        "@id": `${siteUrl}/privacy#breadcrumb`,
+      },
+    ],
+  };
 
   return (
-    <div className="max-w-4xl mx-auto py-5 sm:py-10 px-3.5 sm:px-6 space-y-6 sm:space-y-8 font-mono text-ink">
-      <h1 className="sr-only">Privacy Policy</h1>
-      {/* Top Navigation */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs"
-        >
-          <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
-          <span>Back to Leaderboard</span>
-        </Link>
-        <div className="text-xs text-ink-dim flex items-center gap-2 flex-wrap">
-          <Link href="/about" className="hover:text-ink transition-colors">About</Link>
-          <span>&middot;</span>
-          <Link href="/terms" className="hover:text-ink transition-colors">Terms</Link>
-          <span>&middot;</span>
-          <Link href="/privacy" className="text-signal font-bold">Privacy</Link>
-          <span>&middot;</span>
-          <Link href="/contact" className="hover:text-ink transition-colors">Contact</Link>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <div className="max-w-4xl mx-auto py-5 sm:py-10 px-3.5 sm:px-6 space-y-6 sm:space-y-8 font-mono text-ink">
+        <h1 className="sr-only">Privacy Policy</h1>
+        {/* Top Navigation & Breadcrumbs */}
+        <div className="flex items-center justify-between gap-3 flex-wrap border-b border-hairline pb-3">
+          <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim">
+            <Link
+              href="/"
+              className="hover:text-ink transition-colors flex items-center gap-1"
+            >
+              <span>Home</span>
+            </Link>
+            <span className="text-ink-faint">/</span>
+            <span className="text-ink font-semibold">Privacy Policy</span>
+          </nav>
+
+          <div className="text-xs text-ink-dim flex items-center gap-2 flex-wrap">
+            <Link href="/about" className="hover:text-ink transition-colors">About</Link>
+            <span>&middot;</span>
+            <Link href="/terms" className="hover:text-ink transition-colors">Terms</Link>
+            <span>&middot;</span>
+            <Link href="/privacy" className="text-signal font-bold">Privacy</Link>
+            <span>&middot;</span>
+            <Link href="/contact" className="hover:text-ink transition-colors">Contact</Link>
+          </div>
         </div>
-      </div>
 
       {/* Header Banner */}
       <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 rounded-xs">
@@ -194,5 +219,6 @@ export default function PrivacyPolicyPage() {
         </div>
       </div>
     </div>
+    </>
   );
 }

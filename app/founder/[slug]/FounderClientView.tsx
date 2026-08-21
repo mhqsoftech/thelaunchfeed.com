@@ -170,13 +170,26 @@ export function FounderProfileContent({
       {/* Navigation Breadcrumb Bar — Sticky & Aligned with Sidebars */}
       {!onExitPreview && (
         <div className="sticky -top-4 z-20 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
-          <div className="h-10 flex items-end justify-between pb-2.5 gap-2">
-            <Link
-              href="/"
-              className="text-xs font-mono text-ink-dim hover:text-ink flex items-center gap-1.5 transition-colors shrink-0"
-            >
-              ← Back to Launch Feed
-            </Link>
+          <div className="h-10 flex items-center justify-between pb-2.5 gap-2">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim overflow-x-auto no-scrollbar py-0.5 min-w-0">
+              <Link
+                href="/"
+                className="hover:text-ink transition-colors flex items-center gap-1 shrink-0"
+              >
+                <span>Home</span>
+              </Link>
+              <span className="text-ink-faint shrink-0">/</span>
+              <Link
+                href="/founders"
+                className="hover:text-ink transition-colors shrink-0"
+              >
+                Founders
+              </Link>
+              <span className="text-ink-faint shrink-0">/</span>
+              <span className="text-ink font-semibold truncate max-w-[150px] sm:max-w-[260px] md:max-w-none">
+                {founder.name || founder.username}
+              </span>
+            </nav>
 
             {/* Verified-MRR badge or Founder Index indicator */}
             {founder.revenue && founder.revenue !== "$0" && founder.revenue !== "$0 / mo" ? (
@@ -689,7 +702,7 @@ export default function FounderClientView({
   suggestedFounders?: SuggestedFounder[];
 }) {
   useEffect(() => {
-    document.title = `${founder.name} (${founder.handle}) — Founder Profile | The Launch Feed`;
+    document.title = `${founder.name} (${founder.handle}) - Founder Profile | The Launch Feed`;
   }, [founder]);
 
   return (

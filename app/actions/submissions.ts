@@ -489,20 +489,27 @@ export async function publishSubmissionNow(id: string): Promise<void> {
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
     const urlsToIndex = [
       `${appUrl}/product/${encodeURIComponent(product.slug)}`,
+      `${appUrl}/badges/${encodeURIComponent(product.slug)}`,
       `${appUrl}/`,
     ];
     if (sub.category?.slug) {
       urlsToIndex.push(`${appUrl}/category/${encodeURIComponent(sub.category.slug)}`);
     }
-    await submitBatch(urlsToIndex);
+    if (sub.owner?.username && sub.owner.isProfilePublic) {
+      urlsToIndex.push(`${appUrl}/founder/${encodeURIComponent(sub.owner.username.replace(/^@/, "").trim())}`);
+    }
+    await submitBatch(urlsToIndex, { type: "URL_UPDATED" });
   } catch (e) {
     console.error("[web-indexing] inline publish failed:", e);
   }
 
   revalidatePath("/admin");
   revalidatePath("/");
+  revalidatePath("/founders");
+  revalidatePath("/category");
   revalidatePath("/profile");
   revalidatePath(`/product/${product.slug}`);
+  revalidatePath(`/badges/${product.slug}`);
 }
 
 export async function publishAllScheduledSubmissions(): Promise<{ count: number }> {

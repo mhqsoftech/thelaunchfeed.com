@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getProductBySlug } from "@/lib/queries/products";
 import { computeAwardsForProduct } from "@/lib/queries/awards";
 import BadgesClientView from "../BadgesClientView";
+import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
 
 export async function generateMetadata({
   params,
@@ -73,13 +74,40 @@ export default async function ProductBadgesPage({
       ? requestedAward
       : eligibleAwards.find((a) => a !== "launch" && a !== "pod") || eligibleAwards[0] || "launch";
 
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
+  const badgeUrl = `${siteUrl}/badges/${encodeURIComponent(cleanSlug)}`;
+  const productUrl = `${siteUrl}/product/${encodeURIComponent(cleanSlug)}`;
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      organizationNode(),
+      websiteNode(),
+      {
+        ...breadcrumb([
+          { name: "Home", url: siteUrl },
+          { name: "Badges", url: `${siteUrl}/badges` },
+          { name: product.name, url: productUrl },
+          { name: "Official Embed Badges", url: badgeUrl },
+        ]),
+        "@id": `${badgeUrl}#breadcrumb`,
+      },
+    ],
+  };
+
   return (
-    <BadgesClientView
-      initialProduct={product.slug}
-      productName={product.name}
-      initialAward={initialAward}
-      eligibleAwardIds={eligibleAwards}
-      isProductSpecific={true}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <BadgesClientView
+        initialProduct={product.slug}
+        productName={product.name}
+        initialAward={initialAward}
+        eligibleAwardIds={eligibleAwards}
+        isProductSpecific={true}
+      />
+    </>
   );
 }

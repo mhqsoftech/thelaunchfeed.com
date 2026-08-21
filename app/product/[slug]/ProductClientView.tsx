@@ -344,7 +344,7 @@ export default function ProductClientView({
   const topAccolade = wonAccolades[0] || null;
 
   useEffect(() => {
-    document.title = `${baseProduct.name} - The Launch Feed`;
+    document.title = `${baseProduct.name} - Product | The Launch Feed`;
     const s = getStoredSession();
     if (s) {
       setUserSession(s);
@@ -477,11 +477,31 @@ export default function ProductClientView({
         {/* Navigation Breadcrumb Bar — Sticky & Pinned */}
         <div className="sticky -top-4 z-30 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
           <div className="h-10 flex items-center justify-between pb-2.5 gap-3">
+            <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim overflow-x-auto no-scrollbar py-0.5 min-w-0">
+              <Link
+                href="/"
+                className="hover:text-ink transition-colors flex items-center gap-1 shrink-0"
+              >
+                <span>Home</span>
+              </Link>
+              <span className="text-ink-faint shrink-0">/</span>
+              <Link
+                href={product.category ? `/category/${slugify(product.category)}` : "/"}
+                className="hover:text-ink transition-colors shrink-0 uppercase text-[11px] font-bold"
+              >
+                {product.category || "Products"}
+              </Link>
+              <span className="text-ink-faint shrink-0">/</span>
+              <span className="text-ink font-semibold truncate max-w-[160px] sm:max-w-[280px] md:max-w-none">
+                {product.name}
+              </span>
+            </nav>
+
             <Link
               href="/"
-              className="text-xs font-mono text-ink-dim hover:text-ink transition-colors flex items-center gap-1.5 shrink-0"
+              className="text-xs font-mono text-ink-dim hover:text-ink transition-colors hidden sm:flex items-center gap-1 shrink-0 text-[11px]"
             >
-              ← Back to Launch Feed
+              ← Leaderboard
             </Link>
           </div>
         </div>

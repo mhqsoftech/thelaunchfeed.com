@@ -66,8 +66,9 @@ export async function generateMetadata({
   const absoluteShareImage = shareImage.startsWith("http")
     ? shareImage
     : `${siteUrl}${shareImage.startsWith("/") ? "" : "/"}${shareImage}`;
+  const pageTitle = `${name} (${handle}) - Founder Profile | The Launch Feed`;
   return {
-    title: `${name} - The Launch Feed`,
+    title: pageTitle,
     description,
     keywords: [
       name,
@@ -90,7 +91,7 @@ export async function generateMetadata({
     openGraph: {
       type: "profile",
       url: canonicalUrl,
-      title: `${name} - The Launch Feed`,
+      title: pageTitle,
       description,
       siteName: "The Launch Feed",
       images: [
@@ -103,7 +104,7 @@ export async function generateMetadata({
     twitter: {
       // Founder cards read best as a square avatar next to text.
       card: founder.image ? "summary" : "summary_large_image",
-      title: `${name} - The Launch Feed`,
+      title: pageTitle,
       description,
       creator: founder.twitterHandle ? `@${founder.twitterHandle.replace(/^@/, "")}` : undefined,
       images: [absoluteShareImage],
@@ -165,7 +166,7 @@ export default async function FounderPage({
       {
         "@type": "ProfilePage",
         "@id": `${canonicalUrl}#profile`,
-        name: `${f.name || f.username} — Founder Profile`,
+        name: `${f.name || f.username} (@${f.username}) - Founder Profile | The Launch Feed`,
         url: canonicalUrl,
         isPartOf: { "@id": WEBSITE_ID },
         about: { "@id": personId },

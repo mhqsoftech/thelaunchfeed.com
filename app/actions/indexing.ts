@@ -197,11 +197,23 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
   await requireAdmin();
 
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com")
-    .replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com")
-    .replace(/\/+$/, "");
+  const normUrl = (raw: string) =>
+    raw
+      .trim()
+      .replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com")
+      .replace(/\/+$/, "")
+      .toLowerCase();
 
   // 1. Fetch all submission logs to map submission status by normalized URL
-  let logMap = new Map<string, { count: number; lastStatus: "SUCCESS" | "FAILED" | "SKIPPED_QUOTA" | "NEVER"; lastSubmittedAt: string; lastEngine: string }>();
+  let logMap = new Map<
+    string,
+    {
+      count: number;
+      lastStatus: "SUCCESS" | "FAILED" | "SKIPPED_QUOTA" | "NEVER";
+      lastSubmittedAt: string;
+      lastEngine: string;
+    }
+  >();
 
   try {
     if (prisma?.webIndexingLog) {
@@ -216,7 +228,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
       });
 
       for (const log of logs) {
-        const norm = log.url.trim().replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com").replace(/\/+$/, "");
+        const norm = normUrl(log.url);
         if (!logMap.has(norm)) {
           logMap.set(norm, {
             count: 1,
@@ -248,12 +260,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
 
   for (const p of staticPages) {
     const fullUrl = `${appUrl}${p.path}`;
-    // Match the trailing-slash normaliser applied to log rows above,
-    // otherwise the homepage "/" builds "https://…/" while logs are stored
-    // as "https://…" and the lookup misses — homepage stays stuck on
-    // "Not Submitted" regardless of how many times admin resubmits.
-    const logKey = fullUrl.replace(/\/+$/, "") || appUrl;
-    const logInfo = logMap.get(logKey);
+    const logInfo = logMap.get(normUrl(fullUrl));
     allEntries.push({
       id: `static-${p.path}`,
       url: fullUrl,
@@ -280,7 +287,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
     for (const c of categories) {
       const path = `/category/${encodeURIComponent(c.slug)}`;
       const fullUrl = `${appUrl}${path}`;
-      const logInfo = logMap.get(fullUrl);
+      const logInfo = logMap.get(normUrl(fullUrl));
       allEntries.push({
         id: `category-${c.id}`,
         url: fullUrl,
@@ -304,20 +311,28 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
   try {
     const products = await prisma.product.findMany({
       where: { status: "LIVE" },
-      select: { id: true, name: true, slug: true, tagline: true, updatedAt: true, launchedAt: true },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        tagline: true,
+        updatedAt: true,
+        launchedAt: true,
+        category: { select: { name: true } },
+      },
       orderBy: [{ updatedAt: "desc" }, { launchedAt: "desc" }],
     });
 
     for (const p of products) {
       const path = `/product/${encodeURIComponent(p.slug)}`;
       const fullUrl = `${appUrl}${path}`;
-      const logInfo = logMap.get(fullUrl);
+      const logInfo = logMap.get(normUrl(fullUrl));
       allEntries.push({
         id: `product-${p.id}`,
         url: fullUrl,
         path,
         title: p.name,
-        subtitle: p.tagline || `Product launch page (/product/${p.slug})`,
+        subtitle: p.tagline || (p.category?.name ? `${p.category.name} · /product/${p.slug}` : `Product launch page (/product/${p.slug})`),
         type: "PRODUCT",
         updatedAt: (p.updatedAt || p.launchedAt || new Date()).toISOString(),
         isSubmitted: Boolean(logInfo),
@@ -343,7 +358,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
       const cleanUsername = u.username.replace(/^@/, "").trim();
       const path = `/founder/${encodeURIComponent(cleanUsername)}`;
       const fullUrl = `${appUrl}${path}`;
-      const logInfo = logMap.get(fullUrl);
+      const logInfo = logMap.get(normUrl(fullUrl));
       allEntries.push({
         id: `founder-${u.id}`,
         url: fullUrl,
@@ -424,4 +439,93 @@ export async function submitAllUnsubmittedUrlsAction(engineChoice: "ALL" | "GOOG
   }
 
   return await submitSelectedUrlsAction(unsubmittedUrls, engineChoice);
+}
+
+/**
+ * Instantly auto-discovers all LIVE products across the database and submits
+ * their public product, category, badges, and founder pages for indexing.
+ */
+export async function autoDiscoverAndIndexLiveProductsAction(
+  engineChoice: "ALL" | "GOOGLE" | "INDEXNOW" = "ALL",
+  forceAll: boolean = false
+) {
+  await requireAdmin();
+
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com")
+    .replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com")
+    .replace(/\/+$/, "");
+
+  const normUrl = (raw: string) =>
+    raw
+      .trim()
+      .replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com")
+      .replace(/\/+$/, "")
+      .toLowerCase();
+
+  // 1. Query all LIVE products directly from DB
+  const products = await prisma.product.findMany({
+    where: { status: "LIVE" },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      category: { select: { slug: true } },
+      owner: { select: { username: true, isProfilePublic: true } },
+    },
+    orderBy: [{ updatedAt: "desc" }, { launchedAt: "desc" }],
+  });
+
+  if (products.length === 0) {
+    return {
+      totalDiscovered: 0,
+      submittedCount: 0,
+      message: "No live products found in database.",
+    };
+  }
+
+  // 2. Fetch logged URLs
+  const existingLogs = await prisma.webIndexingLog
+    .findMany({
+      select: { url: true },
+    })
+    .catch(() => []);
+
+  const loggedUrls = new Set(existingLogs.map((l) => normUrl(l.url)));
+
+  const urlsToSubmit: string[] = [];
+
+  for (const p of products) {
+    const pUrl = `${appUrl}/product/${encodeURIComponent(p.slug)}`;
+    if (forceAll || !loggedUrls.has(normUrl(pUrl))) {
+      urlsToSubmit.push(pUrl);
+      urlsToSubmit.push(`${appUrl}/badges/${encodeURIComponent(p.slug)}`);
+      if (p.category?.slug) {
+        urlsToSubmit.push(`${appUrl}/category/${encodeURIComponent(p.category.slug)}`);
+      }
+      if (p.owner?.username && p.owner.isProfilePublic) {
+        urlsToSubmit.push(`${appUrl}/founder/${encodeURIComponent(p.owner.username.replace(/^@/, "").trim())}`);
+      }
+    }
+  }
+
+  // Always include homepage
+  urlsToSubmit.push(`${appUrl}/`);
+
+  const uniqueUrls = Array.from(new Set(urlsToSubmit));
+
+  const engines: ("GOOGLE" | "INDEXNOW")[] =
+    engineChoice === "GOOGLE"
+      ? ["GOOGLE"]
+      : engineChoice === "INDEXNOW"
+        ? ["INDEXNOW"]
+        : ["GOOGLE", "INDEXNOW"];
+
+  const batchRes = await submitBatch(uniqueUrls, { type: "URL_UPDATED", engines });
+
+  revalidatePath("/admin");
+  return {
+    totalDiscovered: products.length,
+    submittedCount: uniqueUrls.length,
+    batchRes,
+  };
 }

@@ -34,8 +34,9 @@ export async function generateMetadata({
     product.logoUrl ||
     `${siteUrl}/og-default.png`;
   const absoluteShareImage = shareImage.startsWith("http") ? shareImage : `${siteUrl}${shareImage.startsWith("/") ? "" : "/"}${shareImage}`;
+  const pageTitle = `${product.name} - Product | The Launch Feed`;
   return {
-    title: `${product.name} - The Launch Feed`,
+    title: pageTitle,
     description,
     keywords: [
       product.name,
@@ -54,7 +55,7 @@ export async function generateMetadata({
     openGraph: {
       type: "website",
       url: canonicalUrl,
-      title: `${product.name} - The Launch Feed`,
+      title: pageTitle,
       description,
       siteName: "The Launch Feed",
       images: [
@@ -66,7 +67,7 @@ export async function generateMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${product.name} - The Launch Feed`,
+      title: pageTitle,
       description,
       creator: product.owner.twitterHandle ? `@${product.owner.twitterHandle.replace(/^@/, "")}` : "@thelaunchfeed",
       images: [absoluteShareImage],
@@ -196,7 +197,7 @@ export default async function ProductPage({
         "@type": "WebPage",
         "@id": `${productUrl}#webpage`,
         url: productUrl,
-        name: `${p.name} — ${SITE_NAME}`,
+        name: `${p.name} - Product | ${SITE_NAME}`,
         isPartOf: { "@id": WEBSITE_ID },
         primaryImageOfPage: {
           "@type": "ImageObject",

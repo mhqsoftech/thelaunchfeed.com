@@ -199,15 +199,19 @@ export default function ContactClientView() {
   return (
     <div className="max-w-4xl mx-auto py-5 sm:py-10 px-3.5 sm:px-6 space-y-6 sm:space-y-8 font-mono text-ink">
       <h1 className="sr-only">Contact The Launch Feed</h1>
-      {/* Top Navigation */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs"
-        >
-          <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
-          <span>Back to Leaderboard</span>
-        </Link>
+      {/* Top Navigation & Breadcrumbs */}
+      <div className="flex items-center justify-between gap-3 flex-wrap border-b border-hairline pb-3">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim">
+          <Link
+            href="/"
+            className="hover:text-ink transition-colors flex items-center gap-1"
+          >
+            <span>Home</span>
+          </Link>
+          <span className="text-ink-faint">/</span>
+          <span className="text-ink font-semibold">Contact</span>
+        </nav>
+
         <div className="text-xs text-ink-dim flex items-center gap-2 flex-wrap">
           <Link href="/about" className="hover:text-ink transition-colors">About</Link>
           <span>&middot;</span>

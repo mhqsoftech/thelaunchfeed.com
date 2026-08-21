@@ -1004,6 +1004,114 @@ function ProductsTab({ query, setQuery }: { query: string; setQuery: (q: string)
   );
 }
 
+/**
+ * Parallelogram-styled Role Selector Dropdown matching the platform's brutalist geometry.
+ * Only allows selecting MAKER or MODERATOR.
+ */
+function ParallelogramRoleDropdown({
+  role,
+  onChange,
+  disabled,
+  size = "sm",
+}: {
+  role: string;
+  onChange: (newRole: "MAKER" | "MODERATOR") => void;
+  disabled?: boolean;
+  size?: "sm" | "md";
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMousedown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) {
+      document.addEventListener("mousedown", handleMousedown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleMousedown);
+    };
+  }, [open]);
+
+  const isMod = role === "MODERATOR";
+  const isAdmin = role === "ADMIN";
+  const isMaker = !isMod && !isAdmin;
+
+  return (
+    <div ref={ref} className="relative inline-block text-left font-mono">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        className={`group inline-flex items-center gap-1.5 ${
+          size === "md" ? "pl-3.5 pr-2.5 py-1.5 text-xs" : "pl-2.5 pr-2 py-1 text-[10px]"
+        } font-bold uppercase transition-all cursor-pointer border ${
+          isAdmin
+            ? "bg-signal/15 border-signal text-signal font-black"
+            : isMod
+            ? "bg-sky-500/10 border-sky-400 text-sky-400 hover:border-sky-300 font-bold"
+            : "bg-surface border-hairline text-ink-dim hover:text-ink hover:border-ink font-bold"
+        } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+        style={{ clipPath: "polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%)" }}
+      >
+        <span className="truncate">
+          {isAdmin ? "ADMIN" : isMod ? "MODERATOR" : "MAKER"}
+        </span>
+        <svg
+          className={`w-2.5 h-2.5 transition-transform ${open ? "rotate-180" : ""}`}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={3}
+        >
+          <path strokeLinecap="square" d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 mt-1 z-50 min-w-[120px] bg-void border border-hairline shadow-2xl font-mono divide-y divide-hairline/40 overflow-hidden"
+          style={{ clipPath: "polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%)" }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              onChange("MAKER");
+              setOpen(false);
+            }}
+            className={`w-full text-left pl-3.5 pr-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors cursor-pointer flex items-center justify-between ${
+              isMaker
+                ? "bg-signal/20 text-signal font-black"
+                : "text-ink hover:bg-surface hover:text-signal"
+            }`}
+          >
+            <span>MAKER</span>
+            {isMaker && <span className="text-signal text-[9px]">✓</span>}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onChange("MODERATOR");
+              setOpen(false);
+            }}
+            className={`w-full text-left pl-3.5 pr-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors cursor-pointer flex items-center justify-between ${
+              isMod
+                ? "bg-sky-500/20 text-sky-400 font-black"
+                : "text-ink hover:bg-surface hover:text-sky-400"
+            }`}
+          >
+            <span>MODERATOR</span>
+            {isMod && <span className="text-sky-400 text-[9px]">✓</span>}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─────────────────────────── UsersTab (Full Admin Capabilities) ─────────────────────────── */
 
 function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) => void }) {
@@ -1432,24 +1540,13 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                   </div>
                 </td>
 
-                {/* Role Switcher */}
+                {/* Role Switcher — Parallelogram styled, allows only MAKER / MODERATOR */}
                 <td className="px-3 py-2.5">
-                  <select
-                    value={u.role}
-                    onChange={(e) => handleRoleChange(u, e.target.value as any)}
+                  <ParallelogramRoleDropdown
+                    role={u.role}
+                    onChange={(r) => handleRoleChange(u, r)}
                     disabled={pending}
-                    className={`px-2 py-1 text-[10px] font-bold uppercase border bg-surface outline-none cursor-pointer ${
-                      u.role === "ADMIN"
-                        ? "border-signal text-signal font-black"
-                        : u.role === "MODERATOR"
-                        ? "border-sky-400 text-sky-400"
-                        : "border-hairline text-ink-dim"
-                    }`}
-                  >
-                    <option value="MAKER">MAKER</option>
-                    <option value="MODERATOR">MODERATOR</option>
-                    <option value="ADMIN">ADMIN</option>
-                  </select>
+                  />
                 </td>
 
                 {/* Visibility Toggle */}
@@ -1625,15 +1722,11 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-hairline">
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Role Assignment</label>
-                  <select
-                    value={editForm.role}
-                    onChange={(e) => setEditForm({ ...editForm, role: e.target.value as any })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono text-ink font-bold"
-                  >
-                    <option value="MAKER">MAKER</option>
-                    <option value="MODERATOR">MODERATOR</option>
-                    <option value="ADMIN">ADMIN</option>
-                  </select>
+                  <ParallelogramRoleDropdown
+                    role={editForm.role}
+                    onChange={(r) => setEditForm({ ...editForm, role: r })}
+                    size="md"
+                  />
                 </div>
                 <div className="space-y-1.5 pt-4">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1802,15 +1895,11 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-hairline">
                 <div>
                   <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Initial Role</label>
-                  <select
-                    value={createForm.role}
-                    onChange={(e) => setCreateForm({ ...createForm, role: e.target.value as any })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono text-ink font-bold"
-                  >
-                    <option value="MAKER">MAKER</option>
-                    <option value="MODERATOR">MODERATOR</option>
-                    <option value="ADMIN">ADMIN</option>
-                  </select>
+                  <ParallelogramRoleDropdown
+                    role={createForm.role}
+                    onChange={(r) => setCreateForm({ ...createForm, role: r })}
+                    size="md"
+                  />
                 </div>
                 <div className="space-y-1.5 pt-4">
                   <label className="flex items-center gap-2 cursor-pointer">
