@@ -478,6 +478,11 @@ export default function SubmitClientView({
         };
         localStorage.setItem("tlf_submit_draft", JSON.stringify(draft));
       } catch {}
+    } else {
+      try {
+        localStorage.removeItem("tlf_submit_draft");
+        localStorage.removeItem("tlf_pending_submission");
+      } catch {}
     }
   }, [formData, thumbnailAvif, galleryAvif, faqs, pricingTiers, features, autofillUrl, launchTier, isAuthorizedConfirmed, isEmbeddedMode, editParam, submitted]);
 
@@ -1076,6 +1081,37 @@ export default function SubmitClientView({
   const [clearArmed, setClearArmed] = useState(false);
   const clearArmTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Wipe all in-memory + persisted submit state. Called when clicking "Clear Form",
+  // after a successful submission, and by the "Submit Another Product" button.
+  const resetSubmitFormState = React.useCallback(() => {
+    setFormData(EMPTY_PROFILE);
+    setThumbnailAvif("");
+    setAvifMeta(null);
+    setGalleryAvif([]);
+    setFeatures(["", "", ""]);
+    setPricingTiers([
+      { name: "Free", price: "", specs: "" },
+      { name: "Pro", price: "", specs: "" },
+      { name: "Enterprise", price: "", specs: "" },
+    ]);
+    setFaqs([{ q: "", a: "" }]);
+    setAutofillUrl("");
+    setAutofillError("");
+    setAutofillMeta(null);
+    setEnableRevenueSdk(false);
+    setSdkLog("");
+    setLaunchTier(0);
+    setIsAuthorizedConfirmed(false);
+    setSkippedSteps(new Set());
+    try {
+      localStorage.removeItem("tlf_pending_submission");
+      localStorage.removeItem("tlf_submit_draft");
+    } catch {}
+    try {
+      window.history.replaceState({}, "", "/submit");
+    } catch {}
+  }, []);
+
   const handleClearForm = () => {
     if (!clearArmed) {
       setClearArmed(true);
@@ -1085,24 +1121,7 @@ export default function SubmitClientView({
     }
     if (clearArmTimer.current) clearTimeout(clearArmTimer.current);
     setClearArmed(false);
-    setFormData(EMPTY_PROFILE);
-    setFeatures(["", "", ""]);
-    setPricingTiers([
-      { name: "Free", price: "", specs: "" },
-      { name: "Pro", price: "", specs: "" },
-      { name: "Enterprise", price: "", specs: "" },
-    ]);
-    setFaqs([{ q: "", a: "" }]);
-    setSkippedSteps(new Set());
-    setAutofillUrl("");
-    setAutofillError("");
-    setAutofillMeta(null);
-    setThumbnailAvif("");
-    setAvifMeta(null);
-    setGalleryAvif([]);
-    setEnableRevenueSdk(false);
-    setSdkLog("");
-    setLaunchTier(5);
+    resetSubmitFormState();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1231,35 +1250,6 @@ export default function SubmitClientView({
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
-
-  // Wipe all in-memory + persisted submit state. Called after a successful
-  // submission so the same product never resurrects on the next /submit visit,
-  // and by the "Submit Another Product" button on the success screen.
-  const resetSubmitFormState = React.useCallback(() => {
-    setFormData(EMPTY_PROFILE);
-    setThumbnailAvif("");
-    setGalleryAvif([]);
-    setFeatures(["", "", ""]);
-    setPricingTiers([
-      { name: "Free", price: "", specs: "" },
-      { name: "Pro", price: "", specs: "" },
-      { name: "Enterprise", price: "", specs: "" },
-    ]);
-    setFaqs([{ q: "", a: "" }]);
-    setAutofillUrl("");
-    setAutofillError("");
-    setAutofillMeta(null);
-    setLaunchTier(0);
-    setIsAuthorizedConfirmed(false);
-    setSkippedSteps(new Set());
-    try {
-      localStorage.removeItem("tlf_pending_submission");
-      localStorage.removeItem("tlf_submit_draft");
-    } catch {}
-    try {
-      window.history.replaceState({}, "", "/submit");
-    } catch {}
-  }, []);
 
   const handleSaveDraft = async () => {
     if (isSavingDraft || isSubmitting) return;
