@@ -979,8 +979,16 @@ export default function SubmitClientView({
       const hasTier = pricingTiers.some((t) => !!(t.price?.trim()) || !!(t.specs?.trim()));
       return !!formData.overviewPitch && hasFeature && !!formData.targetAudience && hasTier;
     }
-    if (step === 3) return !!(formData.techStack && formData.infraHosting);
-    if (step === 4) return !!(formData.originStory && formData.makerThesis);
+    if (step === 3) {
+      return !!(
+        formData.techStack ||
+        formData.infraHosting ||
+        formData.githubUrl ||
+        formData.apiUrl ||
+        formData.securityStandards
+      );
+    }
+    if (step === 4) return !!(formData.originStory || formData.makerThesis);
     if (step === 5) return !!(formData.latestVersion || formData.latestChangelog);
     if (step === 6) {
       return (
@@ -1029,11 +1037,16 @@ export default function SubmitClientView({
         return { filled: fields.filter(Boolean).length, total: fields.length };
       }
       case 3: {
-        const fields = [s(formData.techStack), s(formData.infraHosting), s(formData.apiUrl), s(formData.securityStandards)];
-        return { filled: fields.filter(Boolean).length, total: fields.length };
+        const hasAny =
+          s(formData.techStack) ||
+          s(formData.infraHosting) ||
+          s(formData.githubUrl) ||
+          s(formData.apiUrl) ||
+          s(formData.securityStandards);
+        return { filled: hasAny ? 1 : 0, total: 1 };
       }
       case 4: {
-        const fields = [s(formData.originStory), s(formData.makerThesis), s(formData.makerHandle), s(formData.websiteUrl)];
+        const fields = [s(formData.originStory), s(formData.makerThesis)];
         return { filled: fields.filter(Boolean).length, total: fields.length };
       }
       case 5: {
@@ -1577,7 +1590,7 @@ export default function SubmitClientView({
     { id: "section-01", step: 1, title: "01. Core Identity", sub: "Name, category, logo", optional: false },
     { id: "section-02", step: 2, title: "02. Pitch & Tiers", sub: "Summary, features, pricing", optional: false },
     { id: "section-03", step: 3, title: "03. Architecture", sub: "Tech stack, infra, API", optional: true, next: "section-04" },
-    { id: "section-04", step: 4, title: "04. Founder Story", sub: "Origin, thesis, handles", optional: true, next: "section-05" },
+    { id: "section-04", step: 4, title: "04. Founder Story", sub: "Origin, thesis", optional: true, next: "section-05" },
     { id: "section-05", step: 5, title: "05. Changelog", sub: "Release notes, milestones", optional: true, next: "section-06" },
     { id: "section-06", step: 6, title: "06. Revenue SDK", sub: "Automated SDK integration", optional: true, next: "section-07" },
     { id: "section-07", step: 7, title: "07. FAQ & Support", sub: "FAQ pairs, support info", optional: false },
@@ -2705,8 +2718,11 @@ export default function SubmitClientView({
             {/* Section 03: 360° Architecture & Technical Specs */}
             <div id="section-03" className="border border-hairline bg-surface/30 p-4 sm:p-8 space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3">
-                <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider">
-                  03. 360° Architecture & Technical Specs
+                <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                  <span>03. 360° Architecture & Technical Specs</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-faint uppercase font-bold bg-void">
+                    OPTIONAL SECTION
+                  </span>
                 </h2>
                 <span className="text-xs text-ink-faint">TAB 2 SPECS</span>
               </div>
@@ -2714,11 +2730,10 @@ export default function SubmitClientView({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-ink-dim uppercase">
-                    Primary Tech Stack Tags (Comma separated) *
+                    Primary Tech Stack Tags (Comma separated)
                   </label>
                   <input
                     type="text"
-                    required
                     value={formData.techStack}
                     onChange={(e) => handleInputChange("techStack", e.target.value)}
                     placeholder="Next.js 16, React 19, TypeScript, Rust Engine, Neon Postgres, Tailwind CSS v4"
@@ -2783,8 +2798,11 @@ export default function SubmitClientView({
             {/* Section 04: 360° Founder Story & Manifesto */}
             <div id="section-04" className="border border-hairline bg-surface/30 p-4 sm:p-8 space-y-6">
               <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3">
-                <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider">
-                  04. 360° Founder Story & Manifesto
+                <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                  <span>04. 360° Founder Story & Manifesto</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-faint uppercase font-bold bg-void">
+                    OPTIONAL SECTION
+                  </span>
                 </h2>
                 <span className="text-xs text-ink-faint">TAB 3 SPECS</span>
               </div>
@@ -2792,11 +2810,10 @@ export default function SubmitClientView({
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-ink-dim uppercase">
-                    Origin Story (Why did you build this?) *
+                    Origin Story (Why did you build this?)
                   </label>
                   <textarea
                     rows={3}
-                    required
                     value={formData.originStory}
                     onChange={(e) => handleInputChange("originStory", e.target.value)}
                     placeholder="Explain the background problem and what motivated you to launch this product."
@@ -2806,11 +2823,10 @@ export default function SubmitClientView({
 
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-ink-dim uppercase">
-                    Maker Thesis & Product Philosophy *
+                    Maker Thesis & Product Philosophy
                   </label>
                   <textarea
                     rows={2}
-                    required
                     value={formData.makerThesis}
                     onChange={(e) => handleInputChange("makerThesis", e.target.value)}
                     placeholder="Your core engineering or design conviction."
@@ -3648,16 +3664,22 @@ export default function SubmitClientView({
                 </div>
 
                 <div className="space-y-4 leading-relaxed">
-                  <div className="space-y-2">
-                    <h3 className="font-bold text-ink uppercase">Primary Tech Stack</h3>
-                    <div className="flex gap-2 flex-wrap">
-                      {formData.techStack.split(",").map((tech, i) => (
-                        <span key={i} className="px-2 py-0.5 border border-hairline bg-surface text-ink font-bold">
-                          {tech.trim()}
-                        </span>
-                      ))}
+                  {formData.techStack ? (
+                    <div className="space-y-2">
+                      <h3 className="font-bold text-ink uppercase">Primary Tech Stack</h3>
+                      <div className="flex gap-2 flex-wrap">
+                        {formData.techStack
+                          .split(",")
+                          .map((t) => t.trim())
+                          .filter(Boolean)
+                          .map((tech, i) => (
+                            <span key={i} className="px-2 py-0.5 border border-hairline bg-surface text-ink font-bold">
+                              {tech}
+                            </span>
+                          ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : null}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-hairline">
                     <div>
