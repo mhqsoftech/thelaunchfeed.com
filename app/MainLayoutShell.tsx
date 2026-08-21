@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { format, getWeek } from "date-fns";
 import { LaunchFeedLogo, LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
 import FeaturedOnFooterBar from "./components/FeaturedOnFooterBar";
+import { openCookieSettings } from "./lib/cookieConsent";
 import {
   slugify,
   getProductGradientClass,
@@ -1012,6 +1013,15 @@ export default function MainLayoutShell({
                       <Link href="/terms" className="hover:text-ink transition-colors block truncate">
                         Terms of Service
                       </Link>
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        onClick={openCookieSettings}
+                        className="hover:text-signal transition-colors block truncate text-left cursor-pointer w-full text-ink-dim"
+                      >
+                        Cookie Preferences
+                      </button>
                     </li>
                     <li>
                       <a

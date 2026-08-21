@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
 import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
+import ManageCookieButton from "@/app/components/ManageCookieButton";
 
 export const metadata: Metadata = {
   title: "Privacy Policy - The Launch Feed",
@@ -181,7 +182,67 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3 border-t border-hairline pt-6">
           <h2 className="font-mono font-bold text-sm sm:text-base text-ink uppercase tracking-wider flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-signal rounded-full shrink-0" />
-            <span>05. Data Retention &amp; User Rights</span>
+            <span>05. Cookies &amp; Telemetry Policy</span>
+          </h2>
+          <p>
+            We use strictly necessary cookies and local storage tokens to secure user sessions and remember your interface preferences. Optional telemetry cookies help us analyze traffic patterns and optimize platform performance.
+          </p>
+          <div className="overflow-x-auto border border-hairline rounded-xs">
+            <table className="w-full text-left font-mono text-[11px] sm:text-xs">
+              <thead className="bg-surface/60 text-ink border-b border-hairline">
+                <tr>
+                  <th className="p-2 sm:p-2.5">Category</th>
+                  <th className="p-2 sm:p-2.5">Provider / Key</th>
+                  <th className="p-2 sm:p-2.5">Purpose</th>
+                  <th className="p-2 sm:p-2.5">Type</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-hairline">
+                <tr className="bg-void">
+                  <td className="p-2 sm:p-2.5 font-bold text-ink">Essential</td>
+                  <td className="p-2 sm:p-2.5 text-signal">better-auth.session_token</td>
+                  <td className="p-2 sm:p-2.5 font-sans text-ink-dim">User login authentication &amp; secure session validation</td>
+                  <td className="p-2 sm:p-2.5 text-verified font-bold">Strictly Necessary</td>
+                </tr>
+                <tr className="bg-surface/20">
+                  <td className="p-2 sm:p-2.5 font-bold text-ink">Preference</td>
+                  <td className="p-2 sm:p-2.5 text-signal">tlf-theme (localStorage)</td>
+                  <td className="p-2 sm:p-2.5 font-sans text-ink-dim">Remembers chosen UI theme (Void, Thermal, Light)</td>
+                  <td className="p-2 sm:p-2.5 text-verified font-bold">Functional</td>
+                </tr>
+                <tr className="bg-void">
+                  <td className="p-2 sm:p-2.5 font-bold text-ink">Consent</td>
+                  <td className="p-2 sm:p-2.5 text-signal">tlf_cookie_consent</td>
+                  <td className="p-2 sm:p-2.5 font-sans text-ink-dim">Saves your cookie consent choices to avoid repeated prompts</td>
+                  <td className="p-2 sm:p-2.5 text-verified font-bold">Functional</td>
+                </tr>
+                <tr className="bg-surface/20">
+                  <td className="p-2 sm:p-2.5 font-bold text-ink">Analytics</td>
+                  <td className="p-2 sm:p-2.5 text-signal">_ga, _ga_* (Google)</td>
+                  <td className="p-2 sm:p-2.5 font-sans text-ink-dim">Measures pageviews, bounce rates, and traffic referrals</td>
+                  <td className="p-2 sm:p-2.5 text-signal font-bold">Optional (Consent)</td>
+                </tr>
+                <tr className="bg-void">
+                  <td className="p-2 sm:p-2.5 font-bold text-ink">Heatmaps</td>
+                  <td className="p-2 sm:p-2.5 text-signal">_clck, _clsk (Clarity)</td>
+                  <td className="p-2 sm:p-2.5 font-sans text-ink-dim">Anonymous scroll and click telemetry to optimize UX</td>
+                  <td className="p-2 sm:p-2.5 text-signal font-bold">Optional (Consent)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="pt-2 flex items-center justify-between flex-wrap gap-3">
+            <p className="text-xs text-ink-dim font-sans">
+              You can adjust or revoke your cookie choices at any time.
+            </p>
+            <ManageCookieButton />
+          </div>
+        </section>
+
+        <section className="space-y-3 border-t border-hairline pt-6">
+          <h2 className="font-mono font-bold text-sm sm:text-base text-ink uppercase tracking-wider flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-signal rounded-full shrink-0" />
+            <span>06. Data Retention &amp; User Rights</span>
           </h2>
           <p>
             You have full control over your data. You may request the export or complete deletion of your account, votes, and submitted products at any time. To exercise your rights under GDPR, CCPA, or applicable international privacy regulations, contact our privacy desk at <a href="mailto:hi@thelaunchfeed.com" className="text-signal font-mono font-bold hover:underline">hi@thelaunchfeed.com</a>.
@@ -191,7 +252,7 @@ export default function PrivacyPolicyPage() {
         <section className="space-y-3 border-t border-hairline pt-6">
           <h2 className="font-mono font-bold text-sm sm:text-base text-ink uppercase tracking-wider flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-signal rounded-full shrink-0" />
-            <span>06. Contact Us</span>
+            <span>07. Contact Us</span>
           </h2>
           <p>
             If you have questions or concerns regarding this Privacy Policy, please contact our team via <Link href="/contact" className="text-signal font-mono font-bold hover:underline">our contact form</Link> or email us directly at <a href="mailto:hi@thelaunchfeed.com" className="text-signal font-mono font-bold hover:underline">hi@thelaunchfeed.com</a>.

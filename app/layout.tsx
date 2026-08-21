@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { doto, geistSans, geistMono } from "./fonts";
 import SessionBridge from "./components/SessionBridge";
+import CookieConsentBanner from "./components/CookieConsentBanner";
 import { organizationNode, websiteNode } from "@/lib/seo/schema";
 import "./globals.css";
 
@@ -95,6 +96,31 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
+        {/* Google Consent Mode v2 Default Init */}
+        <Script
+          id="google-consent-mode-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              var consentGranted = 'denied';
+              try {
+                var stored = JSON.parse(localStorage.getItem('tlf_cookie_consent'));
+                if (stored && stored.analytics === true) {
+                  consentGranted = 'granted';
+                }
+              } catch(e) {}
+              gtag('consent', 'default', {
+                'analytics_storage': consentGranted,
+                'ad_storage': 'denied',
+                'ad_user_data': 'denied',
+                'ad_personalization': 'denied',
+                'wait_for_update': 500
+              });
+            `,
+          }}
+        />
         {/* Google tag (gtag.js) */}
         <Script
           strategy="afterInteractive"
@@ -144,6 +170,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
         <SessionBridge />
+        <CookieConsentBanner />
         <main id="main" className="flex-1 flex flex-col">
           {children}
         </main>
