@@ -93,7 +93,7 @@ export async function triggerManualBroadcastAction(
     slug: prod.slug,
     tagline: prod.tagline,
     makerName: prod.owner?.name || prod.owner?.username || "Founder",
-    makerHandle: prod.owner?.username ? `@${prod.owner.username}` : undefined,
+    makerUsername: prod.owner?.username || undefined,
     category: prod.category?.name || undefined,
     tags: prod.tags || [],
     websiteUrl: prod.websiteUrl,

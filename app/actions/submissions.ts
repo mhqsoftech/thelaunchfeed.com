@@ -467,7 +467,7 @@ export async function publishSubmissionNow(id: string): Promise<void> {
       slug: product.slug,
       tagline: product.tagline,
       makerName: sub.owner.name || sub.owner.username,
-      makerHandle: sub.owner.username ? `@${sub.owner.username}` : undefined,
+      makerUsername: sub.owner.username || undefined,
       category: sub.category?.name || undefined,
       tags: sub.tags,
       websiteUrl: sub.websiteUrl,

@@ -277,7 +277,37 @@ export const publishDue = inngest.createFunction(
       if (pid) publishedIds.push(pid);
     }
 
-    // Broadcast a launch email per newly-published product to every user.
+    // Single combined broadcast for all products published this tick.
+    // WhatsApp / Telegram / Webhook get one detailed message covering every
+    // launch; X + Bluesky post one short entry per product.
+    if (publishedIds.length > 0) {
+      await step.run("social-broadcast-batch", async () => {
+        try {
+          const products = await prisma.product.findMany({
+            where: { id: { in: publishedIds } },
+            include: { owner: true, category: true },
+          });
+          const { broadcastProductLaunches } = await import("@/lib/broadcast");
+          await broadcastProductLaunches(
+            products.map((p) => ({
+              id: p.id,
+              name: p.name,
+              slug: p.slug,
+              tagline: p.tagline,
+              makerName: p.owner.name || p.owner.username,
+              makerUsername: p.owner.username || undefined,
+              category: p.category?.name || undefined,
+              tags: p.tags,
+              websiteUrl: p.websiteUrl,
+            }))
+          );
+        } catch (err) {
+          console.error("[social-broadcast-batch] failed:", err);
+        }
+      });
+    }
+
+    // Per-product events for founder email + web indexing.
     for (const pid of publishedIds) {
       await step.sendEvent(`launched-${pid}`, {
         name: "product.launched",
@@ -289,7 +319,7 @@ export const publishDue = inngest.createFunction(
 );
 
 export const onProductLaunched = inngest.createFunction(
-  { id: "product-launched-broadcast", name: "Broadcast launch to all users" },
+  { id: "product-launched-notify", name: "Notify founder & index launched product" },
   { event: "product.launched" },
   async ({ event, step }) => {
     const product = await step.run("load-product", () =>
@@ -300,25 +330,9 @@ export const onProductLaunched = inngest.createFunction(
     );
     if (!product) return { skipped: true };
 
-    // Multi-channel social broadcast (X, Telegram, WhatsApp)
-    await step.run("social-broadcast", async () => {
-      try {
-        const { broadcastProductLaunch } = await import("@/lib/broadcast");
-        await broadcastProductLaunch({
-          id: product.id,
-          name: product.name,
-          slug: product.slug,
-          tagline: product.tagline,
-          makerName: product.owner.name || product.owner.username,
-          makerHandle: product.owner.username ? `@${product.owner.username}` : undefined,
-          category: product.category?.name || undefined,
-          tags: product.tags,
-          websiteUrl: product.websiteUrl,
-        });
-      } catch (err) {
-        console.error("[social-broadcast] failed:", err);
-      }
-    });
+    // Social broadcast happens in `publishDue` (batched) or inline in
+    // `publishSubmissionNow` (single) so it isn't done here — otherwise a
+    // per-product X/Bluesky post would fire twice.
 
     // Automated Web Search Indexing (Google Indexing API & IndexNow)
     await step.run("web-indexing-submission", async () => {
@@ -341,13 +355,9 @@ export const onProductLaunched = inngest.createFunction(
       }
     });
 
-    const vars: TemplateVars = {
-      productName: product.name,
-      productSlug: product.slug,
-      userName: product.owner.name || product.owner.username,
-    };
-
-    // 1. Founder-first: dedicated launch notification to the maker (unless seed).
+    // Founder-only launch notification. The site-wide fan-out was removed
+    // intentionally — non-owners no longer receive a launch email for a
+    // product they didn't submit.
     if (!product.owner.isSeed) {
       await step.sendEvent("notify-founder", {
         name: "email.send.requested",
@@ -356,35 +366,15 @@ export const onProductLaunched = inngest.createFunction(
           to: product.owner.email,
           toUserId: product.owner.id,
           trigger: "on-launch",
-          vars,
+          vars: {
+            productName: product.name,
+            productSlug: product.slug,
+            userName: product.owner.name || product.owner.username,
+          },
         },
       });
     }
-
-    // 2. Broadcast to every real user (excluding seeds and the founder we already emailed).
-    const users = await step.run("load-users", () =>
-      prisma.user.findMany({
-        where: { isSeed: false, id: { not: product.owner.id } },
-        select: { id: true, email: true },
-      })
-    );
-
-    if (users.length > 0) {
-      await step.sendEvent(
-        "fan-out",
-        users.map((u) => ({
-          name: "email.send.requested" as const,
-          data: {
-            templateId: "product-launched",
-            to: u.email,
-            toUserId: u.id,
-            trigger: "on-launch",
-            vars,
-          },
-        }))
-      );
-    }
-    return { queued: users.length + 1 };
+    return { queued: product.owner.isSeed ? 0 : 1 };
   }
 );
 
@@ -578,7 +568,7 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
         tagline: w.tagline,
         voteCount: w.voteCount,
         makerName: w.owner.name || w.owner.username,
-        makerHandle: w.owner.username ? `@${w.owner.username}` : undefined,
+        makerUsername: w.owner.username || undefined,
       }));
 
       await broadcastLeaderboardWinners({
@@ -658,7 +648,7 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
         tagline: w.tagline,
         voteCount: w.voteCount,
         makerName: w.owner.name || w.owner.username,
-        makerHandle: w.owner.username ? `@${w.owner.username}` : undefined,
+        makerUsername: w.owner.username || undefined,
       }));
 
       await broadcastLeaderboardWinners({
@@ -736,7 +726,7 @@ export const evaluateLeaderboardCycles = inngest.createFunction(
         tagline: w.tagline,
         voteCount: w.voteCount,
         makerName: w.owner.name || w.owner.username,
-        makerHandle: w.owner.username ? `@${w.owner.username}` : undefined,
+        makerUsername: w.owner.username || undefined,
       }));
 
       await broadcastLeaderboardWinners({

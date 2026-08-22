@@ -549,33 +549,108 @@ export interface ProductLaunchPayload {
   slug: string;
   tagline: string;
   makerName?: string | null;
-  makerHandle?: string | null;
+  makerUsername?: string | null;
   category?: string | null;
   tags?: string[];
   websiteUrl?: string | null;
 }
 
-export async function broadcastProductLaunch(
-  product: ProductLaunchPayload
+// X / Bluesky share the same short-post shape: product URL and founder URL up
+// front, then the tagline (trimmed) and a couple of hashtags if there's room.
+// X free-tier caps at 280 graphemes, Bluesky at 300 — we compose against the
+// smaller cap so the same string is safe for both.
+function composeShortLaunchPost(
+  product: ProductLaunchPayload,
+  siteBase: string,
+  hashtags: string,
+  maxChars = 280
+): string {
+  const productUrl = `${siteBase}/product/${product.slug}`;
+  const founderUrl = product.makerUsername
+    ? `${siteBase}/founder/${product.makerUsername.replace(/^@/, "")}`
+    : null;
+
+  // Links go first so the product URL and founder URL are the first thing a
+  // reader sees (and the first thing scrapers/link-preview cards latch onto).
+  const linkBlock = founderUrl
+    ? `🔗 ${productUrl}\n👤 ${founderUrl}`
+    : `🔗 ${productUrl}`;
+
+  const nameLine = `🚀 ${product.name}`;
+  const trailer = hashtags ? `\n\n${hashtags}` : "";
+
+  // Fixed portion: links, blank line, name line, then blank line before body.
+  const fixedLen = linkBlock.length + 2 + nameLine.length + trailer.length + 2;
+  const room = maxChars - fixedLen;
+  let tagline = product.tagline || "";
+  if (tagline.length > room) tagline = tagline.slice(0, Math.max(0, room - 1)) + "…";
+
+  const body = tagline ? ` — ${tagline}` : "";
+  const out = `${linkBlock}\n\n${nameLine}${body}${trailer}`;
+  return out.length > maxChars ? out.slice(0, maxChars - 1) + "…" : out;
+}
+
+// Combined multi-launch messages for Telegram / WhatsApp — one detailed
+// message per cron tick that lists every product that just went live.
+function formatTelegramBatch(products: ProductLaunchPayload[], siteBase: string): string {
+  const header = products.length === 1
+    ? `🚀 <b>NEW LAUNCH ON THE LAUNCH FEED</b>`
+    : `🚀 <b>${products.length} NEW LAUNCHES ON THE LAUNCH FEED</b>`;
+  const escape = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const blocks = products.map((p, i) => {
+    const productUrl = `${siteBase}/product/${p.slug}`;
+    const founderUrl = p.makerUsername ? `${siteBase}/founder/${p.makerUsername.replace(/^@/, "")}` : null;
+    const makerName = p.makerName || "Founder";
+    const founderLine = founderUrl
+      ? `👤 <b>Founder:</b> <a href="${founderUrl}">${escape(makerName)}</a>`
+      : `👤 <b>Founder:</b> ${escape(makerName)}`;
+    const prefix = products.length === 1 ? "" : `<b>${i + 1}.</b> `;
+    const tagsLine = p.tags && p.tags.length
+      ? `\n🏷 ${p.tags.slice(0, 5).map((t) => `#${t.replace(/[^a-zA-Z0-9]/g, "")}`).filter(Boolean).join(" ")}`
+      : "";
+    return `${prefix}<b><a href="${productUrl}">${escape(p.name)}</a></b>\n<i>${escape(p.tagline)}</i>\n📁 <b>Category:</b> ${escape(p.category || "Software")}\n${founderLine}${tagsLine}`;
+  });
+  return `${header}\n\n${blocks.join("\n\n━━━━━━━━━━\n\n")}`;
+}
+
+function formatWhatsAppBatch(products: ProductLaunchPayload[], siteBase: string): string {
+  const header = products.length === 1
+    ? `🚀 *NEW LAUNCH ON THE LAUNCH FEED*`
+    : `🚀 *${products.length} NEW LAUNCHES ON THE LAUNCH FEED*`;
+  const blocks = products.map((p, i) => {
+    const productUrl = `${siteBase}/product/${p.slug}`;
+    const founderUrl = p.makerUsername ? `${siteBase}/founder/${p.makerUsername.replace(/^@/, "")}` : null;
+    const makerName = p.makerName || "Founder";
+    const prefix = products.length === 1 ? "" : `*${i + 1}.* `;
+    const tagsLine = p.tags && p.tags.length
+      ? `\n🏷 ${p.tags.slice(0, 5).map((t) => `#${t.replace(/[^a-zA-Z0-9]/g, "")}`).filter(Boolean).join(" ")}`
+      : "";
+    return `${prefix}*${p.name}*\n_${p.tagline}_\n📁 Category: ${p.category || "Software"}\n👤 Founder: ${makerName}${founderUrl ? `\n   ${founderUrl}` : ""}\n🔗 ${productUrl}${tagsLine}`;
+  });
+  return `${header}\n\n${blocks.join("\n\n————————\n\n")}`;
+}
+
+/**
+ * Send launch notifications for one or more products in a single cron tick.
+ *
+ * Per-product posts (each has its own tappable product + founder URLs first):
+ *   - X (280-char cap for free tier)
+ *   - Bluesky (300-char cap)
+ *
+ * Batched single message covering every product in the tick:
+ *   - Telegram (rich HTML)
+ *   - WhatsApp (markdown-ish)
+ *   - Webhook (JSON payload with the whole batch)
+ */
+export async function broadcastProductLaunches(
+  products: ProductLaunchPayload[]
 ): Promise<BroadcastLogItem> {
   const config = await getBroadcastConfig();
-  const siteBase = process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com";
-  const productUrl = `${siteBase}/product/${product.slug}`;
-  const makerDisplay = product.makerHandle
-    ? `${product.makerName || "Maker"} (${product.makerHandle})`
-    : product.makerName || "Founder";
-
-  const hashtags = (product.tags || [])
-    .slice(0, 3)
-    .map((t) => `#${t.replace(/[^a-zA-Z0-9]/g, "")}`)
-    .filter(Boolean)
-    .join(" ");
+  const siteBase = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
 
   const results: BroadcastLogItem["results"] = {};
+  const perProductResults: Record<string, { x?: any; bluesky?: any }> = {};
 
-  // Time-box each channel so one slow provider (Telegram / X hanging) cannot
-  // exceed Inngest's step timeout and force a retry that duplicates every
-  // *already-succeeded* broadcast.
   const withTimeout = <T>(p: Promise<T>, label: string, ms = 10_000): Promise<T> =>
     Promise.race([
       p,
@@ -584,24 +659,43 @@ export async function broadcastProductLaunch(
       ),
     ]);
 
-  // Every disabled channel gets an explicit "not configured" entry so the
-  // broadcast log tells operators why a channel produced no output, instead
-  // of an empty results object indistinguishable from "everything failed."
   const tasks: Array<Promise<void>> = [];
 
-  if (config.x.enabled) {
-    const xText = `🚀 NEW LAUNCH ON THE LAUNCH FEED\n\n${product.name} — ${product.tagline}\n👤 Maker: ${makerDisplay}\n\n⚡ 360° Specs, Architecture & Upvote:\n${productUrl}\n\n#buildinpublic #indiehackers ${hashtags}`.trim();
-    tasks.push(
-      withTimeout(sendXBroadcast(xText, config.x), "x")
-        .then((r) => { results.x = r; })
-        .catch((e) => { results.x = { success: false, message: e.message || String(e) }; })
-    );
-  } else {
-    results.x = { success: false, message: "channel not enabled" };
+  // ── X + Bluesky: one post per product ──
+  for (const product of products) {
+    const hashtags = (product.tags || [])
+      .slice(0, 3)
+      .map((t) => `#${t.replace(/[^a-zA-Z0-9]/g, "")}`)
+      .filter(Boolean)
+      .join(" ");
+
+    perProductResults[product.id] = {};
+
+    if (config.x.enabled) {
+      const xText = composeShortLaunchPost(product, siteBase, hashtags, 280);
+      tasks.push(
+        withTimeout(sendXBroadcast(xText, config.x), `x:${product.slug}`)
+          .then((r) => { perProductResults[product.id].x = r; })
+          .catch((e) => { perProductResults[product.id].x = { success: false, message: e.message || String(e) }; })
+      );
+    }
+
+    if (config.bluesky?.enabled) {
+      const bskyText = composeShortLaunchPost(product, siteBase, hashtags, 300);
+      tasks.push(
+        withTimeout(sendBlueskyBroadcast(bskyText, config.bluesky), `bluesky:${product.slug}`)
+          .then((r) => { perProductResults[product.id].bluesky = r; })
+          .catch((e) => { perProductResults[product.id].bluesky = { success: false, message: e.message || String(e) }; })
+      );
+    }
   }
 
+  if (!config.x.enabled) results.x = { success: false, message: "channel not enabled" };
+  if (!config.bluesky?.enabled) results.bluesky = { success: false, message: "channel not enabled" };
+
+  // ── Telegram: one detailed message covering the whole batch ──
   if (config.telegram.enabled) {
-    const tgHtml = `🚀 <b>NEW LAUNCH ON THE LAUNCH FEED</b>\n\n<b>${product.name}</b>\n<i>${product.tagline}</i>\n\n👤 <b>Maker:</b> ${makerDisplay}\n📁 <b>Category:</b> ${product.category || "Software"}\n\n⚡ <b>Full 360° Specs &amp; Upvote:</b>\n<a href="${productUrl}">${productUrl}</a>\n\n#launch #${product.category?.toLowerCase() || "tech"}`;
+    const tgHtml = formatTelegramBatch(products, siteBase);
     tasks.push(
       withTimeout(sendTelegramBroadcast(tgHtml, config.telegram), "telegram")
         .then((r) => { results.telegram = r; })
@@ -611,8 +705,9 @@ export async function broadcastProductLaunch(
     results.telegram = { success: false, message: "channel not enabled" };
   }
 
+  // ── WhatsApp: one detailed message covering the whole batch ──
   if (config.whatsapp.enabled) {
-    const waText = `🚀 *NEW LAUNCH ON THE LAUNCH FEED*\n\n*${product.name}*\n_${product.tagline}_\n\n👤 *Maker:* ${makerDisplay}\n\n⚡ *Explore 360° Architecture Specs & Upvote:*\n${productUrl}`;
+    const waText = formatWhatsAppBatch(products, siteBase);
     tasks.push(
       withTimeout(sendWhatsAppBroadcast(waText, config.whatsapp), "whatsapp")
         .then((r) => { results.whatsapp = r; })
@@ -622,27 +717,32 @@ export async function broadcastProductLaunch(
     results.whatsapp = { success: false, message: "channel not enabled" };
   }
 
-  if (config.bluesky?.enabled) {
-    const bskyText = `🚀 New launch: ${product.name} — ${product.tagline}\nBy ${makerDisplay}\n${productUrl}\n${hashtags}`.trim();
-    tasks.push(
-      withTimeout(sendBlueskyBroadcast(bskyText, config.bluesky), "bluesky")
-        .then((r) => { results.bluesky = r; })
-        .catch((e) => { results.bluesky = { success: false, message: e.message || String(e) }; })
-    );
-  } else {
-    results.bluesky = { success: false, message: "channel not enabled" };
-  }
-
+  // ── Webhook: one JSON payload with every launch in the batch ──
   if (config.webhook?.enabled && config.webhook.webhookUrl) {
+    const items = products.map((p) => {
+      const productUrl = `${siteBase}/product/${p.slug}`;
+      const founderUrl = p.makerUsername ? `${siteBase}/founder/${p.makerUsername.replace(/^@/, "")}` : null;
+      return {
+        productName: p.name,
+        tagline: p.tagline,
+        productUrl,
+        founderUrl,
+        makerName: p.makerName || "Founder",
+        category: p.category || "Software",
+        tags: p.tags || [],
+      };
+    });
     const webhookPayload = {
       event: "product.launched",
-      productName: product.name,
-      tagline: product.tagline,
-      productUrl,
-      makerName: makerDisplay,
-      category: product.category || "Software",
-      tags: product.tags || [],
-      text: `🚀 NEW LAUNCH: ${product.name} — ${product.tagline}\n\n👤 Maker: ${makerDisplay}\n⚡ Upvote & View Specs: ${productUrl}\n\n#buildinpublic #indiehackers ${hashtags}`,
+      launches: items,
+      // Legacy top-level fields (first product) for existing Make.com / Zapier
+      // scenarios wired against the single-launch shape.
+      productName: items[0]?.productName,
+      tagline: items[0]?.tagline,
+      productUrl: items[0]?.productUrl,
+      makerName: items[0]?.makerName,
+      text: formatWhatsAppBatch(products, siteBase),
+      tags: items[0]?.tags || [],
       timestamp: new Date().toISOString(),
     };
     tasks.push(
@@ -656,17 +756,53 @@ export async function broadcastProductLaunch(
 
   await Promise.allSettled(tasks);
 
+  // Roll per-product X / Bluesky results into aggregate status lines for the log.
+  if (config.x.enabled) {
+    const rows = products.map((p) => {
+      const r = perProductResults[p.id]?.x;
+      return `${p.slug}: ${r?.success ? "ok" : (r?.message || "no result")}`;
+    });
+    const anyOk = products.some((p) => perProductResults[p.id]?.x?.success);
+    results.x = {
+      success: anyOk,
+      message: `posted ${products.length} launch(es) — ${rows.join("; ")}`,
+    };
+  }
+  if (config.bluesky?.enabled) {
+    const rows = products.map((p) => {
+      const r = perProductResults[p.id]?.bluesky;
+      return `${p.slug}: ${r?.success ? "ok" : (r?.message || "no result")}`;
+    });
+    const anyOk = products.some((p) => perProductResults[p.id]?.bluesky?.success);
+    results.bluesky = {
+      success: anyOk,
+      message: `posted ${products.length} launch(es) — ${rows.join("; ")}`,
+    };
+  }
+
+  const first = products[0];
   const logItem: BroadcastLogItem = {
-    id: `bcast-${Date.now()}-${product.id.slice(0, 6)}`,
-    productId: product.id,
-    productName: product.name,
-    productSlug: product.slug,
+    id: `bcast-${Date.now()}-${(first?.id || "batch").slice(0, 6)}`,
+    productId: first?.id || "batch",
+    productName: products.length === 1 ? first!.name : `${products.length} launches`,
+    productSlug: first?.slug || "batch",
     timestamp: new Date().toISOString(),
     results,
   };
 
   await appendBroadcastLog(logItem);
   return logItem;
+}
+
+/**
+ * Backwards-compatible single-product wrapper. Callers that only have one
+ * product (admin manual broadcast, on-demand `publishSubmissionNow`) go
+ * through the same code path as the batched cron path.
+ */
+export async function broadcastProductLaunch(
+  product: ProductLaunchPayload
+): Promise<BroadcastLogItem> {
+  return broadcastProductLaunches([product]);
 }
 
 export interface LeaderboardWinnerItem {
@@ -677,7 +813,7 @@ export interface LeaderboardWinnerItem {
   tagline: string;
   voteCount: number;
   makerName: string;
-  makerHandle?: string | null;
+  makerUsername?: string | null;
 }
 
 export interface LeaderboardWinnersPayload {
@@ -710,10 +846,17 @@ export async function broadcastLeaderboardWinners(
 
   const results: BroadcastLogItem["results"] = {};
 
+  const founderUrl = (w: LeaderboardWinnerItem | undefined) =>
+    w?.makerUsername ? `${siteBase}/founder/${w.makerUsername.replace(/^@/, "")}` : null;
+  const makerLinePlain = (w: LeaderboardWinnerItem) => {
+    const url = founderUrl(w);
+    return url ? `${w.makerName} — ${url}` : w.makerName;
+  };
+
   // 1. X / Twitter
   if (config.x.enabled) {
     let xText = `🏆 THE LAUNCH FEED — TOP WINNERS: ${periodTitle.toUpperCase()}\n\n`;
-    if (w1) xText += `🥇 #1 ${w1.name} (${w1.voteCount} votes)\n👤 Maker: ${w1.makerHandle ? `${w1.makerName} (${w1.makerHandle})` : w1.makerName}\n🔗 ${siteBase}/product/${w1.slug}\n\n`;
+    if (w1) xText += `🥇 #1 ${w1.name} (${w1.voteCount} votes)\n🔗 ${siteBase}/product/${w1.slug}\n👤 ${makerLinePlain(w1)}\n\n`;
     if (w2) xText += `🥈 #2 ${w2.name} (${w2.voteCount} votes)\n🔗 ${siteBase}/product/${w2.slug}\n\n`;
     if (w3) xText += `🥉 #3 ${w3.name} (${w3.voteCount} votes)\n🔗 ${siteBase}/product/${w3.slug}\n\n`;
     xText += `⚡ Official Embed Badges & Leaderboard: ${siteBase}\n#buildinpublic #indiehackers`;
@@ -722,10 +865,14 @@ export async function broadcastLeaderboardWinners(
 
   // 2. Telegram
   if (config.telegram.enabled) {
+    const founderLink = (w: LeaderboardWinnerItem) => {
+      const url = founderUrl(w);
+      return url ? `<a href="${url}">${w.makerName}</a>` : w.makerName;
+    };
     let tgHtml = `🏆 <b>THE LAUNCH FEED — TOP WINNERS: ${periodTitle.toUpperCase()}</b>\n\n`;
-    if (w1) tgHtml += `🥇 <b>#1 <a href="${siteBase}/product/${w1.slug}">${w1.name}</a></b> (${w1.voteCount} votes)\n<i>${w1.tagline}</i>\n👤 <b>Maker:</b> ${w1.makerName}\n\n`;
-    if (w2) tgHtml += `🥈 <b>#2 <a href="${siteBase}/product/${w2.slug}">${w2.name}</a></b> (${w2.voteCount} votes)\n<i>${w2.tagline}</i>\n\n`;
-    if (w3) tgHtml += `🥉 <b>#3 <a href="${siteBase}/product/${w3.slug}">${w3.name}</a></b> (${w3.voteCount} votes)\n<i>${w3.tagline}</i>\n\n`;
+    if (w1) tgHtml += `🥇 <b>#1 <a href="${siteBase}/product/${w1.slug}">${w1.name}</a></b> (${w1.voteCount} votes)\n<i>${w1.tagline}</i>\n👤 <b>Founder:</b> ${founderLink(w1)}\n\n`;
+    if (w2) tgHtml += `🥈 <b>#2 <a href="${siteBase}/product/${w2.slug}">${w2.name}</a></b> (${w2.voteCount} votes)\n<i>${w2.tagline}</i>\n👤 <b>Founder:</b> ${founderLink(w2)}\n\n`;
+    if (w3) tgHtml += `🥉 <b>#3 <a href="${siteBase}/product/${w3.slug}">${w3.name}</a></b> (${w3.voteCount} votes)\n<i>${w3.tagline}</i>\n👤 <b>Founder:</b> ${founderLink(w3)}\n\n`;
     tgHtml += `⚡ <b>Official Embed Badges &amp; Leaderboard:</b>\n<a href="${siteBase}">${siteBase}</a>`;
     results.telegram = await sendTelegramBroadcast(tgHtml, config.telegram);
   }
@@ -733,9 +880,9 @@ export async function broadcastLeaderboardWinners(
   // 3. WhatsApp
   if (config.whatsapp.enabled) {
     let waText = `🏆 *THE LAUNCH FEED — TOP WINNERS: ${periodTitle.toUpperCase()}*\n\n`;
-    if (w1) waText += `🥇 *#1 ${w1.name}* (${w1.voteCount} votes)\n_${w1.tagline}_\n👤 *Maker:* ${w1.makerName}\n🔗 ${siteBase}/product/${w1.slug}\n\n`;
-    if (w2) waText += `🥈 *#2 ${w2.name}* (${w2.voteCount} votes)\n_${w2.tagline}_\n🔗 ${siteBase}/product/${w2.slug}\n\n`;
-    if (w3) waText += `🥉 *#3 ${w3.name}* (${w3.voteCount} votes)\n_${w3.tagline}_\n🔗 ${siteBase}/product/${w3.slug}\n\n`;
+    if (w1) waText += `🥇 *#1 ${w1.name}* (${w1.voteCount} votes)\n_${w1.tagline}_\n👤 *Founder:* ${makerLinePlain(w1)}\n🔗 ${siteBase}/product/${w1.slug}\n\n`;
+    if (w2) waText += `🥈 *#2 ${w2.name}* (${w2.voteCount} votes)\n_${w2.tagline}_\n👤 *Founder:* ${makerLinePlain(w2)}\n🔗 ${siteBase}/product/${w2.slug}\n\n`;
+    if (w3) waText += `🥉 *#3 ${w3.name}* (${w3.voteCount} votes)\n_${w3.tagline}_\n👤 *Founder:* ${makerLinePlain(w3)}\n🔗 ${siteBase}/product/${w3.slug}\n\n`;
     waText += `⚡ *View Leaderboard & Official Award Embeds:*\n${siteBase}`;
     results.whatsapp = await sendWhatsAppBroadcast(waText.trim(), config.whatsapp);
   }
@@ -743,7 +890,11 @@ export async function broadcastLeaderboardWinners(
   // 4. Bluesky (native AT Protocol)
   if (config.bluesky?.enabled) {
     let bText = `🏆 Top winners — ${periodTitle}\n\n`;
-    if (w1) bText += `🥇 ${w1.name} (${w1.voteCount})\n${siteBase}/product/${w1.slug}\n`;
+    if (w1) {
+      bText += `🥇 ${w1.name} (${w1.voteCount})\n${siteBase}/product/${w1.slug}\n`;
+      const fu = founderUrl(w1);
+      if (fu) bText += `👤 ${fu}\n`;
+    }
     if (w2) bText += `🥈 ${w2.name} — ${siteBase}/product/${w2.slug}\n`;
     if (w3) bText += `🥉 ${w3.name} — ${siteBase}/product/${w3.slug}\n`;
     results.bluesky = await sendBlueskyBroadcast(bText.trim(), config.bluesky);
