@@ -308,7 +308,7 @@ export type MyProductStatus = "LIVE" | "SCHEDULED" | "REJECTED" | "DRAFT";
  * Never fabricated — computed from real DB state per product.
  */
 import type { ProductAward } from "@/lib/awards";
-import { computeAwardsForProducts } from "@/lib/queries/awards";
+import { computeAwardsForProductsTimegated } from "@/lib/queries/awards";
 
 export type { ProductAward };
 
@@ -345,6 +345,10 @@ export async function listMyProducts(): Promise<MyProduct[]> {
         logoUrl: true,
         voteCount: true,
         launchedAt: true,
+        dailyRank: true,
+        weeklyRank: true,
+        monthlyRank: true,
+        revenue: { select: { isVerified: true, mrrCents: true } },
         category: { select: { slug: true, name: true } },
       },
     }),
@@ -366,7 +370,7 @@ export async function listMyProducts(): Promise<MyProduct[]> {
   ]);
 
   const displayName = user.name || user.username;
-  const awardsByProduct = await computeAwardsForProducts(published);
+  const awardsByProduct = await computeAwardsForProductsTimegated(published);
   const liveRows: MyProduct[] = published.map((p) => ({
     id: p.id,
     slug: p.slug,

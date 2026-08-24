@@ -283,58 +283,58 @@ export default function ProductClientView({
     return false;
   }, [isOwner, userSession, product.ownerId, product.maker]);
 
+  // Time-gate helper: minimum elapsed ms since launch before each category is revealed
+  const isTimegateEligible = React.useCallback((awardId: string): boolean => {
+    const launchMs = new Date(product.launchedAt).getTime();
+    const elapsed = Date.now() - launchMs;
+    const GATES: Record<string, number> = {
+      daily: 24 * 60 * 60 * 1000,
+      weekly: 7 * 24 * 60 * 60 * 1000,
+      monthly: 30 * 24 * 60 * 60 * 1000,
+      yearly: 365 * 24 * 60 * 60 * 1000,
+      alltime: 365 * 24 * 60 * 60 * 1000,
+    };
+    let category: string | null = null;
+    if (awardId.startsWith("daily_") || awardId === "pod") category = "daily";
+    else if (awardId.startsWith("weekly_")) category = "weekly";
+    else if (awardId.startsWith("monthly_")) category = "monthly";
+    else if (awardId.startsWith("yearly_") || awardId === "champion") category = "yearly";
+    else if (awardId.startsWith("alltime_")) category = "alltime";
+    if (!category) return true;
+    return elapsed >= (GATES[category] ?? 0);
+  }, [product.launchedAt]);
+
   const eligibleAwards = React.useMemo<EmbedAwardId[]>(() => {
     const list: EmbedAwardId[] = ["launch"];
     if (product.rawAwards) {
       for (const a of product.rawAwards) {
-        list.push(a as EmbedAwardId);
+        if (isTimegateEligible(a)) {
+          list.push(a as EmbedAwardId);
+        }
       }
     }
-    if (product.dailyRank === 1) { list.push("daily_1"); list.push("pod"); }
-    if (product.dailyRank === 2) list.push("daily_2");
-    if (product.dailyRank === 3) list.push("daily_3");
-
-    if (product.weeklyRank === 1) list.push("weekly_1");
-    if (product.weeklyRank === 2) list.push("weekly_2");
-    if (product.weeklyRank === 3) list.push("weekly_3");
-
-    if (product.monthlyRank === 1) list.push("monthly_1");
-    if (product.monthlyRank === 2) list.push("monthly_2");
-    if (product.monthlyRank === 3) list.push("monthly_3");
-
-    if (product.votes >= 100) { list.push("yearly_1"); list.push("champion"); }
-    if (product.votes >= 50) list.push("alltime_1");
     if (product.revenue && product.revenue.trim().length > 0) list.push("revenue");
-    if (product.votes >= 10) list.push("upvote");
+    if (product.votes >= 50) list.push("upvote");
     return Array.from(new Set(list));
-  }, [product.rawAwards, product.dailyRank, product.weeklyRank, product.monthlyRank, product.votes, product.revenue]);
+  }, [product.rawAwards, product.votes, product.revenue, isTimegateEligible]);
 
   const displayAccolades: AccoladeItem[] = React.useMemo(() => {
-    if (product.accolades && product.accolades.length > 0) {
+    if (product.accolades) {
       return product.accolades;
     }
-    const awardsList: ProductAward[] = product.rawAwards ? [...product.rawAwards] : ["launch"];
-    if (product.dailyRank === 1) awardsList.push("daily_1");
-    if (product.dailyRank === 2) awardsList.push("daily_2");
-    if (product.dailyRank === 3) awardsList.push("daily_3");
-    if (product.weeklyRank === 1) awardsList.push("weekly_1");
-    if (product.weeklyRank === 2) awardsList.push("weekly_2");
-    if (product.weeklyRank === 3) awardsList.push("weekly_3");
-    if (product.monthlyRank === 1) awardsList.push("monthly_1");
-    if (product.monthlyRank === 2) awardsList.push("monthly_2");
-    if (product.monthlyRank === 3) awardsList.push("monthly_3");
+    const awardsList: ProductAward[] = (product.rawAwards ? [...product.rawAwards] : ["launch"]).filter(
+      (a): a is ProductAward => isTimegateEligible(a)
+    );
     if (product.revenue) awardsList.push("revenue");
     if (product.votes >= 50) awardsList.push("upvote");
-    return getAccoladeDetails(awardsList, product.slug, { revenueFormatted: product.revenue });
+    return getAccoladeDetails(Array.from(new Set(awardsList)) as ProductAward[], product.slug, { revenueFormatted: product.revenue });
   }, [
     product.accolades,
     product.rawAwards,
-    product.dailyRank,
-    product.weeklyRank,
-    product.monthlyRank,
     product.revenue,
     product.votes,
     product.slug,
+    isTimegateEligible,
   ]);
 
   const wonAccolades = React.useMemo(

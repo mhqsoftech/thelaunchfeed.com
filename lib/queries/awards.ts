@@ -185,6 +185,40 @@ export async function computeAwardsForProductTimegated(product: {
 }
 
 /**
+ * Computes time-gated eligible awards for a batch of products.
+ */
+export async function computeAwardsForProductsTimegated(
+  products: Array<{
+    id: string;
+    slug?: string;
+    voteCount: number;
+    dailyRank?: number | null;
+    weeklyRank?: number | null;
+    monthlyRank?: number | null;
+    revenue?: { isVerified?: boolean; mrrCents?: number } | null;
+    launchedAt: Date;
+  }>
+): Promise<Map<string, ProductAward[]>> {
+  const allMap = await computeAwardsForProducts(products);
+  const now = Date.now();
+  const resultMap = new Map<string, ProductAward[]>();
+
+  for (const p of products) {
+    const list = allMap.get(p.id) || ["launch"];
+    const elapsed = now - p.launchedAt.getTime();
+    const filtered = list.filter((award) => {
+      const category = getAwardTimeGateCategory(award);
+      if (!category) return true;
+      const requiredMs = TIME_GATE_MS[category];
+      return requiredMs ? elapsed >= requiredMs : true;
+    });
+    resultMap.set(p.id, filtered);
+  }
+
+  return resultMap;
+}
+
+/**
  * Checks whether a specific award is time-gate eligible for a given launch date.
  * Used by the badge SVG API to enforce time-gating at the render layer.
  */
