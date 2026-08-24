@@ -211,6 +211,30 @@ export default function ProfileClientView({
       setResubmitting(false);
     }
   };
+
+  // Deletion modal state for drafts and in-queue submissions
+  const [submissionToDelete, setSubmissionToDelete] = useState<{
+    id: string;
+    submissionId: string;
+    name: string;
+    status: "DRAFT" | "SCHEDULED" | "REJECTED";
+  } | null>(null);
+  const [deletingSubmission, setDeletingSubmission] = useState(false);
+
+  const handleConfirmDeleteSubmission = async () => {
+    if (!submissionToDelete) return;
+    setDeletingSubmission(true);
+    try {
+      await deleteMySubmission(submissionToDelete.submissionId);
+      setProductsList((prev) => prev.filter((x) => x.id !== submissionToDelete.id));
+      setSubmissionToDelete(null);
+    } catch (err) {
+      console.error("[delete-submission] failed", err);
+      alert("Could not delete submission — please try again.");
+    } finally {
+      setDeletingSubmission(false);
+    }
+  };
   const [paymentProvider, setPaymentProvider] = useState<string>("stripe");
   const [stripeApiKey, setStripeApiKey] = useState(
     REVENUE_PROVIDERS[0].sampleKey
@@ -1173,15 +1197,13 @@ export default function ProfileClientView({
                                 {submissionId && (
                                   <button
                                     type="button"
-                                    onClick={async () => {
-                                      if (!confirm(`Delete draft "${d.name || "Untitled"}"? This can't be undone.`)) return;
-                                      try {
-                                        await deleteMySubmission(submissionId);
-                                        setProductsList((prev) => prev.filter((x) => x.id !== d.id));
-                                      } catch (err) {
-                                        console.error("[delete-draft] failed", err);
-                                        alert("Could not delete draft — please try again.");
-                                      }
+                                    onClick={() => {
+                                      setSubmissionToDelete({
+                                        id: d.id,
+                                        submissionId,
+                                        name: d.name || "Untitled draft",
+                                        status: "DRAFT",
+                                      });
                                     }}
                                     className="px-3 py-1.5 text-[11px] font-mono font-bold border border-hairline bg-void text-ink-dim hover:text-signal hover:border-signal/50 uppercase tracking-wider transition-colors cursor-pointer"
                                   >
@@ -1392,15 +1414,13 @@ export default function ProfileClientView({
                                   {(p as MyProduct).submissionId && (
                                     <button
                                       type="button"
-                                      onClick={async () => {
-                                        if (!confirm(`Delete rejected submission "${p.name || "Untitled"}"? This cannot be undone.`)) return;
-                                        try {
-                                          await deleteMySubmission((p as MyProduct).submissionId!);
-                                          setProductsList((prev) => prev.filter((x) => x.id !== p.id));
-                                        } catch (err) {
-                                          console.error("[delete-submission] failed", err);
-                                          alert("Could not delete submission — please try again.");
-                                        }
+                                      onClick={() => {
+                                        setSubmissionToDelete({
+                                          id: p.id,
+                                          submissionId: (p as MyProduct).submissionId!,
+                                          name: p.name || "Untitled submission",
+                                          status: "REJECTED",
+                                        });
                                       }}
                                       className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-signal hover:border-signal/50 uppercase tracking-wider transition-colors cursor-pointer shrink-0"
                                     >
@@ -1419,15 +1439,13 @@ export default function ProfileClientView({
                                   {(p as MyProduct).submissionId && (
                                     <button
                                       type="button"
-                                      onClick={async () => {
-                                        if (!confirm(`Cancel and delete queued submission "${p.name || "Untitled"}"? This will cancel your scheduled launch and cannot be undone.`)) return;
-                                        try {
-                                          await deleteMySubmission((p as MyProduct).submissionId!);
-                                          setProductsList((prev) => prev.filter((x) => x.id !== p.id));
-                                        } catch (err) {
-                                          console.error("[delete-submission] failed", err);
-                                          alert("Could not delete queued submission — please try again.");
-                                        }
+                                      onClick={() => {
+                                        setSubmissionToDelete({
+                                          id: p.id,
+                                          submissionId: (p as MyProduct).submissionId!,
+                                          name: p.name || "Untitled submission",
+                                          status: "SCHEDULED",
+                                        });
                                       }}
                                       className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-signal hover:border-signal/50 uppercase tracking-wider transition-colors cursor-pointer shrink-0"
                                     >
@@ -2783,6 +2801,79 @@ export default function ProfileClientView({
                 className="px-4 py-2 bg-signal text-void hover:bg-signal/90 text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
               >
                 <span>Confirm &amp; Sync Revenue →</span>
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Aesthetic Delete Submission Confirmation Modal */}
+      {submissionToDelete && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-w-md border border-rose-500/40 bg-void p-5 sm:p-6 space-y-4 font-mono text-ink shadow-2xl relative rounded-xs">
+            <div className="flex items-center justify-between border-b border-hairline pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
+                  Confirm Deletion
+                </h3>
+              </div>
+              <span className={`text-[9px] font-mono px-2 py-0.5 border uppercase font-bold ${
+                submissionToDelete.status === "SCHEDULED"
+                  ? "border-amber-500/50 text-amber-400 bg-amber-500/10"
+                  : submissionToDelete.status === "REJECTED"
+                  ? "border-rose-500/50 text-rose-400 bg-rose-500/10"
+                  : "border-hairline text-ink-dim bg-surface"
+              }`}>
+                {submissionToDelete.status === "SCHEDULED"
+                  ? "In Queue"
+                  : submissionToDelete.status === "REJECTED"
+                  ? "Rejected"
+                  : "Draft"}
+              </span>
+            </div>
+
+            <div className="space-y-2.5 text-xs text-ink-dim leading-relaxed">
+              <div className="p-3 border border-hairline bg-surface/30 rounded-xs space-y-1">
+                <div className="text-[10px] uppercase font-bold text-ink-faint">Item Name</div>
+                <div className="text-sm font-bold text-ink truncate">
+                  {submissionToDelete.name || "Untitled submission"}
+                </div>
+              </div>
+
+              <p className="text-ink-dim">
+                {submissionToDelete.status === "SCHEDULED"
+                  ? "Are you sure you want to cancel and delete this queued submission? Your scheduled launch slot will be cancelled and removed from the queue. This action cannot be undone."
+                  : submissionToDelete.status === "REJECTED"
+                  ? "Are you sure you want to permanently delete this rejected submission? It will be removed from your dashboard."
+                  : "Are you sure you want to permanently delete this draft? All saved details and draft assets will be removed."}
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-hairline">
+              <button
+                type="button"
+                disabled={deletingSubmission}
+                onClick={() => setSubmissionToDelete(null)}
+                className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 rounded-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deletingSubmission}
+                onClick={handleConfirmDeleteSubmission}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 rounded-xs shadow-xs"
+              >
+                {deletingSubmission ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Delete Permanently</span>
+                )}
               </button>
             </div>
           </div>
