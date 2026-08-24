@@ -168,7 +168,7 @@ export default function BadgesClientView({
   isProductSpecific = false,
   productName,
 }: BadgesClientViewProps) {
-  const [productInput, setProductInput] = useState(initialProduct || "my-product");
+  const productInput = isProductSpecific ? (initialProduct || "my-product") : "showcase";
   const [activeCategory, setActiveCategory] = useState<string>("all");
 
   // Filter available tiers to ONLY those earned by the product if eligibleAwardIds are specified
@@ -333,23 +333,21 @@ export function LaunchFeedBadge() {
             : "Embed live vector SVG badges into your landing page, GitHub README, or product documentation. Badges update dynamically with your live votes, daily/weekly/monthly rank, and verified revenue telemetry."}
         </p>
 
-        {/* Product Slug / Name Display */}
+        {/* Earned Awards Notice (non-product generic view) */}
         {!isProductSpecific && (
-          <div className="pt-1 max-w-md space-y-1 w-full min-w-0">
-            <label className="block text-[10px] sm:text-[11px] font-bold uppercase text-ink-dim">
-              Your Product Name or Slug:
-            </label>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full">
-              <input
-                type="text"
-                value={productInput}
-                onChange={(e) => setProductInput(e.target.value)}
-                placeholder="e.g. my-awesome-tool"
-                className="w-full sm:flex-1 px-3 py-2 border border-hairline bg-surface text-ink text-xs font-mono font-bold focus:border-signal outline-none rounded-xs min-w-0"
-              />
-              <span className="text-[10px] text-ink-faint shrink-0 truncate max-w-full">
-                Slug: <code className="text-signal font-bold bg-surface px-1.5 py-0.5 border border-hairline rounded-xs">{cleanSlug}</code>
-              </span>
+          <div className="pt-2 w-full min-w-0">
+            <div className="flex items-start gap-2.5 p-3 border border-signal/30 bg-signal/5 rounded-xs">
+              <span className="text-signal text-base leading-none mt-0.5 shrink-0">⚡</span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-ink">
+                  Badges are earned awards — not self-assigned.
+                </p>
+                <p className="text-[11px] text-ink-dim mt-1 leading-relaxed">
+                  Each badge is automatically awarded based on verified leaderboard rankings. Visit your{" "}
+                  <Link href="/" className="text-signal hover:underline font-bold">product page</Link>{" "}
+                  to access your earned badges and embed codes.
+                </p>
+              </div>
             </div>
           </div>
         )}
@@ -483,22 +481,30 @@ export function LaunchFeedBadge() {
 
             {/* Instant Actions Row */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-3 border-t border-hairline/60 w-full">
-              <a
-                href={downloadUrl}
-                download
-                className="w-full sm:w-auto px-3.5 py-2 bg-signal text-void font-bold text-xs uppercase flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs rounded-xs"
-              >
-                <span>↓ Download SVG Asset</span>
-              </a>
+              {isProductSpecific ? (
+                <>
+                  <a
+                    href={downloadUrl}
+                    download
+                    className="w-full sm:w-auto px-3.5 py-2 bg-signal text-void font-bold text-xs uppercase flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs rounded-xs"
+                  >
+                    <span>↓ Download SVG Asset</span>
+                  </a>
 
-              <a
-                href={badgeImgUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full sm:w-auto px-3.5 py-2 border border-hairline hover:border-ink bg-surface hover:bg-raised text-ink font-bold text-xs uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer rounded-xs"
-              >
-                <span>Open Vector URL ↗</span>
-              </a>
+                  <a
+                    href={badgeImgUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:w-auto px-3.5 py-2 border border-hairline hover:border-ink bg-surface hover:bg-raised text-ink font-bold text-xs uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer rounded-xs"
+                  >
+                    <span>Open Vector URL ↗</span>
+                  </a>
+                </>
+              ) : (
+                <span className="text-[10px] text-ink-faint italic">
+                  Downloads available from your product&apos;s badge page
+                </span>
+              )}
 
               <span className="text-[10px] sm:text-xs text-ink-dim text-center sm:text-right sm:ml-auto pt-1 sm:pt-0 truncate max-w-full">
                 Badge: <strong className="text-ink">{currentTier.name}</strong>
@@ -506,53 +512,70 @@ export function LaunchFeedBadge() {
             </div>
           </div>
 
-          {/* Embed Code Generator */}
-          <div className="w-full border border-hairline bg-void p-3.5 sm:p-5 space-y-3 rounded-xs min-w-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-hairline pb-2.5">
-              <label className="text-xs font-bold text-ink uppercase tracking-wider">
-                3. Copy Embed Snippet
-              </label>
-              <div className="grid grid-cols-4 sm:flex items-center gap-1 w-full sm:w-auto">
-                {(["html", "markdown", "react", "url"] as const).map((fmt) => (
+          {/* Embed Code Generator — only for product-specific pages */}
+          {isProductSpecific ? (
+            <div className="w-full border border-hairline bg-void p-3.5 sm:p-5 space-y-3 rounded-xs min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-hairline pb-2.5">
+                <label className="text-xs font-bold text-ink uppercase tracking-wider">
+                  3. Copy Embed Snippet
+                </label>
+                <div className="grid grid-cols-4 sm:flex items-center gap-1 w-full sm:w-auto">
+                  {(["html", "markdown", "react", "url"] as const).map((fmt) => (
+                    <button
+                      key={fmt}
+                      type="button"
+                      onClick={() => setFormat(fmt)}
+                      className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-xs truncate ${
+                        format === fmt
+                          ? "border-signal bg-signal text-void"
+                          : "border-hairline bg-surface text-ink-dim hover:text-ink"
+                      }`}
+                    >
+                      {fmt === "url" ? "URL" : fmt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <textarea
+                  readOnly
+                  value={currentSnippet}
+                  rows={format === "react" ? 6 : 4}
+                  className="w-full border border-hairline bg-surface/30 p-2.5 sm:p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-xs break-all sm:break-normal"
+                />
+
+                <div className="flex justify-end">
                   <button
-                    key={fmt}
                     type="button"
-                    onClick={() => setFormat(fmt)}
-                    className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-xs truncate ${
-                      format === fmt
-                        ? "border-signal bg-signal text-void"
-                        : "border-hairline bg-surface text-ink-dim hover:text-ink"
-                    }`}
+                    onClick={() => handleCopy(currentSnippet, format)}
+                    className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-xs"
                   >
-                    {fmt === "url" ? "URL" : fmt}
+                    {copied === format ? (
+                      <span className="text-signal font-bold">✓ Copied {format.toUpperCase()}!</span>
+                    ) : (
+                      <span>Copy {format.toUpperCase()} Code</span>
+                    )}
                   </button>
-                ))}
+                </div>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <textarea
-                readOnly
-                value={currentSnippet}
-                rows={format === "react" ? 6 : 4}
-                className="w-full border border-hairline bg-surface/30 p-2.5 sm:p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-xs break-all sm:break-normal"
-              />
-
-              <div className="flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => handleCopy(currentSnippet, format)}
-                  className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-xs"
-                >
-                  {copied === format ? (
-                    <span className="text-signal font-bold">✓ Copied {format.toUpperCase()}!</span>
-                  ) : (
-                    <span>Copy {format.toUpperCase()} Code</span>
-                  )}
-                </button>
+          ) : (
+            <div className="w-full border border-hairline bg-surface/10 p-4 sm:p-5 rounded-xs min-w-0">
+              <div className="text-xs font-bold text-ink uppercase tracking-wider border-b border-hairline pb-2.5 mb-3">
+                3. Embed on Your Site
               </div>
+              <p className="text-xs text-ink-dim leading-relaxed">
+                Embed codes are generated on each product&apos;s dedicated badge page. Earn a top-3 rank on any leaderboard period, and your badge page will unlock with ready-to-copy HTML, Markdown, React, and direct URL snippets.
+              </p>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-[11px] uppercase transition-colors rounded-xs"
+              >
+                <span>Browse Leaderboard →</span>
+              </Link>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

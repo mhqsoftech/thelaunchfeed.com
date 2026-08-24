@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getProductBySlug } from "@/lib/queries/products";
-import { computeAwardsForProduct } from "@/lib/queries/awards";
+import { computeAwardsForProductTimegated } from "@/lib/queries/awards";
 import BadgesClientView from "../BadgesClientView";
 import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
 
@@ -67,7 +67,7 @@ export default async function ProductBadgesPage({
   if (!product) notFound();
 
   // Compute all awards this specific product has earned / is eligible for
-  const eligibleAwards = await computeAwardsForProduct(product);
+  const eligibleAwards = await computeAwardsForProductTimegated(product);
 
   const initialAward =
     requestedAward && (eligibleAwards.includes(requestedAward as any) || (requestedAward === "daily_1" && eligibleAwards.includes("pod" as any)))

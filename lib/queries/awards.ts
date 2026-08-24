@@ -135,3 +135,63 @@ export async function computeAwardsForProduct(product: {
   const map = await computeAwardsForProducts([product]);
   return map.get(product.id) || ["launch"];
 }
+
+// Minimum elapsed milliseconds since launch before a category's badges are revealed
+const TIME_GATE_MS: Record<string, number> = {
+  daily: 24 * 60 * 60 * 1000, // 24 hours
+  weekly: 7 * 24 * 60 * 60 * 1000, // 7 days
+  monthly: 30 * 24 * 60 * 60 * 1000, // 30 days
+  yearly: 365 * 24 * 60 * 60 * 1000, // 365 days
+  alltime: 365 * 24 * 60 * 60 * 1000, // 365 days
+};
+
+// Maps award IDs to their time-gate category
+function getAwardTimeGateCategory(award: string): string | null {
+  if (award.startsWith("daily_")) return "daily";
+  if (award.startsWith("weekly_")) return "weekly";
+  if (award.startsWith("monthly_")) return "monthly";
+  if (award.startsWith("yearly_") || award === "champion") return "yearly";
+  if (award.startsWith("alltime_")) return "alltime";
+  // pod is an alias for daily_1
+  if (award === "pod") return "daily";
+  return null;
+}
+
+/**
+ * Computes time-gated eligible awards for a single product.
+ * Rank badges (daily/weekly/monthly/yearly/alltime) are only included
+ * if the required time period has elapsed since the product's launch date.
+ * Non-rank awards (launch, revenue, upvote) are always included.
+ */
+export async function computeAwardsForProductTimegated(product: {
+  id: string;
+  slug?: string;
+  voteCount: number;
+  dailyRank?: number | null;
+  weeklyRank?: number | null;
+  monthlyRank?: number | null;
+  revenue?: { isVerified?: boolean; mrrCents?: number } | null;
+  launchedAt: Date;
+}): Promise<ProductAward[]> {
+  const allAwards = await computeAwardsForProduct(product);
+  const elapsed = Date.now() - product.launchedAt.getTime();
+
+  return allAwards.filter((award) => {
+    const category = getAwardTimeGateCategory(award);
+    if (!category) return true; // non-rank awards pass through
+    const requiredMs = TIME_GATE_MS[category];
+    return requiredMs ? elapsed >= requiredMs : true;
+  });
+}
+
+/**
+ * Checks whether a specific award is time-gate eligible for a given launch date.
+ * Used by the badge SVG API to enforce time-gating at the render layer.
+ */
+export function isAwardTimegateEligible(award: string, launchedAt: Date): boolean {
+  const category = getAwardTimeGateCategory(award);
+  if (!category) return true;
+  const requiredMs = TIME_GATE_MS[category];
+  if (!requiredMs) return true;
+  return Date.now() - launchedAt.getTime() >= requiredMs;
+}

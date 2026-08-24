@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { DOTO_FONT_BASE64 } from "@/lib/badgeFont";
+import { isAwardTimegateEligible } from "@/lib/queries/awards";
 
 function escapeXml(s: string): string {
   return s
@@ -33,13 +34,14 @@ export async function GET(
   const award = (searchParams.get("award") || "launch").toLowerCase();
 
   // Look up live product data for real upvotes, name, and revenue
-  let product: { name: string; voteCount: number; category: { name: string } | null; details: any } | null = null;
+  let product: { name: string; voteCount: number; category: { name: string } | null; details: any; launchedAt: Date } | null = null;
   try {
     product = await prisma.product.findUnique({
       where: { slug },
       select: {
         name: true,
         voteCount: true,
+        launchedAt: true,
         category: { select: { name: true } },
         details: true,
       },
@@ -47,6 +49,14 @@ export async function GET(
   } catch {}
 
   const votes = product?.voteCount || 1;
+
+  // Time-gate enforcement: if the requested award hasn't met its
+  // minimum elapsed time since launch, fall back to the generic launch badge.
+  let effectiveAward = award;
+  if (product?.launchedAt && !isAwardTimegateEligible(award, product.launchedAt)) {
+    effectiveAward = "launch";
+  }
+
   // details.revenue is user-controlled; the actual escaping happens at every
   // <text> interpolation site below (via escapeXml), which keeps future edits
   // safe even if new user-controlled fields flow into mainText/subText.
@@ -59,97 +69,97 @@ export async function GET(
   let customIconType = "matrix"; // default 4-square
 
   // 1. Daily Awards
-  if (award === "pod" || award === "daily_1") {
+  if (effectiveAward === "pod" || effectiveAward === "daily_1") {
     mainText = "#1 PRODUCT OF DAY";
     subText = "THE LAUNCH FEED";
     statText = `🥇 #1 DAILY`;
     customIconType = "daily_1";
-  } else if (award === "daily_2") {
+  } else if (effectiveAward === "daily_2") {
     mainText = "#2 PRODUCT OF DAY";
     subText = "THE LAUNCH FEED";
     statText = `🥈 #2 DAILY`;
     customIconType = "daily_2";
-  } else if (award === "daily_3") {
+  } else if (effectiveAward === "daily_3") {
     mainText = "#3 PRODUCT OF DAY";
     subText = "THE LAUNCH FEED";
     statText = `🥉 #3 DAILY`;
     customIconType = "daily_3";
   }
   // 2. Weekly Awards
-  else if (award === "weekly_1") {
+  else if (effectiveAward === "weekly_1") {
     mainText = "#1 PRODUCT OF WEEK";
     subText = "THE LAUNCH FEED";
     statText = `⚡ #1 WEEKLY`;
     customIconType = "weekly_1";
-  } else if (award === "weekly_2") {
+  } else if (effectiveAward === "weekly_2") {
     mainText = "#2 PRODUCT OF WEEK";
     subText = "THE LAUNCH FEED";
     statText = `⚡ #2 WEEKLY`;
     customIconType = "weekly_2";
-  } else if (award === "weekly_3") {
+  } else if (effectiveAward === "weekly_3") {
     mainText = "#3 PRODUCT OF WEEK";
     subText = "THE LAUNCH FEED";
     statText = `⚡ #3 WEEKLY`;
     customIconType = "weekly_3";
   }
   // 3. Monthly Awards
-  else if (award === "monthly_1") {
+  else if (effectiveAward === "monthly_1") {
     mainText = "#1 PRODUCT OF MONTH";
     subText = "THE LAUNCH FEED";
     statText = `★ #1 MONTHLY`;
     customIconType = "monthly_1";
-  } else if (award === "monthly_2") {
+  } else if (effectiveAward === "monthly_2") {
     mainText = "#2 PRODUCT OF MONTH";
     subText = "THE LAUNCH FEED";
     statText = `★ #2 MONTHLY`;
     customIconType = "monthly_2";
-  } else if (award === "monthly_3") {
+  } else if (effectiveAward === "monthly_3") {
     mainText = "#3 PRODUCT OF MONTH";
     subText = "THE LAUNCH FEED";
     statText = `★ #3 MONTHLY`;
     customIconType = "monthly_3";
   }
   // 4. Yearly Awards
-  else if (award === "champion" || award === "yearly_1") {
+  else if (effectiveAward === "champion" || effectiveAward === "yearly_1") {
     mainText = "2026 CHAMPION";
     subText = "THE LAUNCH FEED";
     statText = `👑 #1 YEARLY`;
     customIconType = "yearly_1";
-  } else if (award === "yearly_2") {
+  } else if (effectiveAward === "yearly_2") {
     mainText = "2026 FINALIST #2";
     subText = "THE LAUNCH FEED";
     statText = `👑 #2 YEARLY`;
     customIconType = "yearly_2";
-  } else if (award === "yearly_3") {
+  } else if (effectiveAward === "yearly_3") {
     mainText = "2026 FINALIST #3";
     subText = "THE LAUNCH FEED";
     statText = `👑 #3 YEARLY`;
     customIconType = "yearly_3";
   }
   // 5. All-Time Awards
-  else if (award === "alltime_1") {
+  else if (effectiveAward === "alltime_1") {
     mainText = "ALL-TIME #1 GOAT";
     subText = "THE LAUNCH FEED";
     statText = `🏆 GOAT #1`;
     customIconType = "alltime_1";
-  } else if (award === "alltime_2") {
+  } else if (effectiveAward === "alltime_2") {
     mainText = "ALL-TIME #2";
     subText = "THE LAUNCH FEED";
     statText = `🛡️ #2 HALL OF FAME`;
     customIconType = "alltime_2";
-  } else if (award === "alltime_3") {
+  } else if (effectiveAward === "alltime_3") {
     mainText = "ALL-TIME #3";
     subText = "THE LAUNCH FEED";
     statText = `🌿 #3 HALL OF FAME`;
     customIconType = "alltime_3";
   }
   // 6. Upvote & Revenue Badges
-  else if (award === "revenue" && revenue) {
+  else if (effectiveAward === "revenue" && revenue) {
     mainText = "MRR TELEMETRY";
     subText = revenue;
     statText = `✓ VERIFIED`;
     customIconType = "revenue";
-  } else if (award === "upvote") {
+  } else if (effectiveAward === "upvote") {
     mainText = `${votes.toLocaleString()} UPVOTES`;
     subText = "THE LAUNCH FEED";
     statText = `▲ TOP VOTED`;
@@ -424,7 +434,7 @@ export async function GET(
     searchParams.get("download") === "true" ||
     searchParams.get("download") === "1" ||
     searchParams.get("dl") === "1";
-  const filename = `${slug || "launchfeed"}-${award}-${theme}-badge.svg`;
+  const filename = `${slug || "launchfeed"}-${effectiveAward}-${theme}-badge.svg`;
 
   const responseHeaders: Record<string, string> = {
     "Content-Type": "image/svg+xml; charset=utf-8",
