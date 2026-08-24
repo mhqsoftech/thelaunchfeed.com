@@ -48,8 +48,8 @@ export default function FeaturedOnFooterBar({
         title="Featured on online software directories"
       >
         {/* Left and Right Subtle Fade Gradients for clean edge blending */}
-        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-canvas to-transparent z-10" />
-        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-canvas to-transparent z-10" />
+        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-void to-transparent z-10" />
+        <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-void to-transparent z-10" />
 
         <div
           className={`flex items-center gap-4 ${

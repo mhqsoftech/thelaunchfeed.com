@@ -54,6 +54,9 @@ export default function DirectoryEmbedsTab() {
   const [formTargetUrl, setFormTargetUrl] = useState("");
   const [formEnabled, setFormEnabled] = useState(true);
 
+  // Delete modal state
+  const [deletingEmbed, setDeletingEmbed] = useState<{ id: string; name: string } | null>(null);
+
   const fetchEmbeds = async () => {
     try {
       setLoading(true);
@@ -126,17 +129,19 @@ export default function DirectoryEmbedsTab() {
     });
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete the embed code for "${name}"?`)) return;
+  const handleConfirmDelete = async () => {
+    if (!deletingEmbed) return;
 
     startTransition(async () => {
-      const res = await deleteDirectoryEmbed(id);
+      const res = await deleteDirectoryEmbed(deletingEmbed.id);
       if (res.success) {
         setSuccessMsg("Embed deleted successfully");
         setTimeout(() => setSuccessMsg(null), 3000);
+        setDeletingEmbed(null);
         await fetchEmbeds();
       } else {
         setError(res.error || "Failed to delete");
+        setDeletingEmbed(null);
       }
     });
   };
@@ -331,7 +336,7 @@ export default function DirectoryEmbedsTab() {
                       <button
                         type="button"
                         disabled={isPending}
-                        onClick={() => handleDelete(item.id, item.name)}
+                        onClick={() => setDeletingEmbed({ id: item.id, name: item.name })}
                         className="px-2.5 py-1 border border-signal/40 text-signal hover:bg-signal hover:text-void text-[10px] uppercase font-bold transition-colors cursor-pointer"
                       >
                         Delete
@@ -358,16 +363,17 @@ export default function DirectoryEmbedsTab() {
 
       {/* Add / Edit Modal */}
       {showModal && typeof document !== "undefined" && createPortal(
-        <div className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-canvas border border-hairline w-full max-w-xl p-6 space-y-5 shadow-2xl">
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-void border border-hairline w-full max-w-xl p-5 sm:p-6 space-y-5 shadow-2xl font-mono text-ink relative rounded-xs">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
-              <h3 className="text-sm font-bold text-ink uppercase">
+              <h3 className="text-sm font-bold text-ink uppercase tracking-wider">
                 {editingId ? "Edit Directory Embed" : "Add Directory Embed Code"}
               </h3>
               <button
                 type="button"
                 onClick={() => setShowModal(false)}
-                className="text-ink-dim hover:text-ink font-bold text-base cursor-pointer"
+                className="text-ink-dim hover:text-ink font-bold text-lg leading-none cursor-pointer"
+                aria-label="Close"
               >
                 &times;
               </button>
@@ -376,7 +382,7 @@ export default function DirectoryEmbedsTab() {
             {/* Presets Row */}
             {!editingId && (
               <div className="space-y-1.5">
-                <div className="text-[10px] font-bold uppercase text-ink-dim">
+                <div className="text-[10px] font-bold uppercase text-ink-dim tracking-wider">
                   Quick Presets (Click to fill sample format):
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -385,7 +391,7 @@ export default function DirectoryEmbedsTab() {
                       key={p.name}
                       type="button"
                       onClick={() => applyPreset(p)}
-                      className="px-2 py-1 text-[10px] border border-hairline hover:border-signal bg-surface/40 hover:text-signal transition-colors cursor-pointer"
+                      className="px-2.5 py-1 text-[10px] font-bold border border-hairline bg-surface hover:bg-raised text-ink hover:text-signal hover:border-signal/50 transition-colors cursor-pointer rounded-xs"
                     >
                       {p.name}
                     </button>
@@ -405,7 +411,7 @@ export default function DirectoryEmbedsTab() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Product Hunt, Uneed, Peerlist, Toolify"
-                  className="w-full px-3 py-2 border border-hairline bg-void text-ink text-xs focus:border-signal outline-none"
+                  className="w-full px-3 py-2 border border-hairline bg-surface/30 text-ink text-xs focus:border-signal outline-none font-mono placeholder:text-ink-faint rounded-xs"
                 />
               </div>
 
@@ -419,7 +425,7 @@ export default function DirectoryEmbedsTab() {
                   value={formEmbedHtml}
                   onChange={(e) => setFormEmbedHtml(e.target.value)}
                   placeholder='<a href="https://..." target="_blank"><img src="https://..." alt="..." /></a>'
-                  className="w-full px-3 py-2 border border-hairline bg-void text-signal font-mono text-xs focus:border-signal outline-none resize-none leading-relaxed"
+                  className="w-full px-3 py-2 border border-hairline bg-surface/30 text-signal font-mono text-xs focus:border-signal outline-none resize-none leading-relaxed placeholder:text-ink-faint rounded-xs"
                 />
                 <p className="text-[10px] text-ink-dim">
                   Paste the exact HTML embed snippet provided by the directory.
@@ -435,7 +441,7 @@ export default function DirectoryEmbedsTab() {
                   value={formTargetUrl}
                   onChange={(e) => setFormTargetUrl(e.target.value)}
                   placeholder="https://directory.com/products/the-launch-feed"
-                  className="w-full px-3 py-2 border border-hairline bg-void text-ink text-xs focus:border-signal outline-none"
+                  className="w-full px-3 py-2 border border-hairline bg-surface/30 text-ink text-xs focus:border-signal outline-none font-mono placeholder:text-ink-faint rounded-xs"
                 />
               </div>
 
@@ -445,14 +451,14 @@ export default function DirectoryEmbedsTab() {
                   <div className="text-[10px] font-bold uppercase text-ink-dim">
                     Live Preview in Modal:
                   </div>
-                  <div className="p-4 border border-hairline bg-void flex items-center justify-center min-h-[50px] overflow-hidden">
+                  <div className="p-4 border border-hairline bg-surface/20 flex items-center justify-center min-h-[50px] overflow-hidden rounded-xs">
                     <div dangerouslySetInnerHTML={{ __html: formEmbedHtml }} />
                   </div>
                 </div>
               )}
 
               <div className="flex items-center gap-2 pt-1">
-                <label className="flex items-center gap-2 text-xs font-bold uppercase text-ink cursor-pointer">
+                <label className="flex items-center gap-2 text-xs font-bold uppercase text-ink cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={formEnabled}
@@ -468,19 +474,78 @@ export default function DirectoryEmbedsTab() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-hairline text-ink-dim hover:text-ink text-xs uppercase font-bold cursor-pointer"
+                  className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-xs uppercase font-bold cursor-pointer transition-colors rounded-xs"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-signal text-void hover:opacity-90 disabled:opacity-50 text-xs uppercase font-bold cursor-pointer shadow-sm"
+                  className="px-5 py-2 bg-signal text-void hover:bg-signal/90 disabled:opacity-50 text-xs uppercase font-bold cursor-pointer shadow-xs transition-colors rounded-xs"
                 >
                   {isPending ? "Saving..." : editingId ? "Update Embed" : "Save Embed"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deletingEmbed && typeof document !== "undefined" && createPortal(
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-w-md border border-rose-500/40 bg-void p-5 sm:p-6 space-y-4 font-mono text-ink shadow-2xl relative rounded-xs">
+            <div className="flex items-center justify-between border-b border-hairline pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
+                  Delete Directory Embed
+                </h3>
+              </div>
+              <span className="text-[9px] font-mono px-2 py-0.5 border border-rose-500/40 text-rose-400 bg-rose-500/10 uppercase font-bold">
+                Permanent
+              </span>
+            </div>
+
+            <div className="space-y-2.5 text-xs text-ink-dim leading-relaxed">
+              <div className="p-3 border border-hairline bg-surface/30 rounded-xs space-y-1">
+                <div className="text-[10px] uppercase font-bold text-ink-faint">Directory Name</div>
+                <div className="text-sm font-bold text-ink truncate">
+                  {deletingEmbed.name}
+                </div>
+              </div>
+
+              <p className="text-ink-dim">
+                Are you sure you want to delete the embed code for <strong>{deletingEmbed.name}</strong>? It will immediately stop appearing in the footer marquee across all pages.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-hairline">
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => setDeletingEmbed(null)}
+                className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 rounded-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 rounded-xs shadow-xs"
+              >
+                {isPending ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Delete Embed</span>
+                )}
+              </button>
+            </div>
           </div>
         </div>,
         document.body
