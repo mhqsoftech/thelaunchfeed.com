@@ -43,6 +43,32 @@ const imageString = z
     return false;
   }, "Image must be an http(s) URL or a data:image/*");
 
+/**
+ * Video URL validator — accepts any http(s) URL so founders can use YouTube,
+ * Vimeo, Loom, Google Drive, X/Twitter, TikTok, Instagram, Streamable,
+ * Dropbox, or a direct .mp4/.webm link. The Live Preview embed picks the
+ * right player per host; this validator only guarantees the string is a real
+ * URL, not garbage. (Previously restricted to YT/Vimeo/Loom, which silently
+ * failed the whole submission for any other host — including making
+ * `tags` never persist.)
+ */
+const videoUrlSchema = z
+  .string()
+  .optional()
+  .or(z.literal(""))
+  .refine(
+    (v) => {
+      if (!v) return true;
+      try {
+        const u = new URL(v);
+        return u.protocol === "http:" || u.protocol === "https:";
+      } catch {
+        return false;
+      }
+    },
+    { message: "videoUrl must be a valid http(s) URL" },
+  );
+
 const CreateSchema = z.object({
   name: z.string().min(1).max(200),
   tagline: z.string().min(1).max(250).or(z.literal("")),
@@ -53,30 +79,7 @@ const CreateSchema = z.object({
   makerHandle: z.string().min(1),
   logoUrl: imageString.optional().or(z.literal("")),
   screenshots: z.array(imageString).max(8).optional(),
-  videoUrl: z
-    .string()
-    .optional()
-    .or(z.literal(""))
-    .refine(
-      (v) => {
-        if (!v) return true;
-        try {
-          const host = new URL(v).hostname.toLowerCase();
-          return (
-            host === "youtube.com" ||
-            host.endsWith(".youtube.com") ||
-            host === "youtu.be" ||
-            host === "vimeo.com" ||
-            host.endsWith(".vimeo.com") ||
-            host === "loom.com" ||
-            host.endsWith(".loom.com")
-          );
-        } catch {
-          return false;
-        }
-      },
-      { message: "videoUrl must be a YouTube, Vimeo, or Loom URL" }
-    ),
+  videoUrl: videoUrlSchema,
   tags: z.array(z.string().max(60)).max(20).optional(),
   details: z.record(z.string(), z.unknown()).optional(),
   asDraft: z.boolean().optional(),
@@ -719,39 +722,22 @@ const UpdateFieldsSchema = z.object({
   categorySlug: z.string().optional(),
   logoUrl: imageString.optional().or(z.literal("")),
   screenshots: z.array(imageString).max(8).optional(),
-  videoUrl: z
-    .string()
-    .optional()
-    .or(z.literal(""))
-    .refine(
-      (v) => {
-        if (!v) return true;
-        try {
-          const host = new URL(v).hostname.toLowerCase();
-          return (
-            host === "youtube.com" ||
-            host.endsWith(".youtube.com") ||
-            host === "youtu.be" ||
-            host === "vimeo.com" ||
-            host.endsWith(".vimeo.com") ||
-            host === "loom.com" ||
-            host.endsWith(".loom.com")
-          );
-        } catch {
-          return false;
-        }
-      },
-      { message: "videoUrl must be a YouTube, Vimeo, or Loom URL" }
-    ),
+  videoUrl: videoUrlSchema,
   tags: z.array(z.string().max(60)).max(20).optional(),
   details: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** Update a submission the user owns. Pending stays pending, rejected
- *  gets put back on the queue (schedule/status reset + reason cleared). */
+ *  gets put back on the queue (schedule/status reset + reason cleared).
+ *
+ *  When `opts.keepAsDraft` is true and the row is currently a DRAFT, the
+ *  update saves the changes but does NOT promote the row to SCHEDULED — the
+ *  draft stays a draft. Used by the "Update Draft" button on the submit
+ *  form so founders can iterate on a draft without pushing it live. */
 export async function updateMySubmission(
   submissionId: string,
   fields: z.infer<typeof UpdateFieldsSchema>,
+  opts?: { keepAsDraft?: boolean },
 ): Promise<Submission> {
   const user = await requireUser();
   const parsed = UpdateFieldsSchema.parse(fields);
@@ -766,9 +752,12 @@ export async function updateMySubmission(
 
   const wasRejected = existing.status === "REJECTED";
   const wasDraft = existing.status === "DRAFT";
-  const scheduledFor = wasRejected || wasDraft
-    ? getNext6AmIstRelease()
-    : existing.scheduledFor;
+  const keepAsDraft = opts?.keepAsDraft === true && wasDraft;
+  const scheduledFor = keepAsDraft
+    ? existing.scheduledFor
+    : wasRejected || wasDraft
+      ? getNext6AmIstRelease()
+      : existing.scheduledFor;
 
   const logoUrl = parsed.logoUrl !== undefined ? await processImageString(parsed.logoUrl, "logos") : existing.logoUrl;
   let screenshots = existing.screenshots;
@@ -794,7 +783,7 @@ export async function updateMySubmission(
       tags: parsed.tags ?? existing.tags,
       categoryId: category?.id ?? existing.categoryId,
       details: parsed.details !== undefined ? (parsed.details as any) : existing.details,
-      status: "SCHEDULED",
+      status: keepAsDraft ? "DRAFT" : "SCHEDULED",
       scheduledFor,
       rejectedAt: null,
       rejectionReason: null,

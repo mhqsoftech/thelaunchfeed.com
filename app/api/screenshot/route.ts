@@ -24,7 +24,15 @@ export async function GET(req: Request) {
   }
   const target = safety.url;
   const targetUrl = target.toString();
-  const TIMEOUT_MS = 20000;
+  // Providers now wait for the page to finish loading (networkidle / delay flags)
+  // before capturing, so the outer fetch timeout has to be generous enough for
+  // that wait plus the capture itself. Total per provider: up to 40s.
+  const TIMEOUT_MS = 40_000;
+  // Seconds to give the target page after DOM-ready before the capture fires.
+  // Long enough that above-the-fold fonts, hero images, CSS animations, and
+  // client-side hydration all settle, short enough that we don't blow the total
+  // budget when we cascade through providers.
+  const PAGE_SETTLE_S = 4;
 
   // Helper: fetch with timeout
   async function fetchWithTimeout(url: string, ms: number): Promise<Response> {
@@ -58,8 +66,11 @@ export async function GET(req: Request) {
   }
 
   // ── Provider 1: thum.io (free, returns image directly, raw URL not encoded) ──
+  // /wait/<s> = wait N seconds AFTER page load before capturing (settles fonts,
+  // async hero images, and client-side hydration). /noanimate freezes CSS
+  // animations so hero effects don't get captured mid-frame.
   try {
-    const thumUrl = `https://image.thum.io/get/width/1200/crop/630/noanimate/${targetUrl}`;
+    const thumUrl = `https://image.thum.io/get/width/1200/crop/630/wait/${PAGE_SETTLE_S}/noanimate/${targetUrl}`;
     const res = await fetchWithTimeout(thumUrl, TIMEOUT_MS);
     if (res.ok) {
       const img = await extractImage(res);
@@ -70,8 +81,10 @@ export async function GET(req: Request) {
   }
 
   // ── Provider 2: screenshotmachine.com free tier ──
+  // `delay=<s>` (0–10) waits N seconds after load; `timeout` is the page-load
+  // navigation timeout. Both are needed so slow SPAs finish hydrating first.
   try {
-    const ssmUrl = `https://api.screenshotmachine.com/?url=${encodeURIComponent(targetUrl)}&dimension=1200x630&format=png&cacheLimit=0&timeout=10000`;
+    const ssmUrl = `https://api.screenshotmachine.com/?url=${encodeURIComponent(targetUrl)}&dimension=1200x630&format=png&cacheLimit=0&delay=${PAGE_SETTLE_S}&timeout=20000`;
     const res = await fetchWithTimeout(ssmUrl, TIMEOUT_MS);
     if (res.ok) {
       const img = await extractImage(res);
@@ -82,8 +95,13 @@ export async function GET(req: Request) {
   }
 
   // ── Provider 3: Microlink (returns JSON, extract screenshot URL) ──
+  // `waitUntil=networkidle0` = wait until there are no in-flight requests for
+  // 500ms (best proxy for "the page is done"); `waitForTimeout` adds a fixed
+  // settle window after that so lazy hero images / CSS transitions land.
   try {
-    const mlUrl = `https://api.microlink.io/?url=${encodeURIComponent(targetUrl)}&screenshot=true&meta=false&viewport.width=1200&viewport.height=630&viewport.deviceScaleFactor=1`;
+    const mlUrl = `https://api.microlink.io/?url=${encodeURIComponent(
+      targetUrl,
+    )}&screenshot=true&meta=false&viewport.width=1200&viewport.height=630&viewport.deviceScaleFactor=1&waitUntil=networkidle0&waitForTimeout=${PAGE_SETTLE_S * 1000}`;
     const res = await fetchWithTimeout(mlUrl, TIMEOUT_MS);
     if (res.ok) {
       const json = await res.json();
@@ -91,7 +109,7 @@ export async function GET(req: Request) {
       // Microlink returns a CDN URL — still validate before we fetch it, so a
       // compromised or spoofed response can't turn this into an SSRF vector.
       if (screenshotUrl && (await assertSafeUrl(screenshotUrl)).ok) {
-        const imgRes = await fetchWithTimeout(screenshotUrl, 10000);
+        const imgRes = await fetchWithTimeout(screenshotUrl, 20_000);
         if (imgRes.ok) {
           const img = await extractImage(imgRes);
           if (img) return img;

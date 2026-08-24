@@ -32,6 +32,150 @@ import {
   PaymentProviderLogo,
 } from "../lib/revenueTelemetrySDK";
 
+// Merges two comma-separated strings, deduping case-insensitively, keeping the
+// first source's ordering. Used to union the deterministic architecture probe's
+// values with the AI extractor's inferences without producing duplicates.
+function joinNonEmpty(...parts: (string | undefined | null)[]): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    if (!p) continue;
+    for (const raw of p.split(",")) {
+      const t = raw.trim();
+      if (!t) continue;
+      const k = t.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(t);
+    }
+  }
+  return out.join(", ");
+}
+
+/**
+ * Broadcast channels CTA — shown right after a successful submission or edit.
+ * The point: the founder just committed a product to the queue; the natural next
+ * beat is telling them where they can *watch* it broadcast at 06:00 IST and
+ * where they'll get pinged when it goes live. Kept visually loud so it competes
+ * with the action buttons for attention without pushing them off the fold.
+ */
+function BroadcastChannelsCTA({ productName, mode }: { productName: string; mode: "new" | "edit" }) {
+  const label = productName?.trim() || "Your product";
+  const channels = [
+    {
+      key: "whatsapp",
+      name: "WhatsApp",
+      handle: "Launch Feed · daily group",
+      href: "https://chat.whatsapp.com/HxTenCRhtHa9PIviuQNl9U",
+      accent: "text-emerald-400 group-hover:text-emerald-300",
+      dot: "bg-emerald-400",
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden>
+          <path d="M20.52 3.48A11.9 11.9 0 0012.02 0C5.4 0 .07 5.35.07 11.94c0 2.1.55 4.15 1.6 5.96L0 24l6.28-1.64a11.93 11.93 0 005.73 1.46h.01c6.62 0 11.95-5.35 11.95-11.94a11.85 11.85 0 00-3.45-8.4zM12.02 21.8h-.01a9.83 9.83 0 01-5.02-1.37l-.36-.22-3.73.98 1-3.64-.24-.37a9.86 9.86 0 01-1.5-5.24C2.16 6.5 6.57 2.1 12.03 2.1c2.63 0 5.1 1.02 6.96 2.88a9.75 9.75 0 012.87 6.94c0 5.45-4.4 9.88-9.84 9.88zm5.4-7.4c-.29-.15-1.72-.85-1.99-.94-.27-.1-.47-.15-.66.15-.2.3-.75.94-.92 1.14-.17.2-.34.22-.63.07-.29-.15-1.24-.46-2.36-1.47-.87-.78-1.46-1.74-1.63-2.03-.17-.3-.02-.46.13-.6.13-.13.29-.34.44-.51.15-.17.19-.29.29-.49.1-.2.05-.37-.03-.51-.07-.15-.66-1.6-.91-2.19-.24-.58-.49-.5-.66-.51h-.57c-.19 0-.51.07-.78.37s-1.03 1.01-1.03 2.46 1.05 2.85 1.2 3.05c.14.2 2.07 3.17 5.01 4.44.7.3 1.25.48 1.68.62.7.22 1.35.19 1.86.12.57-.09 1.72-.7 1.97-1.38.24-.68.24-1.26.17-1.38-.07-.12-.27-.19-.56-.34z" />
+        </svg>
+      ),
+    },
+    {
+      key: "telegram",
+      name: "Telegram",
+      handle: "t.me/thelaunchfeed",
+      href: "https://t.me/thelaunchfeed",
+      accent: "text-sky-400 group-hover:text-sky-300",
+      dot: "bg-sky-400",
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden>
+          <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.24 3.64 11.94c-.88-.25-.89-.86.2-1.3L19.83 4.6c.73-.33 1.43.18 1.15 1.3l-3.05 14.37c-.19.94-.72 1.17-1.47.73l-4.03-2.98-1.94 1.88c-.22.22-.4.4-.83.4z" />
+        </svg>
+      ),
+    },
+    {
+      key: "x",
+      name: "X",
+      handle: "@thelaunchfeed",
+      href: "https://x.com/thelaunchfeed",
+      accent: "text-ink group-hover:text-signal",
+      dot: "bg-ink",
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden>
+          <path d="M18.244 2H21l-6.53 7.463L22 22h-6.828l-4.79-6.263L4.8 22H2l7.02-8.02L2 2h6.914l4.36 5.76L18.245 2zm-1.194 18.303h1.882L7.05 3.63H5.033l12.017 16.673z" />
+        </svg>
+      ),
+    },
+    {
+      key: "bluesky",
+      name: "Bluesky",
+      handle: "@thelaunchfeed.bsky.social",
+      href: "https://bsky.app/profile/thelaunchfeed.bsky.social",
+      accent: "text-blue-400 group-hover:text-blue-300",
+      dot: "bg-blue-400",
+      icon: (
+        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor" aria-hidden>
+          <path d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-8.001C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364.136-.02.275-.039.415-.056-.138.022-.276.04-.415.056-3.911.58-7.386 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a8.741 8.741 0 01-.415-.056c.14.017.279.036.415.056 2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.235C16.046 4.747 13.087 8.687 12 10.8z" />
+        </svg>
+      ),
+    },
+  ] as const;
+
+  const headline =
+    mode === "edit"
+      ? `Stay in the loop — every update to ${label} broadcasts here.`
+      : `Watch ${label} go live at 06:00 IST — in real time, on the channel of your choice.`;
+
+  return (
+    <div className="relative border border-signal/40 bg-gradient-to-br from-signal/[0.08] via-void to-void p-5 sm:p-6 w-full space-y-4 overflow-hidden">
+      {/* Ambient radar-wave motif — subtle, purely decorative. */}
+      <div className="pointer-events-none absolute -top-10 -right-10 w-40 h-40 opacity-30" aria-hidden>
+        <span className="absolute inset-0 rounded-full border border-signal animate-ping" />
+        <span
+          className="absolute inset-0 rounded-full border border-signal animate-ping"
+          style={{ animationDelay: "0.9s", animationDuration: "2.6s" }}
+        />
+        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-signal" />
+      </div>
+
+      <div className="relative flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-widest text-signal">
+        <span className="w-2 h-2 rounded-full bg-signal animate-pulse" />
+        <span>◉ Join the broadcast</span>
+      </div>
+
+      <p className="relative text-sm sm:text-[15px] text-ink leading-relaxed font-mono">
+        {headline.split(label).map((part, i, arr) => (
+          <React.Fragment key={i}>
+            {part}
+            {i < arr.length - 1 && <strong className="text-signal font-bold">{label}</strong>}
+          </React.Fragment>
+        ))}
+      </p>
+
+      <div className="relative grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {channels.map((c) => (
+          <a
+            key={c.key}
+            href={c.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex flex-col items-start gap-1.5 p-3 border border-hairline bg-void hover:border-signal hover:bg-signal/5 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+          >
+            <span className={`flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest ${c.accent}`}>
+              {c.icon}
+              <span>{c.name}</span>
+            </span>
+            <span className="text-[11px] font-mono text-ink font-bold group-hover:text-signal transition-colors truncate w-full">
+              {c.handle} <span className="inline-block group-hover:translate-x-0.5 transition-transform">↗</span>
+            </span>
+          </a>
+        ))}
+      </div>
+
+      <p className="relative text-[10px] font-mono uppercase tracking-widest text-ink-faint">
+        {mode === "edit"
+          ? "◼ WhatsApp · Telegram · X · Bluesky — every update, every leaderboard change"
+          : "◼ Free · No spam · Unsubscribe any time · Also on email · rss · atom"}
+      </p>
+    </div>
+  );
+}
+
 function PixelatedShipmentBox({ className = "w-4 h-4" }: { className?: string }) {
   return (
     <svg
@@ -338,6 +482,13 @@ export default function SubmitClientView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [draftSavedFlash, setDraftSavedFlash] = useState(false);
+  // When editing an existing DRAFT row, this ref flips true right before we
+  // submit if the founder clicked the "Update Draft" button. The submit handler
+  // reads it in its edit-mode branch to pass keepAsDraft to updateMySubmission
+  // (so the row stays a draft instead of being promoted to SCHEDULED) and to
+  // suppress the "Queued for launch" success screen.
+  const keepAsDraftIntentRef = React.useRef(false);
+  const [isUpdatingDraft, setIsUpdatingDraft] = useState(false);
 
   const isEditMode = Boolean(onSaveProduct || editTarget || editParam);
 
@@ -996,12 +1147,12 @@ export default function SubmitClientView({
     if (step === 4) return !!(formData.originStory || formData.makerThesis);
     if (step === 5) return !!(formData.latestVersion || formData.latestChangelog);
     if (step === 6) {
-      return (
-        enableRevenueSdk ||
-        !!(formData.pricingPartner && formData.pricingPartner.trim()) ||
-        !!(formData.apiKey && formData.apiKey.trim()) ||
-        !!(formData.revenue && formData.revenue.trim())
-      );
+      // Revenue SDK is optional. It only counts as complete when the user has
+      // explicitly enabled the SDK toggle or explicitly skipped this step
+      // (handled by the skippedSteps short-circuit at the top of this function).
+      // Autofilled pricingPartner / revenue values MUST NOT flip this step to
+      // complete on their own — the user has to make a deliberate choice.
+      return enableRevenueSdk;
     }
     if (step === 7) return faqs.length > 0 && !!(faqs[0].q && faqs[0].a);
     return false;
@@ -1059,12 +1210,9 @@ export default function SubmitClientView({
         return { filled: fields.filter(Boolean).length, total: fields.length };
       }
       case 6: {
-        const isDone =
-          enableRevenueSdk ||
-          s(formData.pricingPartner) ||
-          s(formData.apiKey) ||
-          s(formData.revenue);
-        return { filled: isDone ? 1 : 0, total: 1 };
+        // Same rule as getStepStatus: only the explicit SDK toggle counts as
+        // "done". Autofilled values are UI defaults, not user commitments.
+        return { filled: enableRevenueSdk ? 1 : 0, total: 1 };
       }
       case 7: {
         const anyFaq = faqs.some((f) => s(f.q) && s(f.a));
@@ -1134,14 +1282,26 @@ export default function SubmitClientView({
     setIsExtracting(true);
 
     try {
-      const res = await fetch("/api/autofill", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: autofillUrl.trim() }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        throw new Error(json?.error || `Extraction failed (${res.status})`);
+      // Fire the AI extractor and the deterministic architecture probe in parallel.
+      // The architecture endpoint runs a real crawl (no AI) — HTTP headers, TLS/HSTS/CSP,
+      // security.txt, robots, sitemap, manifest, /openapi.json, /graphql, /api, /docs,
+      // /health, plus the full fingerprint from the HTML — and gives us verified values
+      // for the Architecture section that override the AI's inferences.
+      const [aiRes, archRes] = await Promise.all([
+        fetch("/api/autofill", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: autofillUrl.trim() }),
+        }),
+        fetch("/api/architecture", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: autofillUrl.trim() }),
+        }).catch(() => null),
+      ]);
+      const json = await aiRes.json();
+      if (!aiRes.ok || !json.ok) {
+        throw new Error(json?.error || `Extraction failed (${aiRes.status})`);
       }
       const d = json.data as {
         name: string; tagline: string; category: string; makerName: string; makerHandle: string;
@@ -1152,8 +1312,34 @@ export default function SubmitClientView({
         originStory: string; makerThesis: string; latestVersion: string; latestChangelog: string;
         roadmapQ3: string; roadmapQ4: string; pricingPartner: string;
         faqs: { q: string; a: string }[]; supportEmail: string;
+        tags?: string;
         logoCandidates?: string[];
       };
+
+      // Merge the deterministic architecture output over the AI's version for the four
+      // Architecture & Technical Specs fields. Where the probe found something concrete,
+      // that value wins; where it didn't, the AI's grounded inference stays.
+      let arch: {
+        techStack?: string;
+        infraHosting?: string;
+        apiUrl?: string;
+        securityStandards?: string;
+      } = {};
+      if (archRes && archRes.ok) {
+        try {
+          const aj = await archRes.json();
+          if (aj?.ok && aj.data?.form) {
+            arch = {
+              techStack: joinNonEmpty(aj.data.form.techStack, d.techStack),
+              infraHosting: joinNonEmpty(aj.data.form.infraHosting, d.infraHosting),
+              apiUrl: aj.data.form.apiUrl || d.apiUrl,
+              securityStandards: joinNonEmpty(aj.data.form.securityStandards, d.securityStandards),
+            };
+          }
+        } catch {
+          // architecture probe failed silently — fall back to AI values
+        }
+      }
 
       const rawFeatures = Array.isArray(d?.features) ? d.features : [];
       const feat = [...rawFeatures];
@@ -1194,10 +1380,11 @@ export default function SubmitClientView({
         freePlan: tiers[0] ? [tiers[0].price, tiers[0].specs].filter(Boolean).join(" · ") : prev.freePlan,
         proPlan: tiers[1] ? [tiers[1].price, tiers[1].specs].filter(Boolean).join(" · ") : prev.proPlan,
         enterprisePlan: tiers[2] ? [tiers[2].price, tiers[2].specs].filter(Boolean).join(" · ") : prev.enterprisePlan,
-        techStack: d.techStack || prev.techStack,
-        infraHosting: d.infraHosting || prev.infraHosting,
-        apiUrl: d.apiUrl || prev.apiUrl,
-        securityStandards: d.securityStandards || prev.securityStandards,
+        techStack: arch.techStack || d.techStack || prev.techStack,
+        infraHosting: arch.infraHosting || d.infraHosting || prev.infraHosting,
+        apiUrl: arch.apiUrl || d.apiUrl || prev.apiUrl,
+        securityStandards: arch.securityStandards || d.securityStandards || prev.securityStandards,
+        tags: d.tags || prev.tags,
         originStory: d.originStory || prev.originStory,
         makerThesis: d.makerThesis || prev.makerThesis,
         latestVersion: d.latestVersion || prev.latestVersion,
@@ -1339,6 +1526,17 @@ export default function SubmitClientView({
     }
   };
 
+  // Triggered by the "Update Draft" button when editing an existing draft.
+  // Flags the intent and calls the normal submit pipeline, which reads the
+  // flag in its edit-mode branch and passes { keepAsDraft: true } to
+  // updateMySubmission — the row's status stays "DRAFT" instead of being
+  // promoted to "SCHEDULED".
+  const handleUpdateDraft = (e: React.MouseEvent | React.FormEvent) => {
+    keepAsDraftIntentRef.current = true;
+    setIsUpdatingDraft(true);
+    handleSubmit(e as React.FormEvent);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmittingRef.current) return;
@@ -1456,7 +1654,17 @@ export default function SubmitClientView({
           details,
         };
         if (editTarget.kind === "submission" && editTarget.submissionId) {
-          const upd = await updateMySubmission(editTarget.submissionId, fields);
+          const keepAsDraft = keepAsDraftIntentRef.current === true;
+          const upd = await updateMySubmission(editTarget.submissionId, fields, { keepAsDraft });
+          // "Update Draft" path: save changes, stay on the form, show a flash.
+          // Do NOT show the queued success screen — the row is still a draft.
+          if (keepAsDraft) {
+            keepAsDraftIntentRef.current = false;
+            setIsUpdatingDraft(false);
+            setDraftSavedFlash(true);
+            setTimeout(() => setDraftSavedFlash(false), 3000);
+            return;
+          }
           // Draft → publish with paid tier: kick off Dodo checkout BEFORE
           // showing the queued screen. Return from here — the checkout return
           // handler at the top of this file completes the submission.
@@ -1572,6 +1780,8 @@ export default function SubmitClientView({
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
+      setIsUpdatingDraft(false);
+      keepAsDraftIntentRef.current = false;
     }
   };
 
@@ -2058,6 +2268,8 @@ export default function SubmitClientView({
                 )}
               </div>
 
+              <BroadcastChannelsCTA productName={formData.name} mode="edit" />
+
               <div className="pt-2 flex items-center justify-center gap-4 flex-wrap">
                 <Link
                   href={`/product/${updatedProductSlug || slugify(formData.name)}`}
@@ -2153,6 +2365,8 @@ export default function SubmitClientView({
                   <span className="text-ink font-bold">00:30 UTC · 6:00 AM IST</span>
                 </div>
               </div>
+
+              <BroadcastChannelsCTA productName={formData.name} mode="new" />
 
               <div className="pt-2 flex items-center justify-center gap-3 flex-wrap">
                 <button
@@ -2474,7 +2688,7 @@ export default function SubmitClientView({
                       </div>
                       <p className="text-[10px] text-ink-faint font-mono break-words">
                         {isCapturingScreenshot
-                          ? "Capturing 1200×630 homepage snapshot and converting to .AVIF…"
+                          ? "Waiting for the homepage to finish loading, then capturing a 1200×630 snapshot and converting to .AVIF… (this can take 15–30 seconds)"
                           : isConvertingGallery
                           ? "Converting uploaded screenshots to high-density .AVIF format..."
                           : `Upload up to ${4 - galleryAvif.length} product screenshot images (PNG, JPG, WebP) to display UI previews.`}
@@ -3440,6 +3654,31 @@ export default function SubmitClientView({
                     )}
                   </button>
                 )}
+                {editTarget?.kind === "submission" && editTarget?.status === "DRAFT" && (
+                  <button
+                    type="button"
+                    onClick={handleUpdateDraft}
+                    disabled={isSubmitting || isUpdatingDraft}
+                    className={`w-full sm:w-auto px-5 py-2.5 text-xs font-bold uppercase transition-colors flex items-center justify-center gap-2 shrink-0 border ${
+                      isUpdatingDraft
+                        ? "border-hairline bg-surface text-ink-dim cursor-wait"
+                        : "border-signal/60 bg-surface text-signal hover:bg-signal/10 cursor-pointer"
+                    }`}
+                    title="Save your changes to the draft without publishing it to the queue"
+                  >
+                    {isUpdatingDraft ? (
+                      <>
+                        <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                        </svg>
+                        <span>Updating Draft…</span>
+                      </>
+                    ) : (
+                      <span>↻ Update Draft</span>
+                    )}
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={isSubmitting || (!isEmbeddedMode && !isAuthorizedConfirmed)}
@@ -3462,7 +3701,7 @@ export default function SubmitClientView({
                   ) : (
                     <>
                       <PixelatedShipmentBox className="w-4 h-4 text-current shrink-0" />
-                      <span>{isEditMode ? "Save Product Updates →" : "Submit Product Shipment"}</span>
+                      <span>{editTarget?.kind === "submission" && editTarget?.status === "DRAFT" ? "Launch Draft to Queue →" : isEditMode ? "Save Product Updates →" : "Submit Product Shipment"}</span>
                     </>
                   )}
                 </button>
@@ -3530,47 +3769,174 @@ export default function SubmitClientView({
                 </div>
                 <div className="overflow-hidden rounded-xs border border-hairline bg-black">
                   {(() => {
-                    const url = formData.videoUrl;
-                    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+                    const url = formData.videoUrl.trim();
+                    const iframeCls = "w-full aspect-video rounded-xs border-0";
+
+                    // YouTube (watch / youtu.be / shorts / embed)
+                    const ytMatch = url.match(
+                      /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/,
+                    );
                     if (ytMatch) {
                       return (
                         <iframe
                           src={`https://www.youtube-nocookie.com/embed/${ytMatch[1]}`}
                           title="Product Video Demo"
-                          className="w-full aspect-video rounded-xs border-0"
+                          className={iframeCls}
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                           allowFullScreen
                         />
                       );
                     }
+
+                    // Loom
                     const loomMatch = url.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
                     if (loomMatch) {
                       return (
                         <iframe
                           src={`https://www.loom.com/embed/${loomMatch[1]}`}
                           title="Product Video Walkthrough"
-                          className="w-full aspect-video rounded-xs border-0"
+                          className={iframeCls}
                           allowFullScreen
                         />
                       );
                     }
-                    const vimeoMatch = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)/);
+
+                    // Vimeo
+                    const vimeoMatch = url.match(
+                      /vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)/,
+                    );
                     if (vimeoMatch) {
                       return (
                         <iframe
                           src={`https://player.vimeo.com/video/${vimeoMatch[1]}`}
                           title="Product Video Demo"
-                          className="w-full aspect-video rounded-xs border-0"
+                          className={iframeCls}
                           allowFullScreen
                         />
                       );
                     }
+
+                    // Google Drive — accepts /file/d/<id>/... or open?id=<id>
+                    const driveMatch =
+                      url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]{20,})/) ||
+                      url.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]{20,})/) ||
+                      url.match(/drive\.google\.com\/uc\?(?:export=[a-z]+&)?id=([a-zA-Z0-9_-]{20,})/);
+                    if (driveMatch) {
+                      return (
+                        <iframe
+                          src={`https://drive.google.com/file/d/${driveMatch[1]}/preview`}
+                          title="Product Video Demo (Google Drive)"
+                          className={iframeCls}
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                        />
+                      );
+                    }
+
+                    // X / Twitter — no true iframe embed, use the platform's video-embed page
+                    const xMatch = url.match(
+                      /(?:twitter\.com|x\.com)\/([A-Za-z0-9_]+)\/status\/(\d+)/,
+                    );
+                    if (xMatch) {
+                      return (
+                        <iframe
+                          src={`https://platform.twitter.com/embed/Tweet.html?id=${xMatch[2]}&theme=dark`}
+                          title="Product Video Demo (X)"
+                          className={iframeCls}
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                        />
+                      );
+                    }
+
+                    // TikTok
+                    const tiktokMatch = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
+                    if (tiktokMatch) {
+                      return (
+                        <iframe
+                          src={`https://www.tiktok.com/player/v1/${tiktokMatch[1]}`}
+                          title="Product Video Demo (TikTok)"
+                          className={iframeCls}
+                          allow="autoplay; encrypted-media; fullscreen"
+                          allowFullScreen
+                        />
+                      );
+                    }
+
+                    // Instagram reel / post
+                    const igMatch = url.match(/instagram\.com\/(?:reel|p|tv)\/([A-Za-z0-9_-]+)/);
+                    if (igMatch) {
+                      return (
+                        <iframe
+                          src={`https://www.instagram.com/p/${igMatch[1]}/embed`}
+                          title="Product Video Demo (Instagram)"
+                          className={iframeCls}
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                        />
+                      );
+                    }
+
+                    // Streamable
+                    const streamMatch = url.match(/streamable\.com\/(?:e\/)?([a-zA-Z0-9]+)/);
+                    if (streamMatch) {
+                      return (
+                        <iframe
+                          src={`https://streamable.com/e/${streamMatch[1]}`}
+                          title="Product Video Demo (Streamable)"
+                          className={iframeCls}
+                          allow="autoplay; encrypted-media"
+                          allowFullScreen
+                        />
+                      );
+                    }
+
+                    // Dropbox — swap ?dl=0 for raw=1 so the <video> tag can stream it
+                    const dropboxMatch = url.match(/dropbox\.com\/(?:s|scl\/fi)\/[^\s]+/);
+                    if (dropboxMatch) {
+                      const raw = url.replace(/[?&]dl=\d/, "").replace(/([?&])$/, "") + (url.includes("?") ? "&" : "?") + "raw=1";
+                      return (
+                        <video
+                          src={raw}
+                          controls
+                          className="w-full aspect-video rounded-xs object-contain bg-black"
+                        />
+                      );
+                    }
+
+                    // Direct file link (.mp4 / .webm / .mov / .m4v)
+                    if (/\.(mp4|webm|mov|m4v|ogv)(\?.*)?$/i.test(url)) {
+                      return (
+                        <video
+                          src={url}
+                          controls
+                          className="w-full aspect-video rounded-xs object-contain bg-black"
+                        />
+                      );
+                    }
+
+                    // Unknown host — full-width poster card so the founder still sees
+                    // something in the preview, with a one-click open in new tab.
                     return (
-                      <video
-                        src={url}
-                        controls
-                        className="w-full aspect-video rounded-xs object-contain bg-black"
-                      />
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center w-full aspect-video bg-gradient-to-br from-surface to-black text-ink hover:text-signal transition-colors group"
+                      >
+                        <div className="text-center space-y-2 px-6">
+                          <div className="text-4xl font-mono text-signal">▶</div>
+                          <div className="text-xs font-mono uppercase tracking-widest text-ink-dim">
+                            Video hosted on an unrecognized platform
+                          </div>
+                          <div className="text-[11px] font-mono text-ink-faint break-all max-w-lg mx-auto">
+                            {url}
+                          </div>
+                          <div className="text-[11px] font-mono uppercase tracking-widest text-signal group-hover:underline">
+                            Open in new tab ↗
+                          </div>
+                        </div>
+                      </a>
                     );
                   })()}
                 </div>
@@ -3622,16 +3988,31 @@ export default function SubmitClientView({
                           {galleryAvif.length} IMAGE(S) · AUTO-CONVERTED TO .AVIF
                         </span>
                       </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {galleryAvif.map((imgUrl, idx) => (
-                          <div key={idx} className="border border-hairline bg-surface h-32 overflow-hidden relative">
-                            <img width="64" height="64" src={imgUrl} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
-                            <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/80 text-white text-[9px] font-mono">
-                              .AVIF
-                            </span>
-                          </div>
-                        ))}
-                      </div>
+                      {galleryAvif.length === 1 ? (
+                        // Single image → full-width hero display so the founder's
+                        // one screenshot lands the way it would on the live page.
+                        <div className="border border-hairline bg-surface overflow-hidden relative">
+                          <img
+                            src={galleryAvif[0]}
+                            alt="Product screenshot"
+                            className="w-full h-auto max-h-[720px] object-contain bg-black"
+                          />
+                          <span className="absolute bottom-2 right-2 px-1.5 py-0.5 bg-black/80 text-white text-[9px] font-mono">
+                            .AVIF · FULL-WIDTH
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {galleryAvif.map((imgUrl, idx) => (
+                            <div key={idx} className="border border-hairline bg-surface h-32 overflow-hidden relative">
+                              <img width="64" height="64" src={imgUrl} alt={`Gallery ${idx + 1}`} className="w-full h-full object-cover" />
+                              <span className="absolute bottom-1 right-1 px-1.5 py-0.5 bg-black/80 text-white text-[9px] font-mono">
+                                .AVIF
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -3864,6 +4245,31 @@ export default function SubmitClientView({
                     </>
                   ) : (
                     <span>Save as Draft</span>
+                  )}
+                </button>
+              )}
+              {editTarget?.kind === "submission" && editTarget?.status === "DRAFT" && (
+                <button
+                  type="button"
+                  onClick={handleUpdateDraft}
+                  disabled={isSubmitting || isUpdatingDraft}
+                  className={`w-full sm:w-auto px-5 py-3 text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 shrink-0 border ${
+                    isUpdatingDraft
+                      ? "border-hairline bg-surface text-ink-dim cursor-wait"
+                      : "border-signal/60 bg-surface text-signal hover:bg-signal/10 cursor-pointer"
+                  }`}
+                  title="Save your changes to the draft without publishing it"
+                >
+                  {isUpdatingDraft ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      <span>Updating Draft…</span>
+                    </>
+                  ) : (
+                    <span>↻ Update Draft</span>
                   )}
                 </button>
               )}

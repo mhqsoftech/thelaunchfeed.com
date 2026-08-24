@@ -33,6 +33,7 @@ export type ExtractedProduct = {
   pricingPartner: string;
   faqs: { q: string; a: string }[];
   supportEmail: string;
+  tags: string;
   ogImage: string;
   favicon: string;
   appleTouchIcon: string;
@@ -49,21 +50,21 @@ const SCHEMA: JsonSchema = {
   additionalProperties: false,
   properties: {
     name: { type: "string" },
-    tagline: { type: "string", description: "One crisp line taken from the source (hero H1/H2, meta description, README subtitle). ≤100 chars, no trailing period. Empty if not present." },
+    tagline: { type: "string", description: "One crisp line, ≤100 chars, no trailing period. Prefer verbatim from hero H1/H2/meta/README subtitle. If none present, write a professional 8-14 word tagline grounded strictly in the product's stated purpose." },
     category: { type: "string" },
-    makerName: { type: "string", description: "Founder/maker ONLY if named on about/team/footer/README author. Empty if not stated." },
-    makerHandle: { type: "string", description: "Twitter/X handle including @, ONLY if linked in source. Empty otherwise." },
+    makerName: { type: "string", description: "Founder/maker ONLY if named on about/team/footer/README author. Empty if not stated (never invent a name)." },
+    makerHandle: { type: "string", description: "Twitter/X handle including @, ONLY if linked in source. Empty otherwise (never invent)." },
     websiteUrl: { type: "string" },
     githubUrl: { type: "string" },
-    revenue: { type: "string", description: "Monthly revenue ONLY if explicitly stated (e.g. $12K/mo). Empty otherwise. NEVER invent." },
-    overviewPitch: { type: "string", description: "Long-form pitch, MINIMUM 1500 characters, ideally 1800-2400. 4-6 paragraphs. Must be grounded in the source (no invented facts, numbers, or claims) but should thoroughly elaborate on every stated feature, capability, integration, audience, and use case found in the corpus. This is the only field where length matters — expand fully." },
+    revenue: { type: "string", description: "Monthly revenue ONLY if explicitly stated (e.g. $12K/mo). Empty otherwise. NEVER invent — this is a verifiable claim." },
+    overviewPitch: { type: "string", description: "Long-form pitch, MINIMUM 1500 characters, ideally 1800-2400. 4-6 paragraphs separated by double newlines. Grounded in the corpus (no invented numbers, customer counts, revenue, awards, or endorsements) but exhaustively elaborate every stated feature, capability, integration, audience, use case, and outcome. Never leave empty." },
     features: {
       type: "array",
       items: { type: "string" },
       maxItems: 8,
-      description: "Concrete product capabilities pulled from features/product/docs pages or README. One sentence each. Empty array if none are stated.",
+      description: "Concrete product capabilities pulled from features/product/docs pages or README. One sentence each. Aim for at least 3; if the corpus lists fewer explicitly, distill 3 grounded capability sentences from whatever product description exists.",
     },
-    targetAudience: { type: "string", description: "Who the product is for, ONLY as stated in the source (e.g. 'built for X'). Empty if not stated." },
+    targetAudience: { type: "string", description: "Who the product is for. Prefer verbatim from source ('built for X'). If not explicitly stated, infer 1-2 sentences grounded strictly in the product's stated purpose and capabilities (e.g. category + primary workflow). Never leave empty." },
     pricingTiers: {
       type: "array",
       maxItems: 6,
@@ -77,19 +78,20 @@ const SCHEMA: JsonSchema = {
         },
         required: ["name", "price", "specs"],
       },
-      description: "ONLY include tiers explicitly present on the pricing/plans page. If no pricing page is in the corpus, return an EMPTY array. Do NOT invent, estimate, or backfill tiers.",
+      description: "VERBATIM-ONLY. Include tiers explicitly present on the pricing/plans page. If no pricing page is in the corpus, return an EMPTY array. Never invent prices or tier structures.",
     },
-    techStack: { type: "string", description: "Comma-separated stack. Use ONLY items from the DETECTED TECHNOLOGIES block (LANGUAGES/FRAMEWORKS/CMS/ANALYTICS/PAYMENTS/AUTH/ERROR TRACKING/…) or technologies explicitly named in page copy (docs code samples, README badges, tech blog posts, careers/jobs). Do NOT list technologies that are neither detected nor named. Empty if nothing qualifies." },
-    infraHosting: { type: "string", description: "Cloud/infra provider. Use ONLY items from the HOSTING/CDN entries in the DETECTED TECHNOLOGIES block, or providers explicitly named in source (status page, docs, 'hosted on...'). Empty otherwise." },
-    apiUrl: { type: "string", description: "Public API base URL ONLY if documented. Empty otherwise." },
-    securityStandards: { type: "string", description: "Compliance badges (SOC2, ISO 27001, GDPR, HIPAA, PCI) ONLY as stated on security/trust page. Empty otherwise." },
-    originStory: { type: "string", description: "Founding narrative paraphrased ONLY from about/story/README/founder blog. Empty if no such content exists in the corpus." },
-    makerThesis: { type: "string", description: "Founder POV paraphrased ONLY from manifesto/mission/opinionated blog copy. Empty if not present." },
-    latestVersion: { type: "string", description: "Latest release/version string ONLY if a changelog or release note is in the corpus. Empty otherwise." },
-    latestChangelog: { type: "string", description: "Summary of the most recent release notes verbatim. Empty if no changelog in corpus." },
-    roadmapQ3: { type: "string", description: "Q3 roadmap item ONLY if a public roadmap explicitly lists it. Empty otherwise." },
-    roadmapQ4: { type: "string", description: "Q4 roadmap item ONLY if a public roadmap explicitly lists it. Empty otherwise." },
-    pricingPartner: { type: "string", description: "Payment provider. Use ONLY items from the PAYMENTS entry in the DETECTED TECHNOLOGIES block, or providers explicitly named in checkout links / terms page. Empty otherwise." },
+    techStack: { type: "string", description: "Comma-separated stack. First use every item from the DETECTED TECHNOLOGIES block. Then add technologies explicitly named in page copy (docs code samples, README badges, careers). If the fingerprint is thin, add 3-5 additional web technologies typical for this category (e.g. 'TypeScript, Next.js, PostgreSQL' for a modern SaaS), but do NOT list branded products (Stripe, Auth0) unless detected/named. Never leave empty." },
+    infraHosting: { type: "string", description: "Cloud/infra provider. Prefer HOSTING/CDN entries from the DETECTED TECHNOLOGIES block and providers explicitly named in source. If none detected/named, describe the deployment model in generic terms grounded in the product ('Managed cloud SaaS' / 'Self-hostable Docker container' / 'Edge-first serverless'). Never leave empty." },
+    apiUrl: { type: "string", description: "Public API base URL ONLY if documented (docs, developer, or API page URL). Empty otherwise (never invent an endpoint)." },
+    securityStandards: { type: "string", description: "Compliance badges (SOC2, ISO 27001, GDPR, HIPAA, PCI) as stated on security/trust page. If none stated, write a 1-line grounded description of standard practices (e.g. 'Encrypted at rest and in transit, role-based access control, least-privilege service credentials, GDPR-aligned data handling.'). Never leave empty." },
+    originStory: { type: "string", description: "Founding narrative, 2-3 paragraphs, separated by double newlines. Prefer paraphrasing about/story/README/founder blog. If no such content exists, write a grounded, non-fabricated narrative from what IS in the corpus (problem observed → product built to solve it → who benefits). Never invent names, dates, funding rounds, or customer stories. Never leave empty." },
+    makerThesis: { type: "string", description: "Founder POV / mission, 1-2 paragraphs. Prefer paraphrasing manifesto/mission/opinionated blog copy. If not stated, distill the product's stated purpose and target audience into a first-principles thesis about why this product matters. Never leave empty." },
+    latestVersion: { type: "string", description: "Latest release/version string. Prefer verbatim from changelog/release notes/badge. If not stated, return 'v1.0' as a safe placeholder the founder can edit. Never invent a specific higher version." },
+    latestChangelog: { type: "string", description: "Summary of the most recent release notes. Prefer verbatim. If no changelog in corpus, write a grounded 'Initial public launch — <core capability>' style summary using the product's stated core features. Never leave empty." },
+    roadmapQ3: { type: "string", description: "Near-term roadmap item (1-2 sentences). Prefer verbatim from a public roadmap. If none, propose ONE grounded next step consistent with the stated product direction (e.g. 'Deeper integration with X', 'Public API expansion for Y'). Never leave empty. Never claim funding, hiring, or customer numbers." },
+    roadmapQ4: { type: "string", description: "Mid-term roadmap item (1-2 sentences). Prefer verbatim. If none, propose ONE further grounded step. Never leave empty. Never claim funding, hiring, or customer numbers." },
+    pricingPartner: { type: "string", description: "Payment provider. Prefer PAYMENTS entry from the DETECTED TECHNOLOGIES block or providers named in checkout links/terms. If none detected/named, return 'stripe' as the safe default the founder can change. Never leave empty." },
+    tags: { type: "string", description: "5-8 comma-separated single-word or short-phrase tags describing the product (e.g. 'ai, developer-tools, open-source, cli, self-hosted'). Grounded in the product's actual category, capabilities, and target audience. Lowercase, hyphenated for multi-word. Never leave empty." },
     faqs: {
       type: "array",
       maxItems: 6,
@@ -129,6 +131,7 @@ const SCHEMA: JsonSchema = {
     "pricingPartner",
     "faqs",
     "supportEmail",
+    "tags",
   ],
 };
 
@@ -178,15 +181,42 @@ function buildCorpus(crawl: CrawlResult | null, gh: GitHubRepoInfo | null, fp: T
   return parts.join("\n\n---\n\n").slice(0, MAX_INPUT_CHARS);
 }
 
-const SYSTEM_PROMPT = `You extract structured product-launch metadata from website + GitHub content. Your ONLY job is to surface information that is ACTUALLY in the source corpus. You are an extractor, not a copywriter.
+const SYSTEM_PROMPT = `You produce a complete, submission-ready product profile from website + GitHub content. You are a hybrid extractor + grounded technical writer: verbatim for verifiable facts, professional inference for narrative fields.
 
 Return ONLY valid JSON matching the schema. No prose.
 
-CORE RULE — SOURCE-ONLY, NEVER GUESS:
-- If a fact is not present in the corpus, return an empty string "" (or empty array) for that field.
-- Do NOT infer pricing, revenue, versions, tech stack, roadmap items, FAQs, tiers, target audience, or compliance from vibes, category conventions, or "what a product like this usually has".
-- Guessing is a failure. Empty is correct.
-- The user prefers a mostly-empty accurate form over a fully-populated fabricated one.
+TWO CATEGORIES OF FIELDS — apply the right rule to each:
+
+CATEGORY A — VERBATIM-ONLY (never invent, empty is correct if unstated):
+- name, tagline, category
+- makerName, makerHandle
+- websiteUrl, githubUrl, apiUrl
+- revenue (never a numeric guess)
+- pricingTiers.name / .price / .specs (verbatim from a pricing page or empty array)
+- latestVersion (safe placeholder 'v1.0' only if truly unstated)
+- pricingPartner (fall back to 'stripe' only if unstated)
+
+CATEGORY B — GROUNDED INFERENCE ALLOWED (must never be left empty):
+- overviewPitch (1500+ chars, 4-6 paragraphs)
+- features (at least 3 grounded capability sentences)
+- targetAudience (2-3 sentences)
+- techStack (fingerprint first, then category-typical stack if thin)
+- infraHosting (fingerprint first, then generic deployment model)
+- securityStandards (stated compliance OR industry-standard practices)
+- originStory (2-3 paragraphs, problem → product → beneficiary)
+- makerThesis (1-2 paragraphs, first-principles POV)
+- latestChangelog (verbatim OR 'Initial public launch — <core capability>')
+- roadmapQ3, roadmapQ4 (verbatim OR one grounded next step each)
+- faqs (3-6 pairs with complete answers)
+- supportEmail (verbatim OR support@<domain>)
+- tags (5-8 grounded tags)
+
+FORBIDDEN IN ALL CATEGORIES — never invent:
+- Numeric claims: revenue, MRR, ARR, user counts, customer counts, download counts, funding raised, valuation, dates, awards.
+- Named entities: real customer names, investor names, employee names, board members.
+- Specific version numbers beyond the safe 'v1.0' placeholder.
+- Concrete integrations not detected/named in source.
+- Compliance certifications the source doesn't claim (SOC2, ISO 27001, HIPAA, PCI-DSS are claims, not defaults).
 
 DETECTED TECHNOLOGIES BLOCK (top of corpus, when present):
 - This is the AUTHORITATIVE list of technologies fingerprinted from HTTP response headers, script tags, meta generators, cookie signatures, and (for GitHub repos) the /languages byte-count API.
@@ -230,7 +260,7 @@ STYLE:
 - Tagline: ≤100 chars, no trailing period, sourced from hero copy or meta description.
 - No purple prose, no emojis, no exclamation marks.
 - Paraphrase rather than copying long verbatim passages, but preserve factual specificity.
-- category MUST be one enum value.`;
+- category: pick EXACTLY ONE slug from the ALLOWED CATEGORIES list in the user message. If the request contains an enum for "category", you MUST return one of those values verbatim or an empty string. Never invent a category name. Never return a display label — only a slug from the list.`;
 
 /**
  * Cleans and repairs malformed or truncated JSON from LLM generation.
@@ -411,6 +441,7 @@ export async function extractProduct(
   inputUrl: string,
   crawl: CrawlResult | null,
   gh: GitHubRepoInfo | null,
+  allowedCategories?: { slug: string; name: string }[],
 ): Promise<ExtractedProduct> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
@@ -443,7 +474,31 @@ export async function extractProduct(
   const corpus = buildCorpus(crawl, gh, fp);
   if (!corpus.trim()) throw new Error("No content could be fetched from the provided URL");
 
-  const userMsg = `Source URL: ${inputUrl}\n\nCorpus:\n${corpus}`;
+  // Build a per-request schema that constrains `category` to the caller's
+  // allowed list (from the live database). This is what stops the LLM from
+  // inventing a new category — it MUST pick one of the enum values or "".
+  const schemaForRequest: JsonSchema = allowedCategories && allowedCategories.length
+    ? {
+        ...SCHEMA,
+        properties: {
+          ...(SCHEMA.properties as Record<string, unknown>),
+          category: {
+            type: "string",
+            enum: ["", ...allowedCategories.map((c) => c.slug)],
+            description:
+              "Pick EXACTLY ONE slug from the enum. NEVER invent a new category. Return \"\" only if none of the enum values reasonably matches the product.",
+          },
+        },
+      }
+    : SCHEMA;
+
+  const categoryGuidance = allowedCategories && allowedCategories.length
+    ? `\n\nALLOWED CATEGORIES (choose ONE slug from this list for the "category" field; if nothing fits, return ""):\n${allowedCategories
+        .map((c) => `- ${c.slug}  (${c.name})`)
+        .join("\n")}\n\nHARD RULE: The "category" field MUST be either an empty string or one of the slugs above verbatim. Do NOT invent new categories or return category names — only slugs. Prefer the closest fit over an empty string when the product clearly belongs to one of these categories.`
+    : "";
+
+  const userMsg = `Source URL: ${inputUrl}${categoryGuidance}\n\nCorpus:\n${corpus}`;
 
   const res = await fetch(OPENAI_URL, {
     method: "POST",
@@ -461,7 +516,7 @@ export async function extractProduct(
       ],
       response_format: {
         type: "json_schema",
-        json_schema: { name: "product_extraction", schema: SCHEMA, strict: true },
+        json_schema: { name: "product_extraction", schema: schemaForRequest, strict: true },
       },
     }),
   });
@@ -617,10 +672,21 @@ export async function extractProduct(
         }))
     : [];
 
+  // Guard: if an allowed-list was provided, refuse any category the model
+  // hallucinated that isn't in the list. Empty string forces the user to pick.
+  // The AI returns a slug; the submit form's dropdown works with display names,
+  // so we map slug → display name here so the value drops straight into the field.
+  const slugToName = new Map((allowedCategories || []).map((c) => [c.slug, c.name]));
+  const rawCat = (parsed.category || "").trim();
+  const safeCategory =
+    allowedCategories && allowedCategories.length
+      ? slugToName.get(rawCat) ?? ""
+      : rawCat;
+
   return {
     name: parsed.name || "",
     tagline: parsed.tagline || "",
-    category: parsed.category || "",
+    category: safeCategory,
     makerName: parsed.makerName || "",
     makerHandle: parsed.makerHandle || "",
     websiteUrl,
@@ -643,6 +709,7 @@ export async function extractProduct(
     pricingPartner: parsed.pricingPartner || "",
     faqs,
     supportEmail,
+    tags: (parsed as any).tags || "",
     ogImage,
     favicon,
     appleTouchIcon,

@@ -36,10 +36,11 @@ export const metadata: Metadata = {
       "Discover the best new tech products, SaaS apps, and AI tools launched today. Real-time voting, verified MRR badges, and permanent maker backlinks.",
     images: [
       {
-        url: "/thelaunchfeed-logo.png",
-        width: 1477,
-        height: 272,
+        url: "/thelaunchfeed-og.avif",
+        width: 1200,
+        height: 630,
         alt: "The Launch Feed - Ship. Vote. Rise.",
+        type: "image/avif",
       },
     ],
   },
@@ -48,7 +49,7 @@ export const metadata: Metadata = {
     title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
     description:
       "Discover the best new tech products, SaaS apps, and AI tools launched today with verified revenue badges.",
-    images: ["/thelaunchfeed-logo.png"],
+    images: ["/thelaunchfeed-og.avif"],
     creator: "@thelaunchfeed",
   },
   robots: {

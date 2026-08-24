@@ -3,6 +3,7 @@ import { z } from "zod";
 import { crawlSite } from "../../lib/autofill/crawler";
 import { fetchGitHub, isGitHubUrl } from "../../lib/autofill/github";
 import { extractProduct } from "../../lib/autofill/extractor";
+import { listCategories } from "../../actions/categories";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,7 +63,13 @@ export async function POST(req: Request) {
       );
     }
 
-    const extracted = await extractProduct(url, crawlExtra, ghExtra);
+    // Load the live category list so the AI is forced to pick one of them
+    // rather than inventing (or freely creating) a new category.
+    const cats = await listCategories()
+      .then((rows) => rows.map((r) => ({ slug: r.slug, name: r.name })))
+      .catch(() => [] as { slug: string; name: string }[]);
+
+    const extracted = await extractProduct(url, crawlExtra, ghExtra, cats);
 
     return NextResponse.json({
       ok: true,
