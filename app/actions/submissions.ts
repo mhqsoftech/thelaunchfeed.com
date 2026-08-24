@@ -614,17 +614,23 @@ export async function deleteSubmission(id: string): Promise<void> {
 }
 
 /**
- * Delete a draft submission owned by the current user.
- * Only DRAFT rows may be deleted this way — scheduled/published items are
- * managed by admin actions.
+ * Delete an unlaunched submission (DRAFT, SCHEDULED / in-queue, or REJECTED)
+ * owned by the current user. Once a product is PUBLISHED / launched, it cannot
+ * be deleted via this user action.
  */
-export async function deleteMyDraft(submissionId: string): Promise<void> {
+export async function deleteMySubmission(submissionId: string): Promise<void> {
   const user = await requireUser();
   const sub = await prisma.submission.findUnique({ where: { id: submissionId } });
   if (!sub || sub.ownerId !== user.id) throw new Error("FORBIDDEN");
-  if (sub.status !== "DRAFT") throw new Error("NOT_A_DRAFT");
+  if (sub.status === "PUBLISHED" || sub.publishedProductId) {
+    throw new Error("CANNOT_DELETE_PUBLISHED_PRODUCT");
+  }
   await prisma.submission.delete({ where: { id: submissionId } });
   revalidatePath("/profile");
+}
+
+export async function deleteMyDraft(submissionId: string): Promise<void> {
+  return deleteMySubmission(submissionId);
 }
 
 /* ─────────── user-facing status lookup ─────────── */

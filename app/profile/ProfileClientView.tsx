@@ -15,7 +15,7 @@ import {
 import { authClient } from "@/lib/auth-client";
 import { updateProfile, updateUsername, checkUsernameAvailability, listMyProducts, type MyProduct } from "@/app/actions/profile";
 import { savePaymentApiKey, getPaymentApiKeys, deletePaymentApiKey } from "@/app/actions/revenue";
-import { resubmitSubmission } from "@/app/actions/submissions";
+import { resubmitSubmission, deleteMySubmission } from "@/app/actions/submissions";
 import { listCategories } from "@/app/actions/categories";
 import {
   batchHydrateSavedAndUpvoted,
@@ -1176,8 +1176,7 @@ export default function ProfileClientView({
                                     onClick={async () => {
                                       if (!confirm(`Delete draft "${d.name || "Untitled"}"? This can't be undone.`)) return;
                                       try {
-                                        const { deleteMyDraft } = await import("@/app/actions/submissions");
-                                        await deleteMyDraft(submissionId);
+                                        await deleteMySubmission(submissionId);
                                         setProductsList((prev) => prev.filter((x) => x.id !== d.id));
                                       } catch (err) {
                                         console.error("[delete-draft] failed", err);
@@ -1383,19 +1382,59 @@ export default function ProfileClientView({
 
                             <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto flex-wrap">
                               {isRejected ? (
-                                <Link
-                                  href={`/submit?edit=sub:${(p as MyProduct).submissionId}`}
-                                  className="px-3 py-1 text-[11px] font-mono font-bold border border-signal text-signal hover:bg-signal hover:text-void transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
-                                >
-                                  <span>✎ Edit &amp; Resubmit</span>
-                                </Link>
+                                <>
+                                  <Link
+                                    href={`/submit?edit=sub:${(p as MyProduct).submissionId}`}
+                                    className="px-3 py-1 text-[11px] font-mono font-bold border border-signal text-signal hover:bg-signal hover:text-void transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
+                                  >
+                                    <span>✎ Edit &amp; Resubmit</span>
+                                  </Link>
+                                  {(p as MyProduct).submissionId && (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!confirm(`Delete rejected submission "${p.name || "Untitled"}"? This cannot be undone.`)) return;
+                                        try {
+                                          await deleteMySubmission((p as MyProduct).submissionId!);
+                                          setProductsList((prev) => prev.filter((x) => x.id !== p.id));
+                                        } catch (err) {
+                                          console.error("[delete-submission] failed", err);
+                                          alert("Could not delete submission — please try again.");
+                                        }
+                                      }}
+                                      className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-signal hover:border-signal/50 uppercase tracking-wider transition-colors cursor-pointer shrink-0"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </>
                               ) : isPending ? (
-                                <Link
-                                  href={`/submit?edit=sub:${(p as MyProduct).submissionId}`}
-                                  className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline bg-surface hover:bg-raised text-ink transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
-                                >
-                                  <span>✎ Edit submission</span>
-                                </Link>
+                                <>
+                                  <Link
+                                    href={`/submit?edit=sub:${(p as MyProduct).submissionId}`}
+                                    className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline bg-surface hover:bg-raised text-ink transition-colors cursor-pointer shrink-0 flex items-center gap-1.5"
+                                  >
+                                    <span>✎ Edit submission</span>
+                                  </Link>
+                                  {(p as MyProduct).submissionId && (
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        if (!confirm(`Cancel and delete queued submission "${p.name || "Untitled"}"? This will cancel your scheduled launch and cannot be undone.`)) return;
+                                        try {
+                                          await deleteMySubmission((p as MyProduct).submissionId!);
+                                          setProductsList((prev) => prev.filter((x) => x.id !== p.id));
+                                        } catch (err) {
+                                          console.error("[delete-submission] failed", err);
+                                          alert("Could not delete queued submission — please try again.");
+                                        }
+                                      }}
+                                      className="px-3 py-1 text-[11px] font-mono font-bold border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-signal hover:border-signal/50 uppercase tracking-wider transition-colors cursor-pointer shrink-0"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </>
                               ) : (
                                 <>
                                   <Link
