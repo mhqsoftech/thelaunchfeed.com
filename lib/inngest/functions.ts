@@ -232,6 +232,10 @@ export const publishDue = inngest.createFunction(
       // causing product.launched events (and thus broadcast + founder
       // email) to never fire.
       const pid = await step.run(`publish-${sub.id}`, async () => {
+        const subDetails = (sub.details as Record<string, unknown>) || {};
+        const subVideoUrl = sub.videoUrl || (subDetails.videoUrl as string) || null;
+        const subTags = sub.tags && sub.tags.length > 0 ? sub.tags : ((subDetails.tags as string[]) || []);
+
         const product = await prisma.product.create({
           data: {
             slug: await ensureUniqueSlug(slugify(sub.name)),
@@ -241,8 +245,8 @@ export const publishDue = inngest.createFunction(
             websiteUrl: sub.websiteUrl,
             logoUrl: sub.logoUrl,
             screenshots: sub.screenshots,
-            videoUrl: sub.videoUrl,
-            tags: sub.tags,
+            videoUrl: subVideoUrl,
+            tags: subTags,
             categoryId: sub.categoryId,
             ownerId: sub.ownerId,
             status: "LIVE",

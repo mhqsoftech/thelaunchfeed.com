@@ -46,22 +46,30 @@ const imageString = z
 /**
  * Video URL validator — accepts any http(s) URL so founders can use YouTube,
  * Vimeo, Loom, Google Drive, X/Twitter, TikTok, Instagram, Streamable,
- * Dropbox, or a direct .mp4/.webm link. The Live Preview embed picks the
- * right player per host; this validator only guarantees the string is a real
- * URL, not garbage. (Previously restricted to YT/Vimeo/Loom, which silently
- * failed the whole submission for any other host — including making
- * `tags` never persist.)
+ * Dropbox, or a direct .mp4/.webm link. Auto-normalizes URLs without protocol
+ * (e.g. youtube.com/... -> https://youtube.com/...).
  */
 const videoUrlSchema = z
-  .string()
-  .optional()
-  .or(z.literal(""))
+  .preprocess((val) => {
+    if (val === null || val === undefined) return undefined;
+    if (typeof val !== "string") return undefined;
+    const trimmed = val.trim();
+    if (!trimmed) return undefined;
+    if (!/^https?:\/\//i.test(trimmed)) {
+      return `https://${trimmed}`;
+    }
+    return trimmed;
+  }, z.string().optional())
   .refine(
     (v) => {
       if (!v) return true;
       try {
         const u = new URL(v);
-        return u.protocol === "http:" || u.protocol === "https:";
+        return (
+          (u.protocol === "http:" || u.protocol === "https:") &&
+          u.hostname.length >= 3 &&
+          u.hostname.includes(".")
+        );
       } catch {
         return false;
       }
@@ -69,19 +77,50 @@ const videoUrlSchema = z
     { message: "videoUrl must be a valid http(s) URL" },
   );
 
+/**
+ * Tags normalizer — accepts string[] or comma-separated string,
+ * sanitizes each tag (trims, lowercases, removes leading '#'),
+ * and deduplicates.
+ */
+const tagsSchema = z
+  .preprocess((val) => {
+    if (val === null || val === undefined) return [];
+    if (Array.isArray(val)) {
+      return Array.from(
+        new Set(
+          val
+            .map((t) => (typeof t === "string" ? t.trim().toLowerCase().replace(/^#+/, "") : ""))
+            .filter((t) => t.length > 0 && t.length <= 60),
+        ),
+      ).slice(0, 30);
+    }
+    if (typeof val === "string") {
+      return Array.from(
+        new Set(
+          val
+            .split(",")
+            .map((t) => t.trim().toLowerCase().replace(/^#+/, ""))
+            .filter((t) => t.length > 0 && t.length <= 60),
+        ),
+      ).slice(0, 30);
+    }
+    return [];
+  }, z.array(z.string().max(60)).max(30).optional())
+  .default([]);
+
 const CreateSchema = z.object({
   name: z.string().min(1).max(200),
   tagline: z.string().min(1).max(250).or(z.literal("")),
   websiteUrl: z.string().optional().or(z.literal("")),
-  description: z.string().optional(),
-  categorySlug: z.string().optional(),
+  description: z.string().optional().nullable(),
+  categorySlug: z.string().optional().nullable(),
   makerName: z.string().min(1),
   makerHandle: z.string().min(1),
-  logoUrl: imageString.optional().or(z.literal("")),
-  screenshots: z.array(imageString).max(8).optional(),
+  logoUrl: imageString.optional().or(z.literal("")).nullable(),
+  screenshots: z.array(imageString).max(8).optional().nullable(),
   videoUrl: videoUrlSchema,
-  tags: z.array(z.string().max(60)).max(20).optional(),
-  details: z.record(z.string(), z.unknown()).optional(),
+  tags: tagsSchema,
+  details: z.record(z.string(), z.unknown()).optional().nullable(),
   asDraft: z.boolean().optional(),
 });
 
@@ -289,6 +328,14 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
   ]);
   const screenshots: string[] = uploadedScreenshots.filter((s): s is string => !!s);
 
+  const detailsData = parsed.details
+    ? {
+        ...(parsed.details as Record<string, unknown>),
+        videoUrl: parsed.videoUrl || null,
+        tags: parsed.tags ?? [],
+      }
+    : undefined;
+
   const sub = await prisma.submission.create({
     data: {
       ownerId: user.id,
@@ -301,7 +348,7 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Su
       videoUrl: parsed.videoUrl || null,
       tags: parsed.tags ?? [],
       categoryId: category?.id,
-      details: parsed.details ? (parsed.details as any) : undefined,
+      details: detailsData ? (detailsData as any) : undefined,
       makerName: parsed.makerName,
       makerHandle: parsed.makerHandle,
       makerEmail: user.email,
@@ -373,8 +420,12 @@ export async function publishSubmissionNow(id: string): Promise<void> {
   // creates the Product row, flips the submission to PUBLISHED, links
   // them via publishedProductId (satisfying the schema's @unique),
   // and fires the launch email inline.
+  const subDetails = (sub.details as Record<string, unknown>) || {};
+  const subVideoUrl = sub.videoUrl || (subDetails.videoUrl as string) || null;
+  const subTags = sub.tags && sub.tags.length > 0 ? sub.tags : ((subDetails.tags as string[]) || []);
+
   const slug = await ensureUniqueSlug(slugify(sub.name));
-  const fallbackCat = sub.categoryId ? null : await resolveCategory((sub.details as any)?.category || sub.tags?.[0] || sub.name);
+  const fallbackCat = sub.categoryId ? null : await resolveCategory((sub.details as any)?.category || subTags[0] || sub.name);
   const product = await prisma.$transaction(async (tx) => {
     const p = await tx.product.create({
       data: {
@@ -385,8 +436,8 @@ export async function publishSubmissionNow(id: string): Promise<void> {
         websiteUrl: sub.websiteUrl,
         logoUrl: sub.logoUrl,
         screenshots: sub.screenshots,
-        videoUrl: sub.videoUrl,
-        tags: sub.tags,
+        videoUrl: subVideoUrl,
+        tags: subTags,
         categoryId: sub.categoryId || fallbackCat?.id,
         details: sub.details ?? undefined,
         ownerId: sub.ownerId,
@@ -674,6 +725,9 @@ export async function getEditablePayload(idParam: string): Promise<EditablePaylo
       include: { category: { select: { slug: true, name: true } } },
     });
     if (!sub || sub.ownerId !== user.id) return null;
+    const dt = (sub.details as Record<string, unknown>) ?? null;
+    const rawTags = sub.tags && sub.tags.length > 0 ? sub.tags : ((dt?.tags as string[]) || []);
+    const rawVideo = sub.videoUrl || (dt?.videoUrl as string) || "";
     return {
       kind: "submission",
       submissionId: sub.id,
@@ -685,12 +739,12 @@ export async function getEditablePayload(idParam: string): Promise<EditablePaylo
       websiteUrl: sub.websiteUrl,
       logoUrl: sub.logoUrl ?? "",
       screenshots: sub.screenshots ?? [],
-      videoUrl: sub.videoUrl ?? "",
-      tags: sub.tags ?? [],
+      videoUrl: rawVideo,
+      tags: rawTags,
       categorySlug: sub.category?.name || sub.category?.slug || "",
       makerName: sub.makerName,
       makerHandle: sub.makerHandle,
-      details: (sub.details as Record<string, unknown>) ?? null,
+      details: dt,
     };
   }
   if (idParam.startsWith("prod:")) {
@@ -699,6 +753,9 @@ export async function getEditablePayload(idParam: string): Promise<EditablePaylo
       include: { category: { select: { slug: true, name: true } } },
     });
     if (!prod || prod.ownerId !== user.id) return null;
+    const dt = (prod.details as Record<string, unknown>) ?? null;
+    const rawTags = prod.tags && prod.tags.length > 0 ? prod.tags : ((dt?.tags as string[]) || []);
+    const rawVideo = prod.videoUrl || (dt?.videoUrl as string) || "";
     return {
       kind: "product",
       productId: prod.id,
@@ -709,12 +766,12 @@ export async function getEditablePayload(idParam: string): Promise<EditablePaylo
       websiteUrl: prod.websiteUrl,
       logoUrl: prod.logoUrl ?? "",
       screenshots: prod.screenshots ?? [],
-      videoUrl: prod.videoUrl ?? "",
-      tags: prod.tags ?? [],
+      videoUrl: rawVideo,
+      tags: rawTags,
       categorySlug: prod.category?.name || prod.category?.slug || "",
       makerName: user.name || user.username,
       makerHandle: `@${user.username}`,
-      details: (prod.details as Record<string, unknown>) ?? null,
+      details: dt,
     };
   }
   return null;
@@ -723,14 +780,14 @@ export async function getEditablePayload(idParam: string): Promise<EditablePaylo
 const UpdateFieldsSchema = z.object({
   name: z.string().min(1).max(200),
   tagline: z.string().min(1).max(250),
-  description: z.string().optional(),
+  description: z.string().optional().nullable(),
   websiteUrl: z.string().optional().or(z.literal("")),
-  categorySlug: z.string().optional(),
-  logoUrl: imageString.optional().or(z.literal("")),
-  screenshots: z.array(imageString).max(8).optional(),
+  categorySlug: z.string().optional().nullable(),
+  logoUrl: imageString.optional().or(z.literal("")).nullable(),
+  screenshots: z.array(imageString).max(8).optional().nullable(),
   videoUrl: videoUrlSchema,
-  tags: z.array(z.string().max(60)).max(20).optional(),
-  details: z.record(z.string(), z.unknown()).optional(),
+  tags: tagsSchema,
+  details: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
 /** Update a submission the user owns. Pending stays pending, rejected
@@ -769,12 +826,31 @@ export async function updateMySubmission(
   let screenshots = existing.screenshots;
   if (parsed.screenshots !== undefined) {
     const list: string[] = [];
-    for (const scr of parsed.screenshots) {
-      const uploaded = await processImageString(scr, "screenshots");
-      if (uploaded) list.push(uploaded);
+    if (parsed.screenshots) {
+      for (const scr of parsed.screenshots) {
+        const uploaded = await processImageString(scr, "screenshots");
+        if (uploaded) list.push(uploaded);
+      }
     }
     screenshots = list;
   }
+
+  const finalVideoUrl = parsed.videoUrl !== undefined ? (parsed.videoUrl || null) : existing.videoUrl;
+  const finalTags = parsed.tags !== undefined ? parsed.tags : existing.tags;
+
+  const existingDetails = (existing.details as Record<string, unknown>) || {};
+  const updatedDetails = parsed.details !== undefined
+    ? {
+        ...existingDetails,
+        ...(parsed.details as Record<string, unknown>),
+        videoUrl: finalVideoUrl,
+        tags: finalTags,
+      }
+    : {
+        ...existingDetails,
+        videoUrl: finalVideoUrl,
+        tags: finalTags,
+      };
 
   const sub = await prisma.submission.update({
     where: { id: existing.id },
@@ -785,10 +861,10 @@ export async function updateMySubmission(
       websiteUrl: parsed.websiteUrl || existing.websiteUrl,
       logoUrl,
       screenshots,
-      videoUrl: parsed.videoUrl === undefined ? existing.videoUrl : parsed.videoUrl || null,
-      tags: parsed.tags ?? existing.tags,
+      videoUrl: finalVideoUrl,
+      tags: finalTags,
       categoryId: category?.id ?? existing.categoryId,
-      details: parsed.details !== undefined ? (parsed.details as any) : existing.details,
+      details: updatedDetails as any,
       status: keepAsDraft ? "DRAFT" : "SCHEDULED",
       scheduledFor,
       rejectedAt: null,
@@ -839,12 +915,31 @@ export async function updateMyProduct(
   let screenshots = existing.screenshots;
   if (parsed.screenshots !== undefined) {
     const list: string[] = [];
-    for (const scr of parsed.screenshots) {
-      const uploaded = await processImageString(scr, "screenshots");
-      if (uploaded) list.push(uploaded);
+    if (parsed.screenshots) {
+      for (const scr of parsed.screenshots) {
+        const uploaded = await processImageString(scr, "screenshots");
+        if (uploaded) list.push(uploaded);
+      }
     }
     screenshots = list;
   }
+
+  const finalVideoUrl = parsed.videoUrl !== undefined ? (parsed.videoUrl || null) : existing.videoUrl;
+  const finalTags = parsed.tags !== undefined ? parsed.tags : existing.tags;
+
+  const existingDetails = (existing.details as Record<string, unknown>) || {};
+  const updatedDetails = parsed.details !== undefined
+    ? {
+        ...existingDetails,
+        ...(parsed.details as Record<string, unknown>),
+        videoUrl: finalVideoUrl,
+        tags: finalTags,
+      }
+    : {
+        ...existingDetails,
+        videoUrl: finalVideoUrl,
+        tags: finalTags,
+      };
 
   const updated = await prisma.product.update({
     where: { id: productId },
@@ -855,10 +950,10 @@ export async function updateMyProduct(
       websiteUrl: parsed.websiteUrl || existing.websiteUrl,
       logoUrl,
       screenshots,
-      videoUrl: parsed.videoUrl === undefined ? existing.videoUrl : parsed.videoUrl || null,
-      tags: parsed.tags ?? existing.tags,
+      videoUrl: finalVideoUrl,
+      tags: finalTags,
       categoryId: category?.id ?? existing.categoryId,
-      details: parsed.details !== undefined ? (parsed.details as any) : existing.details,
+      details: updatedDetails as any,
     },
     select: { slug: true },
   });

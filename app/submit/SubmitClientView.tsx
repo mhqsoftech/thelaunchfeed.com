@@ -402,6 +402,51 @@ export interface ProductProfileData {
   supportEmail: string;
 }
 
+export function parseTags(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return Array.from(
+      new Set(
+        raw
+          .map((t) => (typeof t === "string" ? t.trim().toLowerCase().replace(/^#+/, "") : ""))
+          .filter((t) => t.length > 0 && t.length <= 60),
+      ),
+    ).slice(0, 30);
+  }
+  if (typeof raw === "string") {
+    return Array.from(
+      new Set(
+        raw
+          .split(",")
+          .map((t) => t.trim().toLowerCase().replace(/^#+/, ""))
+          .filter((t) => t.length > 0 && t.length <= 60),
+      ),
+    ).slice(0, 30);
+  }
+  return [];
+}
+
+export function formatTagsToString(raw: unknown): string {
+  if (!raw) return "";
+  if (Array.isArray(raw)) {
+    return raw.filter(Boolean).join(", ");
+  }
+  if (typeof raw === "string") {
+    return raw;
+  }
+  return "";
+}
+
+export function normalizeVideoUrl(raw?: string | null): string {
+  if (!raw || typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return trimmed;
+}
+
 const EMPTY_PROFILE: ProductProfileData = {
   name: "",
   tagline: "",
@@ -692,6 +737,9 @@ export default function SubmitClientView({
         const activeFaqs = draft?.faqs || faqs;
         const activeThumbnail = draft?.thumbnailAvif || thumbnailAvif;
         const activeGallery = draft?.galleryAvif || galleryAvif;
+        
+        const parsedTags = parseTags(activeForm.tags);
+        const parsedVideoUrl = normalizeVideoUrl(activeForm.videoUrl) || undefined;
 
         const details = {
           overviewPitch: activeForm.overviewPitch,
@@ -717,6 +765,8 @@ export default function SubmitClientView({
           faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
           supportEmail: activeForm.supportEmail,
           githubUrl: activeForm.githubUrl,
+          videoUrl: parsedVideoUrl,
+          tags: parsedTags,
           launchTier: draft?.launchTier ?? launchTier,
         };
 
@@ -724,8 +774,8 @@ export default function SubmitClientView({
           name: activeForm.name || "Untitled product",
           tagline: activeForm.tagline || "",
           websiteUrl: activeForm.websiteUrl || "",
-          videoUrl: activeForm.videoUrl || undefined,
-          tags: activeForm.tags ? activeForm.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
+          videoUrl: parsedVideoUrl,
+          tags: parsedTags,
           description: activeForm.overviewPitch,
           categorySlug,
           makerName: activeForm.makerName || sess.name || "Unknown maker",
@@ -764,58 +814,60 @@ export default function SubmitClientView({
               }),
             });
             const dodoData = await res.json();
-            if (dodoData.checkoutUrl && !cancelled) {
+            if (dodoData.checkoutUrl) {
               window.location.href = dodoData.checkoutUrl;
-              return; // Redirect to checkout — do not flip to success screen.
+              return;
             }
           } catch (e) {
-            console.warn("[auto_submit] Dodo checkout initialization failed:", e);
+            console.warn("[Submit] Paid auto-submit checkout init failed:", e);
           }
         }
 
-        if (!cancelled) {
-          setAutoSubmitStage("done");
-          window.history.replaceState({}, "", "/submit");
-          setQueuedSubmission({ id: sub.id, scheduledFor: sub.scheduledFor.toString(), launchTier: restoredTier });
-          setSubmitted(true);
-          window.scrollTo({ top: 0, behavior: "smooth" });
-        }
+        setAutoSubmitStage("done");
+        setQueuedSubmission({
+          id: sub.id,
+          scheduledFor: sub.scheduledFor.toString(),
+          launchTier: restoredTier,
+          productName: sub.name,
+        });
+        setSubmitted(true);
       } catch (err) {
-        console.error("[auto_submit] execution error:", err);
+        console.error("[auto_submit] failed", err);
+        setAutoSubmitStage("done");
       } finally {
         if (!cancelled) setIsAutoSubmitting(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSubmitParam, isEmbeddedMode, editParam, submitted]);
 
-  // 3b. Post-Auth Auto-Save-Draft Execution (?auto_save_draft=1)
-  // When a guest clicks "Save as Draft", we redirect them to sign-in with this
-  // flag. After sign-in they land back here and we finish saving the draft
-  // server-side without requiring another click.
+  // 4. Auto-save draft (?auto_save_draft=1)
   useEffect(() => {
     if (autoSaveDraftParam !== "1" || isEmbeddedMode || editParam || submitted || autoSavedDraftRef.current) return;
 
     let cancelled = false;
     (async () => {
-      // Read the persisted draft from localStorage so we don't depend on React
-      // state having hydrated yet.
-      let draft: any = null;
+      setIsSavingDraft(true);
       try {
-        const raw = localStorage.getItem("tlf_pending_submission") || localStorage.getItem("tlf_submit_draft");
-        if (raw) draft = JSON.parse(raw);
-      } catch {}
-      const activeForm = draft?.formData || formData;
-      if (!activeForm || !activeForm.name) return;
-      autoSavedDraftRef.current = true;
-
-      let sess = getStoredSession();
-      if (!sess) {
+        let draft: any = null;
         try {
+          const raw = localStorage.getItem("tlf_submit_draft") || localStorage.getItem("tlf_pending_submission");
+          if (raw) draft = JSON.parse(raw);
+        } catch {}
+
+        const activeForm = draft?.formData || formData;
+        if (!activeForm || !activeForm.name) {
+          setIsSavingDraft(false);
+          return;
+        }
+
+        autoSavedDraftRef.current = true;
+
+        let sess = getStoredSession();
+        if (!sess) {
           const meRes = await fetch("/api/me", { cache: "no-store" });
           if (meRes.ok) {
             const meData = await meRes.json();
@@ -824,18 +876,22 @@ export default function SubmitClientView({
               saveSession(meData.session);
             }
           }
-        } catch {}
-      }
-      if (!sess || cancelled) return;
+        }
 
-      setIsSavingDraft(true);
-      try {
+        if (!sess || cancelled) {
+          setIsSavingDraft(false);
+          return;
+        }
+
         const activeFeatures = draft?.features || features;
         const activeTiers = draft?.pricingTiers || pricingTiers;
         const activeFaqs = draft?.faqs || faqs;
         const activeThumbnail = draft?.thumbnailAvif || thumbnailAvif;
         const activeGallery = draft?.galleryAvif || galleryAvif;
         const activeTier = (draft?.launchTier ?? launchTier) as 0 | 5 | 10;
+
+        const parsedDraftTags = parseTags(activeForm.tags);
+        const parsedDraftVideoUrl = normalizeVideoUrl(activeForm.videoUrl) || undefined;
 
         const details = {
           overviewPitch: activeForm.overviewPitch,
@@ -861,14 +917,16 @@ export default function SubmitClientView({
           faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
           supportEmail: activeForm.supportEmail,
           githubUrl: activeForm.githubUrl,
+          videoUrl: parsedDraftVideoUrl,
+          tags: parsedDraftTags,
           launchTier: activeTier,
         };
         await createSubmission({
           name: activeForm.name || "Untitled draft",
           tagline: activeForm.tagline || "",
           websiteUrl: activeForm.websiteUrl || "",
-          videoUrl: activeForm.videoUrl || undefined,
-          tags: activeForm.tags ? activeForm.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
+          videoUrl: parsedDraftVideoUrl,
+          tags: parsedDraftTags,
           description: activeForm.overviewPitch,
           categorySlug: (activeForm.category || "").trim() || undefined,
           makerName: activeForm.makerName || sess.name || "Unknown maker",
@@ -925,7 +983,7 @@ export default function SubmitClientView({
         makerName: initialProductData.makerName || "Menajul Hoque",
         makerHandle: initialProductData.maker || initialProductData.makerHandle || "@menajulm",
         websiteUrl: initialProductData.websiteUrl || initialProductData.website || `https://${pSlug}.com`,
-        videoUrl: initialProductData.videoUrl || "",
+        videoUrl: normalizeVideoUrl(initialProductData.videoUrl),
         githubUrl: initialProductData.githubUrl || "",
         revenue: initialProductData.revenue || "$14.2K / mo",
         overviewPitch:
@@ -960,7 +1018,7 @@ export default function SubmitClientView({
         pricingPartner: initialProductData.pricingPartner || "stripe",
         apiKey: initialProductData.apiKey || "",
         revenueVerified: Boolean(initialProductData.revenueVerified || initialProductData.revenue),
-        tags: Array.isArray(initialProductData.tags) ? initialProductData.tags.join(", ") : (initialProductData.tags as any) || "",
+        tags: formatTagsToString(initialProductData.tags),
         faq1Q: q1,
         faq1A: a1,
         faq2Q: q2,
@@ -996,6 +1054,9 @@ export default function SubmitClientView({
         if (cancelled || !payload) return;
         setEditTarget(payload);
         const dt = (payload.details || {}) as Record<string, any>;
+        const rawTags = (payload.tags && payload.tags.length > 0) ? payload.tags : (dt.tags || []);
+        const rawVideo = payload.videoUrl || dt.videoUrl || "";
+
         setFormData((prev) => ({
           ...prev,
           name: payload.name,
@@ -1004,6 +1065,8 @@ export default function SubmitClientView({
           category: payload.categorySlug || prev.category,
           makerName: payload.makerName || prev.makerName,
           makerHandle: payload.makerHandle || prev.makerHandle,
+          videoUrl: normalizeVideoUrl(rawVideo),
+          tags: formatTagsToString(rawTags),
           overviewPitch: dt.overviewPitch || payload.description || prev.overviewPitch,
           freePlan: dt.freePlan || prev.freePlan,
           proPlan: dt.proPlan || prev.proPlan,
@@ -1313,6 +1376,7 @@ export default function SubmitClientView({
         roadmapQ3: string; roadmapQ4: string; pricingPartner: string;
         faqs: { q: string; a: string }[]; supportEmail: string;
         tags?: string;
+        videoUrl?: string;
         logoCandidates?: string[];
       };
 
@@ -1361,43 +1425,47 @@ export default function SubmitClientView({
       const rawFaqs = Array.isArray(d?.faqs) ? d.faqs : [];
       const faqPairs = rawFaqs.length ? rawFaqs : [{ q: "", a: "" }];
 
-      setFormData((prev) => ({
-        ...prev,
-        name: d.name || prev.name,
-        tagline: d.tagline || prev.tagline,
-        category: d.category || prev.category,
-        makerName: d.makerName || prev.makerName,
-        makerHandle: d.makerHandle || prev.makerHandle,
-        websiteUrl: d.websiteUrl || autofillUrl,
-        videoUrl: (d as any).videoUrl || (editTarget?.videoUrl as string) || prev.videoUrl || "",
-        githubUrl: d.githubUrl || prev.githubUrl,
-        revenue: d.revenue || prev.revenue,
-        overviewPitch: d.overviewPitch || prev.overviewPitch,
-        feature1: feat[0] ?? prev.feature1,
-        feature2: feat[1] ?? prev.feature2,
-        feature3: feat[2] ?? prev.feature3,
-        targetAudience: d.targetAudience || prev.targetAudience,
-        freePlan: tiers[0] ? [tiers[0].price, tiers[0].specs].filter(Boolean).join(" · ") : prev.freePlan,
-        proPlan: tiers[1] ? [tiers[1].price, tiers[1].specs].filter(Boolean).join(" · ") : prev.proPlan,
-        enterprisePlan: tiers[2] ? [tiers[2].price, tiers[2].specs].filter(Boolean).join(" · ") : prev.enterprisePlan,
-        techStack: arch.techStack || d.techStack || prev.techStack,
-        infraHosting: arch.infraHosting || d.infraHosting || prev.infraHosting,
-        apiUrl: arch.apiUrl || d.apiUrl || prev.apiUrl,
-        securityStandards: arch.securityStandards || d.securityStandards || prev.securityStandards,
-        tags: d.tags || prev.tags,
-        originStory: d.originStory || prev.originStory,
-        makerThesis: d.makerThesis || prev.makerThesis,
-        latestVersion: d.latestVersion || prev.latestVersion,
-        latestChangelog: d.latestChangelog || prev.latestChangelog,
-        roadmapQ3: d.roadmapQ3 || prev.roadmapQ3,
-        roadmapQ4: d.roadmapQ4 || prev.roadmapQ4,
-        pricingPartner: d.pricingPartner || prev.pricingPartner,
-        faq1Q: faqPairs[0]?.q ?? prev.faq1Q,
-        faq1A: faqPairs[0]?.a ?? prev.faq1A,
-        faq2Q: faqPairs[1]?.q ?? prev.faq2Q,
-        faq2A: faqPairs[1]?.a ?? prev.faq2A,
-        supportEmail: d.supportEmail || prev.supportEmail,
-      }));
+      setFormData((prev) => {
+        const autofillVideo = d.videoUrl || (editTarget?.videoUrl as string) || prev.videoUrl || "";
+        const autofillTags = d.tags ? formatTagsToString(d.tags) : prev.tags;
+        return {
+          ...prev,
+          name: d.name || prev.name,
+          tagline: d.tagline || prev.tagline,
+          category: d.category || prev.category,
+          makerName: d.makerName || prev.makerName,
+          makerHandle: d.makerHandle || prev.makerHandle,
+          websiteUrl: d.websiteUrl || autofillUrl,
+          videoUrl: normalizeVideoUrl(autofillVideo),
+          githubUrl: d.githubUrl || prev.githubUrl,
+          revenue: d.revenue || prev.revenue,
+          overviewPitch: d.overviewPitch || prev.overviewPitch,
+          feature1: feat[0] ?? prev.feature1,
+          feature2: feat[1] ?? prev.feature2,
+          feature3: feat[2] ?? prev.feature3,
+          targetAudience: d.targetAudience || prev.targetAudience,
+          freePlan: tiers[0] ? [tiers[0].price, tiers[0].specs].filter(Boolean).join(" · ") : prev.freePlan,
+          proPlan: tiers[1] ? [tiers[1].price, tiers[1].specs].filter(Boolean).join(" · ") : prev.proPlan,
+          enterprisePlan: tiers[2] ? [tiers[2].price, tiers[2].specs].filter(Boolean).join(" · ") : prev.enterprisePlan,
+          techStack: arch.techStack || d.techStack || prev.techStack,
+          infraHosting: arch.infraHosting || d.infraHosting || prev.infraHosting,
+          apiUrl: arch.apiUrl || d.apiUrl || prev.apiUrl,
+          securityStandards: arch.securityStandards || d.securityStandards || prev.securityStandards,
+          tags: autofillTags,
+          originStory: d.originStory || prev.originStory,
+          makerThesis: d.makerThesis || prev.makerThesis,
+          latestVersion: d.latestVersion || prev.latestVersion,
+          latestChangelog: d.latestChangelog || prev.latestChangelog,
+          roadmapQ3: d.roadmapQ3 || prev.roadmapQ3,
+          roadmapQ4: d.roadmapQ4 || prev.roadmapQ4,
+          pricingPartner: d.pricingPartner || prev.pricingPartner,
+          faq1Q: faqPairs[0]?.q ?? prev.faq1Q,
+          faq1A: faqPairs[0]?.a ?? prev.faq1A,
+          faq2Q: faqPairs[1]?.q ?? prev.faq2Q,
+          faq2A: faqPairs[1]?.a ?? prev.faq2A,
+          supportEmail: d.supportEmail || prev.supportEmail,
+        };
+      });
 
       setFeatures(feat.filter(Boolean).length ? feat.filter(Boolean) : feat);
       setPricingTiers(tiers);
@@ -1405,24 +1473,25 @@ export default function SubmitClientView({
       setAutofillMeta(json.meta ?? null);
 
       // Auto-fetch the logo/favicon and convert to AVIF for the thumbnail slot.
-      if (d.logoCandidates && d.logoCandidates.length > 0) {
-        setIsConvertingAvif(true);
-        (async () => {
-          for (const candidate of d.logoCandidates!) {
+      if (Array.isArray(d?.logoCandidates) && d.logoCandidates.length > 0) {
+        const candidate = d.logoCandidates[0];
+        if (candidate) {
+          (async () => {
             try {
+              setIsConvertingAvif(true);
               const r = await fetch(`/api/autofill/image?url=${encodeURIComponent(candidate)}`);
-              if (!r.ok) continue;
-              const blob = await r.blob();
-              if (!blob.size) continue;
-              const conv = await convertImageFileToAvifDataUrl(blob, 800, 0.9);
-              setThumbnailAvif(conv.dataUrl);
-              setAvifMeta({ sizeKb: conv.sizeKb, format: conv.format });
-              return;
+              const ij = await r.json();
+              if (ij?.ok && ij?.dataUri) {
+                setThumbnailAvif(ij.dataUri);
+                setAvifMeta({ sizeKb: ij.sizeKb ?? 0, format: "image/avif" });
+              }
             } catch {
-              // try next candidate
+              // image conversion failed silently — founder can still upload manually
+            } finally {
+              setIsConvertingAvif(false);
             }
-          }
-        })().finally(() => setIsConvertingAvif(false));
+          })();
+        }
       }
     } catch (err) {
       setAutofillError(err instanceof Error ? err.message : "Extraction failed");
@@ -1433,9 +1502,17 @@ export default function SubmitClientView({
 
   const handleInputChange = (
     field: keyof typeof formData,
-    value: string
+    value: string | boolean
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleFeatureChange = (index: number, value: string) => {
+    setFeatures((prev) => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
   };
 
   const handleSaveDraft = async () => {
@@ -1475,6 +1552,9 @@ export default function SubmitClientView({
     }
     setIsSavingDraft(true);
     try {
+      const parsedTags = parseTags(formData.tags);
+      const parsedVideoUrl = normalizeVideoUrl(formData.videoUrl) || undefined;
+
       const details = {
         overviewPitch: formData.overviewPitch,
         features: features.filter((f) => f.trim().length > 0),
@@ -1499,14 +1579,16 @@ export default function SubmitClientView({
         faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
         supportEmail: formData.supportEmail,
         githubUrl: formData.githubUrl,
+        videoUrl: parsedVideoUrl,
+        tags: parsedTags,
         launchTier,
       };
       await createSubmission({
         name: formData.name || "Untitled draft",
         tagline: formData.tagline || "",
         websiteUrl: formData.websiteUrl || "",
-        videoUrl: formData.videoUrl || undefined,
-        tags: formData.tags ? formData.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
+        videoUrl: parsedVideoUrl,
+        tags: parsedTags,
         description: formData.overviewPitch,
         categorySlug: (formData.category || "").trim() || undefined,
         makerName: formData.makerName || sess.name || "Unknown maker",
@@ -1541,9 +1623,14 @@ export default function SubmitClientView({
     e.preventDefault();
     if (isSubmittingRef.current) return;
 
+    const parsedTags = parseTags(formData.tags);
+    const parsedVideoUrl = normalizeVideoUrl(formData.videoUrl);
+
     if (onSaveProduct) {
       const updatedProductData = {
         ...formData,
+        videoUrl: parsedVideoUrl || "",
+        tags: parsedTags,
         thumbnailAvif,
         galleryAvif,
         faqs,
@@ -1636,6 +1723,8 @@ export default function SubmitClientView({
         faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
         supportEmail: formData.supportEmail,
         githubUrl: formData.githubUrl,
+        videoUrl: parsedVideoUrl || undefined,
+        tags: parsedTags,
         launchTier,
       };
 
@@ -1646,8 +1735,8 @@ export default function SubmitClientView({
           tagline: formData.tagline || "",
           description: formData.overviewPitch,
           websiteUrl: formData.websiteUrl || "",
-          videoUrl: formData.videoUrl || "",
-          tags: formData.tags ? formData.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
+          videoUrl: parsedVideoUrl || "",
+          tags: parsedTags,
           categorySlug,
           logoUrl: thumbnailAvif || "",
           screenshots: galleryAvif.filter(Boolean),
@@ -1703,8 +1792,8 @@ export default function SubmitClientView({
         name: formData.name || "Untitled product",
         tagline: formData.tagline || "",
         websiteUrl: formData.websiteUrl || "",
-        videoUrl: formData.videoUrl || undefined,
-        tags: formData.tags ? formData.tags.split(",").map((t: string) => t.trim().toLowerCase().replace(/^#/, "")).filter(Boolean) : [],
+        videoUrl: parsedVideoUrl || undefined,
+        tags: parsedTags,
         description: formData.overviewPitch,
         categorySlug,
         makerName: formData.makerName || sess.name || "Unknown maker",

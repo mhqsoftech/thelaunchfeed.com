@@ -34,6 +34,7 @@ export type ExtractedProduct = {
   faqs: { q: string; a: string }[];
   supportEmail: string;
   tags: string;
+  videoUrl?: string;
   ogImage: string;
   favicon: string;
   appleTouchIcon: string;
@@ -92,6 +93,7 @@ const SCHEMA: JsonSchema = {
     roadmapQ4: { type: "string", description: "Mid-term roadmap item (1-2 sentences). Prefer verbatim. If none, propose ONE further grounded step. Never leave empty. Never claim funding, hiring, or customer numbers." },
     pricingPartner: { type: "string", description: "Payment provider. Prefer PAYMENTS entry from the DETECTED TECHNOLOGIES block or providers named in checkout links/terms. If none detected/named, return 'stripe' as the safe default the founder can change. Never leave empty." },
     tags: { type: "string", description: "5-8 comma-separated single-word or short-phrase tags describing the product (e.g. 'ai, developer-tools, open-source, cli, self-hosted'). Grounded in the product's actual category, capabilities, and target audience. Lowercase, hyphenated for multi-word. Never leave empty." },
+    videoUrl: { type: "string", description: "Public YouTube, Loom, Vimeo, or video demo link ONLY if explicitly present in the crawled pages (embed src, video iframe, or demo video link). Empty string otherwise." },
     faqs: {
       type: "array",
       maxItems: 6,
@@ -710,6 +712,7 @@ export async function extractProduct(
     faqs,
     supportEmail,
     tags: (parsed as any).tags || "",
+    videoUrl: (parsed as any).videoUrl || "",
     ogImage,
     favicon,
     appleTouchIcon,

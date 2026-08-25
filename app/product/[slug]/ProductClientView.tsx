@@ -165,7 +165,8 @@ function formatPitchParagraphs(text: string | undefined | null): string[] {
 
 function renderVideoEmbed(url: string) {
   if (!url) return null;
-  const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+  const trimmed = url.trim();
+  const ytMatch = trimmed.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=|shorts\/))([\w-]{11})/);
   if (ytMatch) {
     return (
       <iframe
@@ -177,7 +178,7 @@ function renderVideoEmbed(url: string) {
       />
     );
   }
-  const loomMatch = url.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
+  const loomMatch = trimmed.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/);
   if (loomMatch) {
     return (
       <iframe
@@ -188,7 +189,7 @@ function renderVideoEmbed(url: string) {
       />
     );
   }
-  const vimeoMatch = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)/);
+  const vimeoMatch = trimmed.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)/);
   if (vimeoMatch) {
     return (
       <iframe
@@ -201,7 +202,7 @@ function renderVideoEmbed(url: string) {
   }
   return (
     <video
-      src={url}
+      src={trimmed.startsWith("http") ? trimmed : `https://${trimmed}`}
       controls
       className="w-full aspect-video rounded-xs object-contain bg-black"
     />
@@ -741,43 +742,54 @@ export default function ProductClientView({
             </div>
 
             {/* Product Tags in Action Row Right Corner */}
-            {product.tags && product.tags.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end">
-                {product.tags.slice(0, 6).map((tag, tIdx) => (
-                  <span
-                    key={tIdx}
-                    className="text-[10px] font-mono px-1.5 py-0.5 border border-hairline/60 text-ink-faint uppercase bg-surface/30 hover:border-ink-dim hover:text-ink-dim transition-colors"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-            )}
+            {(() => {
+              const activeTags = (product.tags && product.tags.length > 0)
+                ? product.tags
+                : (Array.isArray((product.details as any)?.tags) ? (product.details as any).tags : []);
+              if (!activeTags || activeTags.length === 0) return null;
+              return (
+                <div className="flex items-center gap-1.5 flex-wrap justify-start sm:justify-end">
+                  {activeTags.slice(0, 8).map((tag: string, tIdx: number) => (
+                    <span
+                      key={tIdx}
+                      className="text-[10px] font-mono px-1.5 py-0.5 border border-hairline/60 text-ink-faint uppercase bg-surface/30 hover:border-ink-dim hover:text-ink-dim transition-colors"
+                    >
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
 
         {/* Video Demo & Walkthrough Section */}
-        {product.videoUrl && (
-          <div className="border border-hairline bg-surface/30 p-4 sm:p-6 space-y-3 max-w-full overflow-hidden">
-            <div className="flex items-center justify-between border-b border-hairline pb-2">
-              <h2 className="font-mono text-xs sm:text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-signal" />
-                <span>Product Video Demo &amp; Walkthrough</span>
-              </h2>
-              <a
-                href={product.videoUrl.startsWith("http") ? product.videoUrl : `https://${product.videoUrl}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-[10px] font-mono text-signal hover:underline"
-              >
-                Open Original ↗
-              </a>
+        {(() => {
+          const activeVideoUrl = product.videoUrl || (product.details as any)?.videoUrl || null;
+          if (!activeVideoUrl) return null;
+          const hrefUrl = activeVideoUrl.startsWith("http") ? activeVideoUrl : `https://${activeVideoUrl}`;
+          return (
+            <div className="border border-hairline bg-surface/30 p-4 sm:p-6 space-y-3 max-w-full overflow-hidden">
+              <div className="flex items-center justify-between border-b border-hairline pb-2">
+                <h2 className="font-mono text-xs sm:text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-signal" />
+                  <span>Product Video Demo &amp; Walkthrough</span>
+                </h2>
+                <a
+                  href={hrefUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] font-mono text-signal hover:underline"
+                >
+                  Open Original ↗
+                </a>
+              </div>
+              <div className="overflow-hidden rounded-xs border border-hairline bg-black">
+                {renderVideoEmbed(activeVideoUrl)}
+              </div>
             </div>
-            <div className="overflow-hidden rounded-xs border border-hairline bg-black">
-              {renderVideoEmbed(product.videoUrl)}
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Horizontally Scrollable Product Media Gallery */}
         <div className="space-y-3 max-w-full overflow-hidden">
