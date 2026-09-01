@@ -41,50 +41,71 @@ export const getPublicProfile = cache(async function getPublicProfile(rawSlug: s
     return cached.data;
   }
 
-  const user = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { username: { equals: clean, mode: "insensitive" } },
-        { username: { equals: noDash, mode: "insensitive" } },
-        { username: { equals: withUnderscore, mode: "insensitive" } },
-        { username: { equals: withDash, mode: "insensitive" } },
-        { id: clean },
-        { email: { startsWith: clean, mode: "insensitive" } },
-        { name: { equals: clean.replace(/[-_]/g, " "), mode: "insensitive" } },
-      ],
-    },
-    select: {
-      ...publicUserSelect(),
-      revenueConnections: {
-        where: { status: "ACTIVE" },
-        orderBy: { createdAt: "desc" },
-        include: {
-          revenues: true,
-        },
+  const profileSelect = {
+    ...publicUserSelect(),
+    revenueConnections: {
+      where: { status: "ACTIVE" },
+      orderBy: { createdAt: "desc" },
+      include: {
+        revenues: true,
       },
-      products: {
-        where: { status: "LIVE" },
-        orderBy: { launchedAt: "desc" },
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-          tagline: true,
-          logoUrl: true,
-          websiteUrl: true,
-          tags: true,
-          commentCount: true,
-          voteCount: true,
-          launchedAt: true,
-          revenue: true,
-          category: { select: { slug: true, name: true } },
-        },
-      },
-      // votes given by this user — feeds the community-participation bonus in
-      // getFounderScore so upvoting other products also moves your own tier.
-      _count: { select: { votes: true } },
     },
+    products: {
+      where: { status: "LIVE" },
+      orderBy: { launchedAt: "desc" },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+        tagline: true,
+        logoUrl: true,
+        websiteUrl: true,
+        tags: true,
+        commentCount: true,
+        voteCount: true,
+        launchedAt: true,
+        revenue: true,
+        category: { select: { slug: true, name: true } },
+      },
+    },
+    // votes given by this user — feeds the community-participation bonus in
+    // getFounderScore so upvoting other products also moves your own tier.
+    _count: { select: { votes: true } },
+  } as const;
+
+  // 1. Exact username match (highest priority — prevents collision between similar handles)
+  let user = await prisma.user.findFirst({
+    where: { username: { equals: clean, mode: "insensitive" } },
+    select: profileSelect,
   });
+
+  // 2. Dash/underscore normalized variants if not found
+  if (!user && (noDash !== clean || withUnderscore !== clean || withDash !== clean)) {
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { username: { equals: noDash, mode: "insensitive" } },
+          { username: { equals: withUnderscore, mode: "insensitive" } },
+          { username: { equals: withDash, mode: "insensitive" } },
+        ],
+      },
+      select: profileSelect,
+    });
+  }
+
+  // 3. Fallback to ID or exact name/email match
+  if (!user) {
+    user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: clean },
+          { name: { equals: clean.replace(/[-_]/g, " "), mode: "insensitive" } },
+          { email: { equals: clean, mode: "insensitive" } },
+        ],
+      },
+      select: profileSelect,
+    });
+  }
 
   if (!user) return null;
   if (!user.isProfilePublic && user.id !== viewerId) return null;

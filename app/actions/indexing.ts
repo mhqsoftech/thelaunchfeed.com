@@ -498,7 +498,6 @@ export async function autoDiscoverAndIndexLiveProductsAction(
     const pUrl = `${appUrl}/product/${encodeURIComponent(p.slug)}`;
     if (forceAll || !loggedUrls.has(normUrl(pUrl))) {
       urlsToSubmit.push(pUrl);
-      urlsToSubmit.push(`${appUrl}/badges/${encodeURIComponent(p.slug)}`);
       if (p.category?.slug) {
         urlsToSubmit.push(`${appUrl}/category/${encodeURIComponent(p.category.slug)}`);
       }

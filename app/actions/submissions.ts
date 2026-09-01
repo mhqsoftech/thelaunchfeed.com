@@ -543,7 +543,6 @@ export async function publishSubmissionNow(id: string): Promise<void> {
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
     const urlsToIndex = [
       `${appUrl}/product/${encodeURIComponent(product.slug)}`,
-      `${appUrl}/badges/${encodeURIComponent(product.slug)}`,
       `${appUrl}/`,
     ];
     if (sub.category?.slug) {

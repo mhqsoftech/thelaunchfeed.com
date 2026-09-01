@@ -117,17 +117,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  // Per-product badge/trophy pages — public and indexable, one URL per product.
-  const badgeRoutes: MetadataRoute.Sitemap = products.map((p) => {
-    const lastMod = p.updatedAt || p.launchedAt || p.createdAt || now;
-    return {
-      url: `${APP_URL}/badges/${encodeURIComponent(p.slug)}`,
-      lastModified: new Date(lastMod),
-      changeFrequency: "weekly" as const,
-      priority: 0.55,
-    };
-  });
-
   // Exact timestamp when founder profile was created or updated
   const founderRoutes: MetadataRoute.Sitemap = users
     .filter((u) => u.username && u.username.trim().length > 0)
@@ -153,5 +142,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  return [...staticRoutes, ...productRoutes, ...badgeRoutes, ...founderRoutes, ...categoryRoutes];
+  return [...staticRoutes, ...productRoutes, ...founderRoutes, ...categoryRoutes];
 }

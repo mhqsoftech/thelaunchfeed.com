@@ -138,6 +138,7 @@ export default async function ProductPage({
     videoUrl: p.videoUrl ?? null,
     tags: p.tags ?? [],
     category: p.category?.name ?? "Uncategorized",
+    categorySlug: p.category?.slug ?? null,
     launchedAt: new Date(p.launchedAt).toISOString().slice(0, 10),
     updatedAt: (p as any).updatedAt ? new Date((p as any).updatedAt).toISOString() : null,
     votes: p.voteCount,

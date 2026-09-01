@@ -60,6 +60,7 @@ export type ViewProduct = {
   videoUrl?: string | null;
   tags?: string[];
   category: string;
+  categorySlug?: string | null;
   launchedAt: string;
   updatedAt?: string | null;
   votes: number;
@@ -529,9 +530,19 @@ export default function ProductClientView({
               <div className="space-y-1.5 min-w-0 flex-1">
                 {/* Category & Won Awards Badges (Always visible on mobile & desktop) */}
                 <div className="flex items-center gap-2 flex-wrap pb-0.5">
-                  <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-dim uppercase bg-surface/60 font-bold tracking-wider">
-                    {product.category}
-                  </span>
+                  {product.categorySlug ? (
+                    <Link
+                      href={`/category/${product.categorySlug}`}
+                      className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-dim hover:text-signal hover:border-signal/50 uppercase bg-surface/60 font-bold tracking-wider transition-colors inline-flex items-center gap-1 group/cat"
+                    >
+                      <span>{product.category}</span>
+                      <span className="text-[9px] text-ink-faint group-hover/cat:text-signal transition-colors">→</span>
+                    </Link>
+                  ) : (
+                    <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-dim uppercase bg-surface/60 font-bold tracking-wider">
+                      {product.category}
+                    </span>
+                  )}
 
                   {/* All Won Accolades / Awards for this product */}
                   {wonAccolades.map((acc, aIdx) => (
@@ -1369,7 +1380,16 @@ export default function ProductClientView({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              {product.categorySlug && (
+                <Link
+                  href={`/category/${product.categorySlug}`}
+                  className="text-[11px] font-mono text-ink-dim hover:text-signal transition-colors hidden sm:inline-flex items-center gap-1 mr-2"
+                >
+                  <span>All {product.category}</span>
+                  <span className="text-[10px]">→</span>
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={() => scrollSimilar("left")}
