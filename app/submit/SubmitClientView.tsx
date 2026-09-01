@@ -547,8 +547,8 @@ export default function SubmitClientView({
 
   const [features, setFeatures] = useState<string[]>(["", "", ""]);
 
-  // Launch tier selection ($0 / $5 / $10) — $0 Free Launch selected by default
-  const [launchTier, setLaunchTier] = useState<0 | 5 | 10>(0);
+  // Launch tier selection ($0 / $5 / $10) — $10 Premium Spotlight selected by default
+  const [launchTier, setLaunchTier] = useState<0 | 5 | 10>(10);
 
   // Ownership & Authorization Confirmation State
   const [isAuthorizedConfirmed, setIsAuthorizedConfirmed] = useState(false);
@@ -1311,7 +1311,7 @@ export default function SubmitClientView({
     setAutofillMeta(null);
     setEnableRevenueSdk(false);
     setSdkLog("");
-    setLaunchTier(0);
+    setLaunchTier(10);
     setIsAuthorizedConfirmed(false);
     setSkippedSteps(new Set());
     try {
@@ -3532,141 +3532,167 @@ export default function SubmitClientView({
 
             {/* Launch Pricing Tier Selection — hidden when editing an existing product */}
             {!isEmbeddedMode && (
-              <div className="border border-hairline bg-surface/30 p-4 sm:p-8 space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline pb-3">
-                  <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider">
+              <div className="border border-hairline bg-surface/30 p-4 sm:p-6 space-y-4">
+                <div className="flex items-center justify-between border-b border-hairline pb-2.5">
+                  <h2 className="font-mono text-xs sm:text-sm font-bold text-ink uppercase tracking-wider">
                     Launch Pricing
                   </h2>
-                  <span className="text-xs text-ink-faint">SELECT A TIER</span>
+                  <span className="text-[10px] font-mono text-ink-faint uppercase">Select Tier</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* $0 Tier */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* $0 Free Tier */}
                   <button
                     type="button"
                     onClick={() => setLaunchTier(0)}
-                    className={`p-5 border text-left space-y-3 transition-colors cursor-pointer ${
+                    className={`p-4 border text-left flex flex-col justify-between space-y-3 transition-colors cursor-pointer ${
                       launchTier === 0
-                        ? "border-signal/40 bg-signal/5"
+                        ? "border-ink bg-surface/60"
                         : "border-hairline bg-void hover:border-ink/50"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-ink">$0</span>
-                      {launchTier === 0 && (
-                        <span className="text-[10px] font-bold text-signal uppercase px-2 py-0.5 border border-signal/30 bg-signal/10 font-mono">SELECTED</span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-ink-dim space-y-2">
-                      <p className="font-bold text-signal uppercase text-[10px]">Free Launch · 100% Free Forever</p>
-                      <ul className="space-y-1 text-ink-dim">
-                        <li className="text-ink font-bold flex items-center gap-1.5">
-                          <span className="text-signal">✓</span>
-                          <span>Auto-Broadcast to 𝕏, Telegram &amp; WhatsApp</span>
+                    <div className="space-y-2.5">
+                      <div className="flex items-baseline justify-between">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xl font-bold text-ink font-mono">$0</span>
+                          <span className="text-[10px] font-mono text-ink-dim uppercase">Free Forever</span>
+                        </div>
+                        {launchTier === 0 ? (
+                          <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 border border-ink/40 bg-surface text-ink">
+                            SELECTED
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono text-ink-faint uppercase">FREE</span>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-ink uppercase font-mono">
+                          Free Community Launch
+                        </div>
+                        <p className="text-[11px] text-ink-dim leading-relaxed">
+                          <strong className="text-ink font-medium">Flagship:</strong> Permanent dofollow SEO backlink &amp; dual 360° product specs pages.
+                        </p>
+                      </div>
+
+                      <ul className="space-y-1 text-[11px] text-ink-dim pt-2 border-t border-hairline/60">
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-ink-faint">✓</span>
+                          <span>Auto-broadcast to 𝕏, Telegram &amp; WhatsApp</span>
                         </li>
-                        <li className="flex items-center gap-1.5">
-                          <span className="text-signal">✓</span>
-                          <span>2 permanent indexable pages (360° Specs &amp; Profile)</span>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-ink-faint">✓</span>
+                          <span>2 permanent indexable pages</span>
                         </li>
-                        <li className="flex items-center gap-1.5">
-                          <span className="text-signal">✓</span>
-                          <span>Permanent high-authority dofollow backlink</span>
-                        </li>
-                        <li className="flex items-center gap-1.5">
-                          <span className="text-signal">✓</span>
-                          <span>Queued for next 6:00 AM IST (00:30 UTC) drop</span>
-                        </li>
-                        <li className="flex items-center gap-1.5">
-                          <span className="text-signal">✓</span>
-                          <span>Community upvotes, reviews &amp; revenue charts</span>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-ink-faint">✓</span>
+                          <span>Standard daily release queue (6:00 AM IST)</span>
                         </li>
                       </ul>
                     </div>
                   </button>
 
-                  {/* $5 Tier - Featured Launch */}
+                  {/* $5 Featured Tier */}
                   <button
                     type="button"
                     onClick={() => setLaunchTier(5)}
-                    className={`p-5 border text-left space-y-3 transition-colors cursor-pointer relative ${
+                    className={`p-4 border text-left flex flex-col justify-between space-y-3 transition-colors cursor-pointer ${
                       launchTier === 5
                         ? "border-signal bg-signal/5"
                         : "border-hairline bg-void hover:border-signal/50"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-signal">$5</span>
-                        <span className="text-[9px] font-mono font-bold text-signal px-1.5 py-0.5 border border-signal/30 bg-signal/10 uppercase">
-                          DODO CHECKOUT
-                        </span>
+                    <div className="space-y-2.5">
+                      <div className="flex items-baseline justify-between">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xl font-bold text-signal font-mono">$5</span>
+                          <span className="text-[10px] font-mono text-ink-dim">/ 30 days</span>
+                        </div>
+                        {launchTier === 5 ? (
+                          <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 border border-signal/40 bg-signal/15 text-signal">
+                            SELECTED
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono text-signal/80 px-1 py-0.5 border border-signal/20 uppercase">
+                            FEATURED
+                          </span>
+                        )}
                       </div>
-                      {launchTier === 5 && (
-                        <span className="text-[10px] font-bold text-signal uppercase px-2 py-0.5 border border-signal/30 bg-signal/10 font-mono">SELECTED</span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-ink-dim space-y-1.5">
-                      <p className="font-bold text-signal uppercase text-[10px]">Featured Launch (30 Days)</p>
-                      <ul className="space-y-1">
-                        <li className="flex items-center gap-1.5 text-ink">
+
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-signal uppercase font-mono">
+                          Header Marquee
+                        </div>
+                        <p className="text-[11px] text-ink-dim leading-relaxed">
+                          <strong className="text-signal font-medium">Flagship:</strong> Pinned 24/7 in top header floating banner across all pages for 30 days.
+                        </p>
+                      </div>
+
+                      <ul className="space-y-1 text-[11px] text-ink-dim pt-2 border-t border-hairline/60">
+                        <li className="flex items-start gap-1.5 text-ink">
                           <span className="text-signal">✓</span>
-                          <span>Everything in Free (Permanent pages &amp; link)</span>
+                          <span>Everything in Free ($0 tier)</span>
                         </li>
-                        <li className="flex items-center gap-1.5 text-ink">
+                        <li className="flex items-start gap-1.5 text-ink">
                           <span className="text-signal">✓</span>
-                          <span className="text-signal font-bold">Header floating section placement</span>
+                          <span>Top floating marquee placement (30D)</span>
                         </li>
-                        <li className="flex items-center gap-1.5">
+                        <li className="flex items-start gap-1.5">
                           <span className="text-signal">✓</span>
-                          <span>Instant activation for 30 continuous days</span>
-                        </li>
-                        <li className="flex items-center gap-1.5">
-                          <span className="text-signal">✓</span>
-                          <span>Track time &amp; analytics in personal profile</span>
+                          <span>Instant activation + dashboard tracking</span>
                         </li>
                       </ul>
                     </div>
                   </button>
 
-                  {/* $10 Tier - Premium Spotlight */}
+                  {/* $10 Spotlight Tier (Default) */}
                   <button
                     type="button"
                     onClick={() => setLaunchTier(10)}
-                    className={`p-5 border text-left space-y-3 transition-colors cursor-pointer relative ${
+                    className={`p-4 border text-left flex flex-col justify-between space-y-3 transition-colors cursor-pointer ${
                       launchTier === 10
-                        ? "border-accent bg-accent/5"
-                        : "border-hairline bg-void hover:border-accent/50"
+                        ? "border-[#38BDF8] bg-[#38BDF8]/5"
+                        : "border-hairline bg-void hover:border-[#38BDF8]/50"
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-ink">$10</span>
-                        <span className="text-[9px] font-mono font-bold text-[#38BDF8] px-1.5 py-0.5 border border-[#38BDF8]/30 bg-[#38BDF8]/10 uppercase">
-                          DODO CHECKOUT
-                        </span>
+                    <div className="space-y-2.5">
+                      <div className="flex items-baseline justify-between">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xl font-bold text-ink font-mono">$10</span>
+                          <span className="text-[10px] font-mono text-[#38BDF8]">/ 30 days</span>
+                        </div>
+                        {launchTier === 10 ? (
+                          <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 border border-[#38BDF8]/40 bg-[#38BDF8]/15 text-[#38BDF8]">
+                            SELECTED
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-mono text-[#38BDF8]/80 px-1 py-0.5 border border-[#38BDF8]/20 uppercase">
+                            SPOTLIGHT
+                          </span>
+                        )}
                       </div>
-                      {launchTier === 10 && (
-                        <span className="text-[10px] font-bold text-[#38BDF8] uppercase px-2 py-0.5 border border-[#38BDF8]/30 bg-[#38BDF8]/10 font-mono">SELECTED</span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-ink-dim space-y-1.5">
-                      <p className="font-bold text-ink uppercase text-[10px]">Premium Spotlight (30 Days)</p>
-                      <ul className="space-y-1">
-                        <li className="flex items-center gap-1.5 text-ink">
+
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-[#38BDF8] uppercase font-mono">
+                          Premium Spotlight
+                        </div>
+                        <p className="text-[11px] text-ink-dim leading-relaxed">
+                          <strong className="text-[#38BDF8] font-medium">Flagship:</strong> Rotating 15s spotlight placed directly beside ⌘K search &amp; submit.
+                        </p>
+                      </div>
+
+                      <ul className="space-y-1 text-[11px] text-ink-dim pt-2 border-t border-hairline/60">
+                        <li className="flex items-start gap-1.5 text-ink">
                           <span className="text-[#38BDF8]">✓</span>
-                          <span>Everything in Free (Permanent pages &amp; link)</span>
+                          <span>Everything in Free + Header placement</span>
                         </li>
-                        <li className="flex items-center gap-1.5 text-ink">
+                        <li className="flex items-start gap-1.5 text-ink">
                           <span className="text-[#38BDF8]">✓</span>
-                          <span className="text-[#38BDF8] font-bold">Alternating 15s spotlight next to search/submit</span>
+                          <span>Prime Search &amp; Submit spotlight (30D)</span>
                         </li>
-                        <li className="flex items-center gap-1.5">
+                        <li className="flex items-start gap-1.5">
                           <span className="text-[#38BDF8]">✓</span>
-                          <span>Instant activation for 30 continuous days</span>
-                        </li>
-                        <li className="flex items-center gap-1.5">
-                          <span className="text-[#38BDF8]">✓</span>
-                          <span>Track time &amp; analytics in personal profile</span>
+                          <span>Maximum high-intent CTR &amp; conversions</span>
                         </li>
                       </ul>
                     </div>
@@ -3681,7 +3707,11 @@ export default function SubmitClientView({
                 <p>
                   {isEditMode
                     ? "Update and save your live product details instantly."
-                    : "By submitting, your product will be reviewed and scheduled for the daily release queue."}
+                    : launchTier === 10
+                    ? "Your product will be reviewed, scheduled, and activated in the $10 Prime Search Spotlight (beside search & submit) for 30 continuous days upon checkout."
+                    : launchTier === 5
+                    ? "Your product will be reviewed, scheduled, and pinned in the $5 Top Header Marquee for 30 continuous days upon checkout."
+                    : "By submitting, your product will be reviewed and scheduled for the daily free release queue (6:00 AM IST)."}
                 </p>
                 
                 {/* Authorization & Ownership Confirmation Checkbox — Only required for NEW product submissions */}
@@ -3775,7 +3805,9 @@ export default function SubmitClientView({
                     isSubmitting
                       ? "bg-signal text-void opacity-95 cursor-wait"
                       : isEmbeddedMode || isAuthorizedConfirmed
-                      ? "bg-signal text-void hover:bg-signal/90 cursor-pointer shadow-sm"
+                      ? launchTier === 10
+                        ? "bg-[#38BDF8] text-void hover:bg-[#38BDF8]/90 cursor-pointer shadow-md font-bold"
+                        : "bg-signal text-void hover:bg-signal/90 cursor-pointer shadow-sm font-bold"
                       : "bg-surface text-ink-faint border border-hairline cursor-not-allowed opacity-60"
                   }`}
                 >
@@ -3790,7 +3822,21 @@ export default function SubmitClientView({
                   ) : (
                     <>
                       <PixelatedShipmentBox className="w-4 h-4 text-current shrink-0" />
-                      <span>{editTarget?.kind === "submission" && editTarget?.status === "DRAFT" ? "Launch Draft to Queue →" : isEditMode ? "Save Product Updates →" : "Submit Product Shipment"}</span>
+                      <span>
+                        {editTarget?.kind === "submission" && editTarget?.status === "DRAFT"
+                          ? launchTier === 10
+                            ? "Launch Draft ($10 Spotlight) →"
+                            : launchTier === 5
+                            ? "Launch Draft ($5 Featured) →"
+                            : "Launch Draft to Queue →"
+                          : isEditMode
+                          ? "Save Product Updates →"
+                          : launchTier === 10
+                          ? "Proceed with $10 Spotlight Launch →"
+                          : launchTier === 5
+                          ? "Proceed with $5 Featured Launch →"
+                          : "Submit Free Product Shipment →"}
+                      </span>
                     </>
                   )}
                 </button>

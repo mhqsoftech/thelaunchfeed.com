@@ -1911,20 +1911,21 @@ export default function ProfileClientView({
                     <span className="text-[10px] text-signal font-mono uppercase font-bold">Dodo Payments Live</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* Free Tier */}
-                    <div className="p-4 border border-hairline bg-void flex flex-col justify-between space-y-4 rounded-xs">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-ink">Free Launch</span>
-                          <span className="text-lg font-bold text-ink">$0</span>
+                    <div className="p-4 border border-hairline bg-void flex flex-col justify-between space-y-3">
+                      <div className="space-y-2.5">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-xs font-bold text-ink uppercase font-mono">Free Launch</span>
+                          <span className="text-base font-bold text-ink font-mono">$0</span>
                         </div>
-                        <div className="text-[10px] text-ink-dim uppercase font-bold">100% Free Forever</div>
-                        <ul className="text-[11px] text-ink-dim space-y-1 pt-1 border-t border-hairline/60">
-                          <li>· Auto-Broadcast to 𝕏, Telegram &amp; WhatsApp</li>
-                          <li>· 2 permanent indexable pages</li>
-                          <li>· Permanent dofollow backlink</li>
-                          <li>· Daily 6 AM IST release queue</li>
+                        <div className="text-[11px] text-ink-dim leading-relaxed">
+                          <strong className="text-ink font-medium">Flagship:</strong> Permanent dofollow SEO backlink &amp; dual 360° product specs pages.
+                        </div>
+                        <ul className="text-[11px] text-ink-dim space-y-1 pt-2 border-t border-hairline/60">
+                          <li>· Auto-broadcast to 𝕏, Telegram &amp; WhatsApp</li>
+                          <li>· 2 permanent indexable product pages</li>
+                          <li>· Standard daily 6:00 AM IST release queue</li>
                         </ul>
                       </div>
                       <Link
@@ -1936,21 +1937,19 @@ export default function ProfileClientView({
                     </div>
 
                     {/* $5 Tier */}
-                    <div className="p-4 border border-signal/40 bg-signal/5 flex flex-col justify-between space-y-4 relative rounded-xs">
-                      <div className="absolute -top-2.5 left-4 px-2 py-0.5 text-[9px] font-bold uppercase font-mono bg-signal text-void">
-                        POPULAR
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-ink">Featured Launch</span>
-                          <span className="text-lg font-bold text-signal">$5</span>
+                    <div className="p-4 border border-signal/30 bg-signal/5 flex flex-col justify-between space-y-3">
+                      <div className="space-y-2.5">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-xs font-bold text-signal uppercase font-mono">Featured Launch</span>
+                          <span className="text-base font-bold text-signal font-mono">$5 <span className="text-[10px] text-ink-dim font-normal">/ 30d</span></span>
                         </div>
-                        <div className="text-[10px] text-signal uppercase font-bold">Header Floating Placement</div>
-                        <ul className="text-[11px] text-ink-dim space-y-1 pt-1 border-t border-hairline/60">
-                          <li>· Everything in Free ($0 tier)</li>
-                          <li className="text-signal font-bold">· Top header floating section placement</li>
-                          <li className="text-ink">· 30 continuous days active</li>
-                          <li>· Real-time profile countdown tracking</li>
+                        <div className="text-[11px] text-ink-dim leading-relaxed">
+                          <strong className="text-signal font-medium">Flagship:</strong> Pinned 24/7 in top header floating marquee across all pages for 30 days.
+                        </div>
+                        <ul className="text-[11px] text-ink-dim space-y-1 pt-2 border-t border-hairline/60">
+                          <li className="text-ink">· Everything in Free ($0 tier)</li>
+                          <li className="text-signal font-bold">· Top header floating marquee (30D)</li>
+                          <li>· Live real-time dashboard countdown</li>
                         </ul>
                       </div>
                       <button
@@ -1961,28 +1960,26 @@ export default function ProfileClientView({
                             window.location.assign("/submit");
                           }
                         }}
-                        className="w-full py-2 px-3 text-[10px] font-mono font-bold uppercase text-center block transition-colors bg-signal text-void hover:opacity-90 cursor-pointer"
+                        className="w-full py-2 px-3 text-[10px] font-mono font-bold uppercase text-center block transition-colors bg-signal text-void hover:opacity-90 cursor-pointer font-bold"
                       >
-                        {productsList.length > 0 ? "Get $5 Placement (30D) →" : "Submit &amp; Upgrade ($5) →"}
+                        {productsList.length > 0 ? "Get $5 Header Marquee →" : "Submit & Upgrade ($5) →"}
                       </button>
                     </div>
 
                     {/* $10 Tier */}
-                    <div className="p-4 border border-[#38BDF8]/40 bg-[#38BDF8]/5 flex flex-col justify-between space-y-4 relative rounded-xs">
-                      <div className="absolute -top-2.5 left-4 px-2 py-0.5 text-[9px] font-bold uppercase font-mono bg-[#38BDF8] text-void font-bold">
-                        SPOTLIGHT
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-ink">Premium Spotlight</span>
-                          <span className="text-lg font-bold text-[#38BDF8]">$10</span>
+                    <div className="p-4 border border-[#38BDF8]/30 bg-[#38BDF8]/5 flex flex-col justify-between space-y-3">
+                      <div className="space-y-2.5">
+                        <div className="flex items-baseline justify-between">
+                          <span className="text-xs font-bold text-[#38BDF8] uppercase font-mono">Premium Spotlight</span>
+                          <span className="text-base font-bold text-[#38BDF8] font-mono">$10 <span className="text-[10px] text-ink-dim font-normal">/ 30d</span></span>
                         </div>
-                        <div className="text-[10px] text-[#38BDF8] uppercase font-bold">Search/Submit Spotlight</div>
-                        <ul className="text-[11px] text-ink-dim space-y-1 pt-1 border-t border-hairline/60">
-                          <li>· Everything in Free ($0 tier)</li>
-                          <li className="text-[#38BDF8] font-bold">· Alternating 15s spotlight next to search/submit</li>
-                          <li className="text-ink">· 30 continuous days active</li>
-                          <li>· Real-time profile countdown tracking</li>
+                        <div className="text-[11px] text-ink-dim leading-relaxed">
+                          <strong className="text-[#38BDF8] font-medium">Flagship:</strong> Rotating 15s spotlight placed directly beside ⌘K search &amp; submit.
+                        </div>
+                        <ul className="text-[11px] text-ink-dim space-y-1 pt-2 border-t border-hairline/60">
+                          <li className="text-ink">· Everything in Free + Header placement</li>
+                          <li className="text-[#38BDF8] font-bold">· Search &amp; Submit spotlight (30D)</li>
+                          <li>· Highest conversion rate on platform</li>
                         </ul>
                       </div>
                       <button
@@ -1995,7 +1992,7 @@ export default function ProfileClientView({
                         }}
                         className="w-full py-2 px-3 text-[10px] font-mono font-bold uppercase text-center block transition-colors bg-[#38BDF8] text-void hover:opacity-90 cursor-pointer font-bold"
                       >
-                        {productsList.length > 0 ? "Get $10 Spotlight (30D) →" : "Submit &amp; Spotlight ($10) →"}
+                        {productsList.length > 0 ? "Get $10 Spotlight →" : "Submit & Spotlight ($10) →"}
                       </button>
                     </div>
                   </div>
