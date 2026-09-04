@@ -212,7 +212,11 @@ export const onSubmissionRejected = inngest.createFunction(
  * links back, and fires `product.launched` which fans out launch emails.
  */
 export const publishDue = inngest.createFunction(
-  { id: "publish-due-submissions", name: "Publish due submissions" },
+  {
+    id: "publish-due-submissions",
+    name: "Publish due submissions",
+    concurrency: { limit: 1 },
+  },
   { cron: "* * * * *" },
   async ({ step }) => {
     const due = (await step.run("fetch-due", () =>
@@ -232,6 +236,36 @@ export const publishDue = inngest.createFunction(
       // causing product.launched events (and thus broadcast + founder
       // email) to never fire.
       const pid = await step.run(`publish-${sub.id}`, async () => {
+        // Idempotency check: if already published, return existing product id immediately
+        const freshSub = await prisma.submission.findUnique({
+          where: { id: sub.id },
+          select: { status: true, publishedProductId: true },
+        });
+        if (freshSub?.status === "PUBLISHED" && freshSub.publishedProductId) {
+          return freshSub.publishedProductId;
+        }
+
+        // Additional safeguard: check if a product was already created for this owner/submission today
+        const existingProduct = await prisma.product.findFirst({
+          where: {
+            ownerId: sub.ownerId,
+            name: { equals: sub.name, mode: "insensitive" },
+            launchedAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+          },
+          select: { id: true },
+        });
+        if (existingProduct) {
+          await prisma.submission.update({
+            where: { id: sub.id },
+            data: {
+              status: "PUBLISHED",
+              publishedAt: now,
+              publishedProductId: existingProduct.id,
+            },
+          });
+          return existingProduct.id;
+        }
+
         const subDetails = (sub.details as Record<string, unknown>) || {};
         const subVideoUrl = sub.videoUrl || (subDetails.videoUrl as string) || null;
         const subTags = sub.tags && sub.tags.length > 0 ? sub.tags : ((subDetails.tags as string[]) || []);
