@@ -134,6 +134,7 @@ const SCHEMA: JsonSchema = {
     "faqs",
     "supportEmail",
     "tags",
+    "videoUrl",
   ],
 };
 

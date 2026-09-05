@@ -133,7 +133,12 @@ async function processImageString(img: string | undefined | null, prefix: string
     if (parsed) {
       const ext = parsed.contentType.split("/")[1] || "png";
       const key = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      return await uploadToNeonStorage(parsed.buffer, key, parsed.contentType);
+      try {
+        return await uploadToNeonStorage(parsed.buffer, key, parsed.contentType);
+      } catch (err) {
+        console.error(`[processImageString] Failed to upload ${prefix}:`, err);
+        throw new Error(`Failed to upload ${prefix} image. Please try again or use a smaller image.`);
+      }
     }
   }
   return img;
@@ -144,6 +149,17 @@ function extractDomainAndPath(rawUrl?: string | null): string {
   let clean = rawUrl.trim().toLowerCase();
   clean = clean.replace(/^https?:\/\//, "");
   clean = clean.replace(/^www\./, "");
+
+  // For app store URLs where query parameters define the unique application identity (e.g. Google Play ?id=...)
+  try {
+    const fullUrl = new URL(rawUrl.match(/^https?:\/\//i) ? rawUrl : `https://${rawUrl}`);
+    if (fullUrl.hostname.includes("play.google.com") && fullUrl.searchParams.has("id")) {
+      const appId = fullUrl.searchParams.get("id") || "";
+      clean = `${fullUrl.hostname}${fullUrl.pathname}?id=${appId}`.replace(/^www\./, "").toLowerCase();
+      return clean.replace(/\/+$/, "");
+    }
+  } catch {}
+
   clean = clean.split("?")[0].split("#")[0];
   clean = clean.replace(/\/+$/, "");
   return clean;
@@ -233,150 +249,217 @@ export async function resolveCategory(raw: string | undefined | null) {
   }
 }
 
-export async function createSubmission(input: CreateSubmissionInput): Promise<Submission> {
-  const user = await requireUser();
-  const parsed = CreateSchema.parse(input);
-  const isDraft = parsed.asDraft === true;
+export type SubmissionConflict = {
+  type: "existing_product" | "existing_submission";
+  productName: string;
+  productSlug?: string;
+  productUrl?: string;
+  websiteUrl?: string;
+};
 
-  // Idempotency: Prevent duplicate submissions if triggered twice in quick succession by same user
-  const recentDuplicate = await prisma.submission.findFirst({
-    where: {
-      ownerId: user.id,
-      name: { equals: parsed.name, mode: "insensitive" },
-      status: isDraft ? "DRAFT" : "SCHEDULED",
-      createdAt: { gte: new Date(Date.now() - 30_000) },
-    },
-  });
-  if (recentDuplicate) {
-    return recentDuplicate;
-  }
+export type CreateSubmissionResult =
+  | { success: true; submission: Submission }
+  | { success: false; error: string; conflict?: SubmissionConflict };
 
-  // Global Deduplication: Prevent any user from submitting a duplicate website URL or product name.
-  // Drafts are private to the user, so skip the global dedup check for them —
-  // multiple people can hold drafts of the same URL until one publishes.
-  const rawUrl = parsed.websiteUrl || `https://${slugify(parsed.name)}.com`;
-  const domain = extractDomainAndPath(rawUrl);
-
-  if (!isDraft && domain && domain.length > 3) {
-    // 1. Check if product is already LIVE or exists on platform
-    const existingProduct = await prisma.product.findFirst({
-      where: {
-        status: { not: "ARCHIVED" },
-        OR: [
-          { websiteUrl: { contains: domain, mode: "insensitive" } },
-          { slug: slugify(parsed.name) },
-        ],
-      },
-      select: { id: true, name: true, websiteUrl: true, slug: true },
-    });
-
-    if (existingProduct) {
-      const existingDomain = extractDomainAndPath(existingProduct.websiteUrl);
-      if (existingDomain === domain || existingProduct.slug === slugify(parsed.name)) {
-        throw new Error(
-          `This product (${existingProduct.name} · ${domain}) has already been launched on The Launch Feed. Each product URL can only be submitted once.`
-        );
+export async function createSubmission(input: CreateSubmissionInput): Promise<CreateSubmissionResult> {
+  try {
+    const user = await requireUser();
+    let parsed: CreateSubmissionInput;
+    try {
+      parsed = CreateSchema.parse(input);
+    } catch (zodErr) {
+      if (zodErr instanceof z.ZodError) {
+        const firstIssue = zodErr.issues[0];
+        const fieldName = firstIssue?.path?.join(".") || "field";
+        return { success: false, error: `Invalid ${fieldName}: ${firstIssue?.message || "Validation failed"}` };
       }
+      return { success: false, error: "Invalid submission data" };
     }
 
-    // 2. Check if a submission is already queued by any user.
-    // If the same user already has a matching SCHEDULED or DRAFT row for this
-    // domain, treat this call as an idempotent resubmit and return the existing
-    // row instead of throwing — the auto-submit-after-signin flow relies on this
-    // when a user hits Submit twice or edits a queued launch from the profile.
-    const existingSubmission = await prisma.submission.findFirst({
-      where: {
-        status: { in: ["SCHEDULED", "DRAFT"] },
-        OR: [
-          { websiteUrl: { contains: domain, mode: "insensitive" } },
-          { name: { equals: parsed.name, mode: "insensitive" } },
-        ],
-      },
-      select: { id: true, name: true, websiteUrl: true, ownerId: true, status: true },
-    });
+    const isDraft = parsed.asDraft === true;
 
-    if (existingSubmission) {
-      const existingSubDomain = extractDomainAndPath(existingSubmission.websiteUrl);
-      const isMatch =
-        existingSubDomain === domain ||
-        existingSubmission.name.toLowerCase().trim() === parsed.name.toLowerCase().trim();
-      if (isMatch) {
-        if (existingSubmission.ownerId === user.id) {
-          // Same user re-submitting — return their existing row silently.
-          const row = await prisma.submission.findUnique({ where: { id: existingSubmission.id } });
-          if (row) return row;
+    // Idempotency: Prevent duplicate submissions if triggered twice in quick succession by same user
+    const recentDuplicate = await prisma.submission.findFirst({
+      where: {
+        ownerId: user.id,
+        name: { equals: parsed.name, mode: "insensitive" },
+        status: isDraft ? "DRAFT" : "SCHEDULED",
+        createdAt: { gte: new Date(Date.now() - 30_000) },
+      },
+    });
+    if (recentDuplicate) {
+      return { success: true, submission: recentDuplicate };
+    }
+
+    // Global Deduplication: Prevent any user from submitting a duplicate website URL or product name.
+    // Drafts are private to the user, so skip the global dedup check for them —
+    // multiple people can hold drafts of the same URL until one publishes.
+    const rawUrl = parsed.websiteUrl || `https://${slugify(parsed.name)}.com`;
+    const domain = extractDomainAndPath(rawUrl);
+
+    if (!isDraft && domain && domain.length > 3) {
+      // 1. Check if product is already LIVE or exists on platform
+      const existingProduct = await prisma.product.findFirst({
+        where: {
+          status: { not: "ARCHIVED" },
+          OR: [
+            { websiteUrl: { contains: domain, mode: "insensitive" } },
+            { slug: slugify(parsed.name) },
+          ],
+        },
+        select: { id: true, name: true, websiteUrl: true, slug: true },
+      });
+
+      if (existingProduct) {
+        const existingDomain = extractDomainAndPath(existingProduct.websiteUrl);
+        if (existingDomain === domain || existingProduct.slug === slugify(parsed.name)) {
+          return {
+            success: false,
+            error: `This product (${existingProduct.name} · ${domain}) has already been launched on The Launch Feed. Each product URL can only be submitted once.`,
+            conflict: {
+              type: "existing_product",
+              productName: existingProduct.name,
+              productSlug: existingProduct.slug,
+              productUrl: `/product/${existingProduct.slug}`,
+              websiteUrl: existingProduct.websiteUrl,
+            },
+          };
         }
-        // Do not leak the queued submission's name or owner — enumerating
-        // this endpoint would otherwise reveal every draft/scheduled launch
-        // by URL or product name.
-        throw new Error(
-          `A launch is already queued for ${domain}. Duplicate submissions are not permitted.`
-        );
+      }
+
+      // 2. Check if a submission is already queued by any user.
+      // If the same user already has a matching SCHEDULED or DRAFT row for this
+      // domain, treat this call as an idempotent resubmit and return the existing
+      // row instead of throwing — the auto-submit-after-signin flow relies on this
+      // when a user hits Submit twice or edits a queued launch from the profile.
+      const existingSubmission = await prisma.submission.findFirst({
+        where: {
+          status: { in: ["SCHEDULED", "DRAFT"] },
+          OR: [
+            { websiteUrl: { contains: domain, mode: "insensitive" } },
+            { name: { equals: parsed.name, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, name: true, websiteUrl: true, ownerId: true, status: true },
+      });
+
+      if (existingSubmission) {
+        const existingSubDomain = extractDomainAndPath(existingSubmission.websiteUrl);
+        const isMatch =
+          existingSubDomain === domain ||
+          existingSubmission.name.toLowerCase().trim() === parsed.name.toLowerCase().trim();
+        if (isMatch) {
+          if (existingSubmission.ownerId === user.id) {
+            // Same user re-submitting — return their existing row silently.
+            const row = await prisma.submission.findUnique({ where: { id: existingSubmission.id } });
+            if (row) return { success: true, submission: row };
+          }
+          // Do not leak the queued submission's name or owner — enumerating
+          // this endpoint would otherwise reveal every draft/scheduled launch
+          // by URL or product name.
+          return {
+            success: false,
+            error: `A launch is already queued for ${domain}. Duplicate submissions are not permitted.`,
+            conflict: {
+              type: "existing_submission",
+              productName: existingSubmission.name,
+              websiteUrl: existingSubmission.websiteUrl,
+            },
+          };
+        }
       }
     }
-  }
 
-  const scheduledFor = isDraft ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : getNext6AmIstRelease();
+    const scheduledFor = isDraft ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : getNext6AmIstRelease();
 
-  const category = await resolveCategory(parsed.categorySlug);
+    const category = await resolveCategory(parsed.categorySlug);
 
-  const [logoUrl, uploadedScreenshots] = await Promise.all([
-    processImageString(parsed.logoUrl, "logos"),
-    parsed.screenshots
-      ? Promise.all(parsed.screenshots.map((scr) => processImageString(scr, "screenshots")))
-      : Promise.resolve<Array<string | null>>([]),
-  ]);
-  const screenshots: string[] = uploadedScreenshots.filter((s): s is string => !!s);
+    const [logoUrl, uploadedScreenshots] = await Promise.all([
+      processImageString(parsed.logoUrl, "logos"),
+      parsed.screenshots
+        ? Promise.all(parsed.screenshots.map((scr) => processImageString(scr, "screenshots")))
+        : Promise.resolve<Array<string | null>>([]),
+    ]);
+    const screenshots: string[] = uploadedScreenshots.filter((s): s is string => !!s);
 
-  const detailsData = parsed.details
-    ? {
-        ...(parsed.details as Record<string, unknown>),
+    const detailsData = parsed.details
+      ? {
+          ...(parsed.details as Record<string, unknown>),
+          videoUrl: parsed.videoUrl || null,
+          tags: parsed.tags ?? [],
+        }
+      : undefined;
+
+    const sub = await prisma.submission.create({
+      data: {
+        ownerId: user.id,
+        name: parsed.name,
+        tagline: parsed.tagline,
+        description: parsed.description,
+        websiteUrl: parsed.websiteUrl || `https://${slugify(parsed.name)}.com`,
+        logoUrl,
+        screenshots,
         videoUrl: parsed.videoUrl || null,
         tags: parsed.tags ?? [],
-      }
-    : undefined;
+        categoryId: category?.id,
+        details: detailsData ? (detailsData as any) : undefined,
+        makerName: parsed.makerName,
+        makerHandle: parsed.makerHandle,
+        makerEmail: user.email,
+        status: isDraft ? "DRAFT" : "SCHEDULED",
+        scheduledFor,
+      },
+    });
 
-  const sub = await prisma.submission.create({
-    data: {
-      ownerId: user.id,
-      name: parsed.name,
-      tagline: parsed.tagline,
-      description: parsed.description,
-      websiteUrl: parsed.websiteUrl || `https://${slugify(parsed.name)}.com`,
-      logoUrl,
-      screenshots,
-      videoUrl: parsed.videoUrl || null,
-      tags: parsed.tags ?? [],
-      categoryId: category?.id,
-      details: detailsData ? (detailsData as any) : undefined,
-      makerName: parsed.makerName,
-      makerHandle: parsed.makerHandle,
-      makerEmail: user.email,
-      status: isDraft ? "DRAFT" : "SCHEDULED",
-      scheduledFor,
-    },
-  });
-
-  if (isDraft) {
-    return sub;
-  }
-
-  // Fire the "submission.created" event AS A BACKGROUND job. The Inngest
-  // handler owns the "product-submitted" email — sending it inline here too
-  // caused every founder to receive the queued-launch confirmation twice.
-  (async () => {
-    try {
-      const { inngest } = await import("@/lib/inngest");
-      await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
-    } catch (e) {
-      console.error("[submission:inngest] failed:", e);
+    if (isDraft) {
+      return { success: true, submission: sub };
     }
-  })().catch((e) => console.error("[submission:background] failed:", e));
 
-  revalidatePath("/admin");
-  revalidatePath("/submit");
-  revalidatePath("/profile");
-  return sub;
+    // Fire the "submission.created" event AS A BACKGROUND job. If Inngest is
+    // not running (e.g. local dev without `npx inngest-cli dev` or missing INNGEST_EVENT_KEY),
+    // safely fall back to in-process sendAndLog so emails/logs work seamlessly without crashing.
+    (async () => {
+      try {
+        const { inngest } = await import("@/lib/inngest");
+        await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
+      } catch (inngestErr) {
+        try {
+          const { isAutomationEnabled } = await import("@/app/actions/automation");
+          const enabled = await isAutomationEnabled("product-submitted").catch(() => true);
+          if (enabled) {
+            const { sendAndLog } = await import("@/lib/inngest/functions");
+            await sendAndLog({
+              templateId: "product-submitted",
+              to: sub.makerEmail,
+              toUserId: sub.ownerId,
+              trigger: "on-submit",
+              vars: {
+                productName: sub.name,
+                productSlug: slugify(sub.name),
+                userName: user.name || user.email,
+                slotExpiresOn: new Date(sub.scheduledFor).toISOString().slice(0, 10),
+              },
+            });
+          }
+        } catch (fallbackErr) {
+          console.warn("[submission:fallback-email] notice:", fallbackErr);
+        }
+      }
+    })().catch((e) => console.error("[submission:background] failed:", e));
+
+    try {
+      revalidatePath("/admin");
+      revalidatePath("/submit");
+      revalidatePath("/profile");
+    } catch (e) {
+      console.warn("[submission:revalidatePath] non-critical error:", e);
+    }
+    return { success: true, submission: sub };
+  } catch (err) {
+    console.error("[createSubmission] error:", err);
+    const msg = err instanceof Error ? err.message : "Failed to create submission. Please try again.";
+    return { success: false, error: msg };
+  }
 }
 
 /* ─────────── admin ─────────── */

@@ -10,6 +10,7 @@ import {
   updateMySubmission,
   updateMyProduct,
   type EditablePayload,
+  type SubmissionConflict,
 } from "@/app/actions/submissions";
 import { useSearchParams } from "next/navigation";
 import { listCategories } from "@/app/actions/categories";
@@ -534,6 +535,8 @@ export default function SubmitClientView({
   // suppress the "Queued for launch" success screen.
   const keepAsDraftIntentRef = React.useRef(false);
   const [isUpdatingDraft, setIsUpdatingDraft] = useState(false);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [submissionConflict, setSubmissionConflict] = useState<SubmissionConflict | null>(null);
 
   const isEditMode = Boolean(onSaveProduct || editTarget || editParam);
 
@@ -770,7 +773,7 @@ export default function SubmitClientView({
           launchTier: draft?.launchTier ?? launchTier,
         };
 
-        const sub = await createSubmission({
+        const subRes = await createSubmission({
           name: activeForm.name || "Untitled product",
           tagline: activeForm.tagline || "",
           websiteUrl: activeForm.websiteUrl || "",
@@ -784,6 +787,11 @@ export default function SubmitClientView({
           screenshots: activeGallery.filter(Boolean),
           details,
         });
+
+        if (!subRes.success) {
+          throw new Error(subRes.error);
+        }
+        const sub = subRes.submission;
 
         if (activeForm.apiKey) {
           try {
@@ -921,7 +929,7 @@ export default function SubmitClientView({
           tags: parsedDraftTags,
           launchTier: activeTier,
         };
-        await createSubmission({
+        const draftRes = await createSubmission({
           name: activeForm.name || "Untitled draft",
           tagline: activeForm.tagline || "",
           websiteUrl: activeForm.websiteUrl || "",
@@ -936,6 +944,10 @@ export default function SubmitClientView({
           details,
           asDraft: true,
         });
+        if (!draftRes.success) {
+          console.warn("[auto_save_draft] failed:", draftRes.error);
+          return;
+        }
         try {
           localStorage.removeItem("tlf_pending_submission");
           localStorage.removeItem("tlf_submit_draft");
@@ -1583,7 +1595,7 @@ export default function SubmitClientView({
         tags: parsedTags,
         launchTier,
       };
-      await createSubmission({
+      const draftRes = await createSubmission({
         name: formData.name || "Untitled draft",
         tagline: formData.tagline || "",
         websiteUrl: formData.websiteUrl || "",
@@ -1598,6 +1610,9 @@ export default function SubmitClientView({
         details,
         asDraft: true,
       });
+      if (!draftRes.success) {
+        throw new Error(draftRes.error);
+      }
       setDraftSavedFlash(true);
       setTimeout(() => setDraftSavedFlash(false), 3000);
     } catch (err) {
@@ -1693,6 +1708,8 @@ export default function SubmitClientView({
       return;
     }
 
+    setSubmissionError(null);
+    setSubmissionConflict(null);
     isSubmittingRef.current = true;
     setIsSubmitting(true);
 
@@ -1788,7 +1805,7 @@ export default function SubmitClientView({
         return;
       }
 
-      const sub = await createSubmission({
+      const subRes = await createSubmission({
         name: formData.name || "Untitled product",
         tagline: formData.tagline || "",
         websiteUrl: formData.websiteUrl || "",
@@ -1802,6 +1819,38 @@ export default function SubmitClientView({
         screenshots: galleryAvif.filter(Boolean),
         details,
       });
+
+      if (!subRes.success) {
+        if (subRes.error === "UNAUTHENTICATED") {
+          setIsSubmitting(false);
+          isSubmittingRef.current = false;
+          const pendingSubmission = {
+            formData,
+            thumbnailAvif,
+            galleryAvif,
+            faqs,
+            pricingTiers,
+            features,
+            autofillUrl,
+            launchTier,
+            isAuthorizedConfirmed,
+          };
+          try {
+            localStorage.setItem("tlf_pending_submission", JSON.stringify(pendingSubmission));
+            localStorage.setItem("tlf_submit_draft", JSON.stringify(pendingSubmission));
+          } catch {}
+          window.location.assign(`/handler/sign-in?after_auth_return_to=${encodeURIComponent("/submit?auto_submit=1")}`);
+          return;
+        }
+
+        // Display conflict/error natively inside the "Dispatching Product Shipment" modal!
+        setSubmissionError(subRes.error);
+        if (subRes.conflict) {
+          setSubmissionConflict(subRes.conflict);
+        }
+        return;
+      }
+      const sub = subRes.submission;
 
       if (formData.apiKey) {
         try {
@@ -1846,7 +1895,10 @@ export default function SubmitClientView({
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error("[submit] failed", err);
-      if (err instanceof Error && err.message === "UNAUTHENTICATED") {
+      const errMsg = err instanceof Error ? err.message : "Submission failed — please try again.";
+      if (errMsg === "UNAUTHENTICATED") {
+        setIsSubmitting(false);
+        isSubmittingRef.current = false;
         const pendingSubmission = {
           formData,
           thumbnailAvif,
@@ -1865,10 +1917,9 @@ export default function SubmitClientView({
         window.location.assign(`/handler/sign-in?after_auth_return_to=${encodeURIComponent("/submit?auto_submit=1")}`);
         return;
       }
-      alert(err instanceof Error && err.message ? err.message : "Submission failed — please try again.");
+      setSubmissionError(errMsg);
     } finally {
       isSubmittingRef.current = false;
-      setIsSubmitting(false);
       setIsUpdatingDraft(false);
       keepAsDraftIntentRef.current = false;
     }
@@ -4440,63 +4491,141 @@ export default function SubmitClientView({
         {isSubmitting && (
           <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 font-mono animate-in fade-in duration-200">
             <div className="bg-void border-2 border-signal max-w-lg w-full p-6 sm:p-8 space-y-6 shadow-2xl relative">
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-hairline pb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-signal animate-ping" />
-                  <span className="text-xs font-bold text-signal uppercase tracking-wider">
-                    {isEditMode ? "SYNCING PRODUCT UPDATES" : "DISPATCHING PRODUCT SHIPMENT"}
-                  </span>
-                </div>
-                <span className="text-[10px] text-ink-dim font-mono animate-pulse">
-                  BROADCASTING...
-                </span>
-              </div>
-
-              {/* Visual Icon / Radar Pulse */}
-              <div className="py-4 flex flex-col items-center justify-center space-y-4">
-                <div className="relative flex items-center justify-center">
-                  <div className="w-20 h-20 rounded-full border border-signal/30 animate-ping absolute" />
-                  <div className="w-16 h-16 bg-surface border border-signal flex items-center justify-center relative shadow-lg">
-                    <LaunchFeedLogo size={32} />
+              {submissionError || submissionConflict ? (
+                <>
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-hairline pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-signal" />
+                      <span className="text-xs font-bold text-signal uppercase tracking-wider">
+                        {submissionConflict?.type === "existing_product"
+                          ? "PRODUCT ALREADY LAUNCHED"
+                          : submissionConflict?.type === "existing_submission"
+                            ? "LAUNCH ALREADY QUEUED"
+                            : "SUBMISSION BLOCKED"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSubmitting(false);
+                        setSubmissionError(null);
+                        setSubmissionConflict(null);
+                      }}
+                      className="text-xs text-ink-dim hover:text-ink border border-hairline px-2 py-0.5 uppercase tracking-wider transition-colors hover:border-signal"
+                    >
+                      ✕ Close
+                    </button>
                   </div>
-                </div>
-                <div className="text-center space-y-1">
-                  <h3 className="text-sm font-bold text-ink uppercase tracking-wide">
-                    {formData.name || "Product"}
-                  </h3>
-                  <p className="text-xs text-ink-dim">
-                    {isEditMode ? "Applying updates to live database..." : "Publishing to The Launch Feed queue..."}
-                  </p>
-                </div>
-              </div>
 
-              {/* Stepped Progress Checklist */}
-              <div className="space-y-2.5 border border-hairline bg-surface/40 p-3.5 text-xs text-ink-dim">
-                <div className="flex items-center gap-2 text-ink font-bold">
-                  <span className="text-signal font-bold">✔</span>
-                  <span>Optimizing metadata & AVIF media pipeline</span>
-                </div>
-                <div className="flex items-center gap-2 text-ink font-bold">
-                  <span className="text-signal font-bold">✔</span>
-                  <span>Generating tamper-proof slug & category links</span>
-                </div>
-                <div className="flex items-center gap-2 text-signal font-bold animate-pulse">
-                  <span>●</span>
-                  <span>Transacting with Neon Postgres & Inngest queues...</span>
-                </div>
-              </div>
+                  {/* Visual Icon / Conflict Detail */}
+                  <div className="py-2 flex flex-col items-center justify-center space-y-4 text-center">
+                    <div className="w-16 h-16 bg-surface border-2 border-signal flex items-center justify-center relative shadow-lg">
+                      <LaunchFeedLogo size={32} />
+                    </div>
+                    <div className="space-y-2">
+                      <h3 className="text-sm font-bold text-ink uppercase tracking-wide">
+                        {submissionConflict?.productName || formData.name || "Product"}
+                      </h3>
+                      <p className="text-xs text-ink-dim max-w-md mx-auto leading-relaxed">
+                        {submissionError}
+                      </p>
+                    </div>
+                  </div>
 
-              {/* High-Tech Segmented Loading Bar */}
-              <div className="space-y-1.5">
-                <div className="h-1.5 w-full bg-surface border border-hairline overflow-hidden">
-                  <div className="h-full bg-signal w-full animate-pulse transition-all" />
-                </div>
-                <div className="flex justify-between text-[10px] text-ink-dim">
-                  <span>STAGE: INGESTION</span>
-                  <span>SUB-SECOND TELEMETRY</span>
-                </div>
-              </div>
+                  {/* Conflict Action: Already Existing Product Link */}
+                  {submissionConflict?.productUrl && (
+                    <div className="bg-surface/60 border border-signal/40 p-4 space-y-2 text-center">
+                      <div className="text-[11px] text-ink-dim uppercase tracking-wider">
+                        This product is live on The Launch Feed:
+                      </div>
+                      <Link
+                        href={submissionConflict.productUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-signal text-void font-bold text-xs uppercase tracking-wider hover:opacity-90 transition-opacity w-full shadow-md"
+                      >
+                        <span>View Launched Product Page →</span>
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsSubmitting(false);
+                        setSubmissionError(null);
+                        setSubmissionConflict(null);
+                      }}
+                      className="w-full py-2.5 bg-surface border border-hairline hover:border-ink/40 text-ink text-xs font-bold uppercase tracking-wider transition-colors"
+                    >
+                      ← Back to Form & Edit URL
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Header */}
+                  <div className="flex items-center justify-between border-b border-hairline pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-signal animate-ping" />
+                      <span className="text-xs font-bold text-signal uppercase tracking-wider">
+                        {isEditMode ? "SYNCING PRODUCT UPDATES" : "DISPATCHING PRODUCT SHIPMENT"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-ink-dim font-mono animate-pulse">
+                      BROADCASTING...
+                    </span>
+                  </div>
+
+                  {/* Visual Icon / Radar Pulse */}
+                  <div className="py-4 flex flex-col items-center justify-center space-y-4">
+                    <div className="relative flex items-center justify-center">
+                      <div className="w-20 h-20 rounded-full border border-signal/30 animate-ping absolute" />
+                      <div className="w-16 h-16 bg-surface border border-signal flex items-center justify-center relative shadow-lg">
+                        <LaunchFeedLogo size={32} />
+                      </div>
+                    </div>
+                    <div className="text-center space-y-1">
+                      <h3 className="text-sm font-bold text-ink uppercase tracking-wide">
+                        {formData.name || "Product"}
+                      </h3>
+                      <p className="text-xs text-ink-dim">
+                        {isEditMode ? "Applying updates to live database..." : "Publishing to The Launch Feed queue..."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Stepped Progress Checklist */}
+                  <div className="space-y-2.5 border border-hairline bg-surface/40 p-3.5 text-xs text-ink-dim">
+                    <div className="flex items-center gap-2 text-ink font-bold">
+                      <span className="text-signal font-bold">✔</span>
+                      <span>Optimizing metadata & AVIF media pipeline</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-ink font-bold">
+                      <span className="text-signal font-bold">✔</span>
+                      <span>Generating tamper-proof slug & category links</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-signal font-bold animate-pulse">
+                      <span>●</span>
+                      <span>Transacting with Neon Postgres & Inngest queues...</span>
+                    </div>
+                  </div>
+
+                  {/* High-Tech Segmented Loading Bar */}
+                  <div className="space-y-1.5">
+                    <div className="h-1.5 w-full bg-surface border border-hairline overflow-hidden">
+                      <div className="h-full bg-signal w-full animate-pulse transition-all" />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-ink-dim">
+                      <span>STAGE: INGESTION</span>
+                      <span>SUB-SECOND TELEMETRY</span>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
