@@ -44,27 +44,63 @@ let memoryLayoutCache: {
   topProducts: LayoutProduct[];
   weeklyProducts?: LayoutProduct[];
   monthlyProducts?: LayoutProduct[];
+  topFounders?: any[];
 } | null = null;
 
 function getInitialLayoutData(): {
   featured: LayoutSlot[];
   rotating: LayoutSlot[];
   topProducts: LayoutProduct[];
+  weeklyProducts: LayoutProduct[];
+  monthlyProducts: LayoutProduct[];
+  topFounders: any[];
 } {
-  if (memoryLayoutCache) return memoryLayoutCache;
+  if (memoryLayoutCache) {
+    return {
+      featured: memoryLayoutCache.featured || [],
+      rotating: memoryLayoutCache.rotating || [],
+      topProducts: memoryLayoutCache.topProducts || [],
+      weeklyProducts: memoryLayoutCache.weeklyProducts || memoryLayoutCache.topProducts || [],
+      monthlyProducts: memoryLayoutCache.monthlyProducts || memoryLayoutCache.topProducts || [],
+      topFounders: memoryLayoutCache.topFounders || [],
+    };
+  }
   if (typeof window !== "undefined") {
     try {
       const raw = sessionStorage.getItem("tlf-layout-cache");
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed?.topProducts) && parsed.topProducts.length > 0) {
-          memoryLayoutCache = parsed;
-          return parsed;
+        if (parsed && typeof parsed === "object") {
+          const cacheObj = {
+            featured: Array.isArray(parsed.featured) ? parsed.featured : [],
+            rotating: Array.isArray(parsed.rotating) ? parsed.rotating : [],
+            topProducts: Array.isArray(parsed.topProducts) ? parsed.topProducts : [],
+            weeklyProducts: Array.isArray(parsed.weeklyProducts)
+              ? parsed.weeklyProducts
+              : Array.isArray(parsed.topProducts)
+              ? parsed.topProducts
+              : [],
+            monthlyProducts: Array.isArray(parsed.monthlyProducts)
+              ? parsed.monthlyProducts
+              : Array.isArray(parsed.topProducts)
+              ? parsed.topProducts
+              : [],
+            topFounders: Array.isArray(parsed.topFounders) ? parsed.topFounders : [],
+          };
+          memoryLayoutCache = cacheObj;
+          return cacheObj;
         }
       }
     } catch {}
   }
-  return { featured: [], rotating: [], topProducts: [] };
+  return {
+    featured: [],
+    rotating: [],
+    topProducts: [],
+    weeklyProducts: [],
+    monthlyProducts: [],
+    topFounders: [],
+  };
 }
 
 const DEFAULT_CATEGORIES = [
@@ -150,6 +186,7 @@ export default function MainLayoutShell({
   }, [searchQuery]);
 
   const [mounted, setMounted] = useState(false);
+  const [isLoadingLayout, setIsLoadingLayout] = useState(true);
   const [featured, setFeatured] = useState<LayoutSlot[]>([]);
   const [rotating, setRotating] = useState<LayoutSlot[]>([]);
   const [topProducts, setTopProducts] = useState<LayoutProduct[]>([]);
@@ -186,12 +223,23 @@ export default function MainLayoutShell({
     setMounted(true);
     // Instantly hydrate from client cache on mount without causing SSR hydration mismatches
     const initial = getInitialLayoutData();
-    if (initial.topProducts.length > 0) {
+    const hasCachedData =
+      initial.featured.length > 0 ||
+      initial.rotating.length > 0 ||
+      initial.weeklyProducts.length > 0 ||
+      initial.monthlyProducts.length > 0 ||
+      initial.topFounders.length > 0;
+
+    if (hasCachedData) {
       setFeatured(initial.featured);
       setRotating(initial.rotating);
       setTopProducts(initial.topProducts);
-      setWeeklyProducts(initial.topProducts);
-      setMonthlyProducts(initial.topProducts);
+      setWeeklyProducts(initial.weeklyProducts);
+      setMonthlyProducts(initial.monthlyProducts);
+      if (initial.topFounders.length > 0) {
+        setTopFounders(initial.topFounders);
+      }
+      setIsLoadingLayout(false);
     }
 
     let cancelled = false;
@@ -201,8 +249,16 @@ export default function MainLayoutShell({
         if (!r.ok) return;
         const data = await r.json();
         if (cancelled) return;
-        const newWeekly = data.weeklyProducts ?? data.topProducts ?? [];
-        const newMonthly = data.monthlyProducts ?? data.topProducts ?? [];
+        const newWeekly = Array.isArray(data.weeklyProducts)
+          ? data.weeklyProducts
+          : Array.isArray(data.topProducts)
+          ? data.topProducts
+          : [];
+        const newMonthly = Array.isArray(data.monthlyProducts)
+          ? data.monthlyProducts
+          : Array.isArray(data.topProducts)
+          ? data.topProducts
+          : [];
         if (Array.isArray(data.categories) && data.categories.length > 0) {
           setCategories(data.categories);
         }
@@ -226,7 +282,13 @@ export default function MainLayoutShell({
         setTopProducts(newWeekly);
         setWeeklyProducts(newWeekly);
         setMonthlyProducts(newMonthly);
-      } catch {}
+      } catch (err) {
+        console.error("Layout data fetch error:", err);
+      } finally {
+        if (!cancelled) {
+          setIsLoadingLayout(false);
+        }
+      }
     };
     load();
     return () => {
@@ -593,82 +655,115 @@ export default function MainLayoutShell({
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between gap-4 pt-3 pr-1">
-                  {railCategoryGroups.length > 0
-                    ? railCategoryGroups.map((group) => (
-                        <div key={group.name} className="space-y-1.5">
-                          <div className="flex items-baseline justify-between border-b border-hairline pb-1">
-                            <span className="text-[11px] font-mono font-bold text-ink uppercase truncate">
-                              {group.name}
-                            </span>
+                <div
+                  className={`flex-1 overflow-y-auto no-scrollbar flex flex-col gap-4 pt-3 pr-1 ${
+                    railCategoryGroups.length > 0 ? "justify-between" : "justify-start"
+                  }`}
+                >
+                  {isLoadingLayout ? (
+                    Array.from({ length: 10 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="p-2 border border-hairline bg-surface/20 rounded-xs flex items-center gap-2 animate-pulse"
+                      >
+                        <div className="w-4 h-4 bg-surface/60 rounded-xs shrink-0" />
+                        <div className="flex-1 space-y-1">
+                          <div className="h-3 bg-surface/80 w-3/4 rounded-xs" />
+                          <div className="h-2 bg-surface/40 w-1/2 rounded-xs" />
+                        </div>
+                      </div>
+                    ))
+                  ) : railCategoryGroups.length > 0 ? (
+                    railCategoryGroups.map((group) => (
+                      <div key={group.name} className="space-y-1.5">
+                        <div className="flex items-baseline justify-between border-b border-hairline pb-1">
+                          <span className="text-[11px] font-mono font-bold text-ink uppercase truncate">
+                            {group.name}
+                          </span>
+                          <Link
+                            href={`/category/${group.slug}`}
+                            className="text-[9px] font-mono text-signal hover:underline shrink-0 ml-1 font-bold"
+                          >
+                            Top 5 →
+                          </Link>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {group.top5.map((product, i) => (
                             <Link
-                              href={`/category/${group.slug}`}
-                              className="text-[9px] font-mono text-signal hover:underline shrink-0 ml-1 font-bold"
+                              key={product.id}
+                              href={`/product/${product.slug || slugify(product.name)}`}
+                              className="p-2 border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/50 rounded-xs transition-all flex items-center gap-2 group block"
                             >
-                              Top 5 →
-                            </Link>
-                          </div>
-
-                          <div className="space-y-1.5">
-                            {group.top5.map((product, i) => (
-                              <Link
-                                key={product.id}
-                                href={`/product/${product.slug || slugify(product.name)}`}
-                                className="p-2 border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/50 rounded-xs transition-all flex items-center gap-2 group block"
+                              <span
+                                className={`font-display font-black text-xs w-4 text-center shrink-0 ${
+                                  i === 0 ? "text-signal font-bold" : "text-ink-faint"
+                                }`}
                               >
-                                <span
-                                  className={`font-display font-black text-xs w-4 text-center shrink-0 ${
-                                    i === 0 ? "text-signal font-bold" : "text-ink-faint"
-                                  }`}
-                                >
-                                  {String(i + 1).padStart(2, "0")}
+                                {String(i + 1).padStart(2, "0")}
+                              </span>
+
+                              <div className="w-5.5 h-5.5 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
+                                {product.logoUrl ? (
+                                  <img width="64" height="64"
+                                    src={product.logoUrl}
+                                    alt={product.name}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  product.name.substring(0, 2).toUpperCase()
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-mono text-ink truncate font-medium group-hover:text-signal transition-colors">
+                                  {product.name}
+                                </div>
+                                <div className="text-[10px] font-mono text-ink-faint truncate">
+                                  {product.maker}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-center shrink-0 px-0.5">
+                                <span className="text-[10px] font-mono font-bold text-ink-dim group-hover:text-signal">
+                                  ▲{product.votes}
                                 </span>
-
-                                <div className="w-5.5 h-5.5 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                                  {product.logoUrl ? (
-                                    <img width="64" height="64"
-                                      src={product.logoUrl}
-                                      alt={product.name}
-                                      loading="lazy"
-                                      decoding="async"
-                                      className="w-full h-full object-cover"
-                                    />
-                                  ) : (
-                                    product.name.substring(0, 2).toUpperCase()
-                                  )}
-                                </div>
-
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-mono text-ink truncate font-medium group-hover:text-signal transition-colors">
-                                    {product.name}
-                                  </div>
-                                  <div className="text-[10px] font-mono text-ink-faint truncate">
-                                    {product.maker}
-                                  </div>
-                                </div>
-
-                                <div className="flex flex-col items-center shrink-0 px-0.5">
-                                  <span className="text-[10px] font-mono font-bold text-ink-dim group-hover:text-signal">
-                                    ▲{product.votes}
-                                  </span>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
+                              </div>
+                            </Link>
+                          ))}
                         </div>
-                      ))
-                    : Array.from({ length: 10 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="p-2 border border-hairline bg-surface/20 rounded-xs flex items-center gap-2 animate-pulse"
-                        >
-                          <div className="w-4 h-4 bg-surface/60 rounded-xs shrink-0" />
-                          <div className="flex-1 space-y-1">
-                            <div className="h-3 bg-surface/80 w-3/4 rounded-xs" />
-                            <div className="h-2 bg-surface/40 w-1/2 rounded-xs" />
-                          </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="py-8 px-3 text-center border border-dashed border-hairline bg-surface/20 rounded-xs space-y-3">
+                      <div className="w-8 h-8 mx-auto rounded-full bg-surface border border-hairline flex items-center justify-center text-ink-dim">
+                        <svg className="w-4 h-4 text-ink-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[11px] font-mono font-bold text-ink uppercase tracking-wider">
+                          No {railTab === "weekly" ? "Weekly" : "Monthly"} Launches
                         </div>
-                      ))}
+                        <p className="text-[10px] font-mono text-ink-dim leading-relaxed">
+                          No projects ranked for this {railTab === "weekly" ? "week" : "month"} yet.
+                        </p>
+                      </div>
+                      <Link
+                        href="/submit"
+                        className="inline-block w-full py-1.5 px-2 text-[10px] font-mono font-bold border border-signal/40 bg-signal/5 text-signal hover:bg-signal hover:text-void rounded-xs transition-colors text-center"
+                      >
+                        + Submit Launch
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1222,64 +1317,79 @@ export default function MainLayoutShell({
               </div>
             ) : (
               /* ── Top 50 Builders / Founders View ── */
-              <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between gap-1.5 pt-3 pr-1">
-                {topFounders.length > 0
-                  ? topFounders.slice(0, 50).map((f, i) => (
-                      <Link
-                        key={f.id || f.username}
-                        href={`/founder/${f.username}`}
-                        className="p-2 border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/50 rounded-xs transition-all flex items-center gap-2 group block"
+              <div
+                className={`flex-1 overflow-y-auto no-scrollbar flex flex-col gap-1.5 pt-3 pr-1 ${
+                  topFounders.length > 0 ? "justify-between" : "justify-start"
+                }`}
+              >
+                {isLoadingLayout ? (
+                  Array.from({ length: 10 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="p-2 border border-hairline bg-surface/20 rounded-xs flex items-center gap-2 animate-pulse"
+                    >
+                      <div className="w-5.5 h-5.5 bg-surface/60 rounded-full shrink-0" />
+                      <div className="flex-1 space-y-1">
+                        <div className="h-3 bg-surface/80 w-3/4 rounded-xs" />
+                        <div className="h-2 bg-surface/40 w-1/2 rounded-xs" />
+                      </div>
+                    </div>
+                  ))
+                ) : topFounders.length > 0 ? (
+                  topFounders.slice(0, 50).map((f, i) => (
+                    <Link
+                      key={f.id || f.username}
+                      href={`/founder/${f.username}`}
+                      className="p-2 border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/50 rounded-xs transition-all flex items-center gap-2 group block"
+                    >
+                      <span
+                        className={`font-display font-black text-xs w-4 text-center shrink-0 ${
+                          i === 0
+                            ? "text-signal font-bold"
+                            : i === 1
+                            ? "text-signal/80 font-bold"
+                            : i === 2
+                            ? "text-signal/60 font-bold"
+                            : "text-ink-faint"
+                        }`}
                       >
-                        <span
-                          className={`font-display font-black text-xs w-4 text-center shrink-0 ${
-                            i === 0
-                              ? "text-signal font-bold"
-                              : i === 1
-                              ? "text-signal/80 font-bold"
-                              : i === 2
-                              ? "text-signal/60 font-bold"
-                              : "text-ink-faint"
-                          }`}
-                        >
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
 
-                        <div className="w-5.5 h-5.5 rounded-full bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                          {f.image ? (
-                            <img width="64" height="64" src={f.image} alt={f.name || f.username} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                          ) : (
-                            (f.name || f.username).substring(0, 2).toUpperCase()
-                          )}
-                        </div>
+                      <div className="w-5.5 h-5.5 rounded-full bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
+                        {f.image ? (
+                          <img width="64" height="64" src={f.image} alt={f.name || f.username} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+                        ) : (
+                          (f.name || f.username).substring(0, 2).toUpperCase()
+                        )}
+                      </div>
 
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-mono text-ink truncate font-medium group-hover:text-signal transition-colors">
-                            {f.name || f.username}
-                          </div>
-                          <div className="text-[10px] font-mono text-ink-faint truncate">
-                            @{f.username}
-                          </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-mono text-ink truncate font-medium group-hover:text-signal transition-colors">
+                          {f.name || f.username}
                         </div>
-
-                        <div className="flex flex-col items-end shrink-0 px-0.5">
-                          <span className="text-[10px] font-mono font-bold text-ink-dim group-hover:text-signal">
-                            {f.totalVotes ? `▲${f.totalVotes}` : `${f.productsCount || 0} shipped`}
-                          </span>
-                        </div>
-                      </Link>
-                    ))
-                  : Array.from({ length: 10 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="p-2 border border-hairline bg-surface/20 rounded-xs flex items-center gap-2 animate-pulse"
-                      >
-                        <div className="w-5.5 h-5.5 bg-surface/60 rounded-full shrink-0" />
-                        <div className="flex-1 space-y-1">
-                          <div className="h-3 bg-surface/80 w-3/4 rounded-xs" />
-                          <div className="h-2 bg-surface/40 w-1/2 rounded-xs" />
+                        <div className="text-[10px] font-mono text-ink-faint truncate">
+                          @{f.username}
                         </div>
                       </div>
-                    ))}
+
+                      <div className="flex flex-col items-end shrink-0 px-0.5">
+                        <span className="text-[10px] font-mono font-bold text-ink-dim group-hover:text-signal">
+                          {f.totalVotes ? `▲${f.totalVotes}` : `${f.productsCount || 0} shipped`}
+                        </span>
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="py-8 px-3 text-center border border-dashed border-hairline bg-surface/20 rounded-xs space-y-2">
+                    <div className="text-[11px] font-mono font-bold text-ink uppercase tracking-wider">
+                      No Builders Found
+                    </div>
+                    <p className="text-[10px] font-mono text-ink-dim leading-relaxed">
+                      No registered founders to display yet.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
