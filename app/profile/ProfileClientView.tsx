@@ -303,6 +303,8 @@ export default function ProfileClientView({
   const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
   const [isUpgradingProduct, setIsUpgradingProduct] = useState<string>("");
   const [checkoutSuccessNotice, setCheckoutSuccessNotice] = useState(false);
+  // Set by /submit after a product is submitted or saved as a draft.
+  const [submitNotice, setSubmitNotice] = useState<"queued" | "draft" | "paid" | null>(null);
 
   const fetchSubscriptions = async () => {
     try {
@@ -356,6 +358,13 @@ export default function ProfileClientView({
       const tabParam = urlParams.get("tab");
       if (tabParam === "subscriptions" || tabParam === "saved" || tabParam === "settings" || tabParam === "products") {
         setActiveTab(tabParam as any);
+      }
+      const notice = urlParams.get("notice");
+      if (notice === "queued" || notice === "draft" || notice === "paid") {
+        setSubmitNotice(notice);
+        urlParams.delete("notice");
+        const rest = urlParams.toString();
+        window.history.replaceState({}, "", `/profile${rest ? `?${rest}` : ""}`);
       }
       if (urlParams.get("checkout") === "success") {
         setCheckoutSuccessNotice(true);
@@ -1165,6 +1174,25 @@ export default function ProfileClientView({
             {/* ─── TAB 1: MY PRODUCTS (drafts on top, launched below) ─── */}
             {activeTab === "products" && (
               <div className="space-y-6 sm:space-y-8">
+                {submitNotice && (
+                  <div role="status" className="flex items-start justify-between gap-3 p-4 border border-signal bg-signal/10 rounded-lg animate-in fade-in duration-300">
+                    <p className="text-sm text-ink font-sans">
+                      {submitNotice === "draft"
+                        ? "Draft saved. You can finish and submit it anytime from My Drafts below."
+                        : submitNotice === "paid"
+                          ? "Payment confirmed — your product is queued for launch with its 30-day placement."
+                          : "Submitted! Your product is queued for launch and listed below."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSubmitNotice(null)}
+                      className="shrink-0 text-ink-dim hover:text-ink text-sm leading-none"
+                      aria-label="Dismiss"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
                 {draftProducts.length > 0 && (
                   <div className="space-y-3 sm:space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-hairline pb-2 gap-1">

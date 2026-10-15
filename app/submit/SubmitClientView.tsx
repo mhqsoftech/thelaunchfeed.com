@@ -541,7 +541,6 @@ export default function SubmitClientView({
   const isSubmittingRef = React.useRef(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
-  const [draftSavedFlash, setDraftSavedFlash] = useState(false);
   // When editing an existing DRAFT row, this ref flips true right before we
   // submit if the founder clicked the "Update Draft" button. The submit handler
   // reads it in its edit-mode branch to pass keepAsDraft to updateMySubmission
@@ -553,6 +552,14 @@ export default function SubmitClientView({
   const [submissionConflict, setSubmissionConflict] = useState<SubmissionConflict | null>(null);
 
   const isEditMode = Boolean(onSaveProduct || editTarget || editParam);
+
+  // After a product is submitted or saved as a draft, the founder lands on
+  // their profile's Products tab, which lists drafts and queued launches.
+  // replace(), not assign(): Back must not return to ?auto_submit=1 / a
+  // checkout-return URL and re-run those flows.
+  const goToProfile = (notice: "queued" | "draft" | "paid") => {
+    window.location.replace(`/profile?tab=products&notice=${notice}`);
+  };
 
   const [faqs, setFaqs] = useState<{ q: string; a: string }[]>([{ q: "", a: "" }]);
 
@@ -662,6 +669,7 @@ export default function SubmitClientView({
               localStorage.removeItem("tlf_pending_submission");
               localStorage.removeItem("tlf_submit_draft");
             } catch {}
+            goToProfile("paid");
           }
         })
         .catch((err) => {
@@ -857,6 +865,7 @@ export default function SubmitClientView({
           productName: sub.name,
         });
         setSubmitted(true);
+        goToProfile("queued");
       } catch (err) {
         console.error("[auto_submit] failed", err);
         setAutoSubmitStage("done");
@@ -969,11 +978,7 @@ export default function SubmitClientView({
           localStorage.removeItem("tlf_pending_submission");
           localStorage.removeItem("tlf_submit_draft");
         } catch {}
-        if (!cancelled) {
-          window.history.replaceState({}, "", "/submit");
-          setDraftSavedFlash(true);
-          setTimeout(() => setDraftSavedFlash(false), 5000);
-        }
+        if (!cancelled) goToProfile("draft");
       } catch (err) {
         console.error("[auto_save_draft] failed", err);
       } finally {
@@ -1630,8 +1635,10 @@ export default function SubmitClientView({
       if (!draftRes.success) {
         throw new Error(draftRes.error);
       }
-      setDraftSavedFlash(true);
-      setTimeout(() => setDraftSavedFlash(false), 3000);
+      try {
+        localStorage.removeItem("tlf_submit_draft");
+      } catch {}
+      goToProfile("draft");
     } catch (err) {
       console.error("[save-draft] failed", err);
       alert(err instanceof Error && err.message ? err.message : "Could not save draft — please try again.");
@@ -1782,9 +1789,7 @@ export default function SubmitClientView({
           // Do NOT show the queued success screen — the row is still a draft.
           if (keepAsDraft) {
             keepAsDraftIntentRef.current = false;
-            setIsUpdatingDraft(false);
-            setDraftSavedFlash(true);
-            setTimeout(() => setDraftSavedFlash(false), 3000);
+            goToProfile("draft");
             return;
           }
           // Draft → publish with paid tier: kick off Dodo checkout BEFORE
@@ -1812,9 +1817,16 @@ export default function SubmitClientView({
             }
           }
           setQueuedSubmission({ id: upd.id, scheduledFor: upd.scheduledFor.toString(), launchTier });
+          setSubmitted(true);
+          goToProfile("queued");
+          return;
         } else if (editTarget.kind === "product" && editTarget.productId) {
           const upd = await updateMyProduct(editTarget.productId, fields);
           setUpdatedProductSlug(upd.slug);
+          // Live-product edits stay on this page and show the "Product
+          // Updated" screen, so close the full-screen syncing overlay —
+          // every other success path navigates away instead.
+          setIsSubmitting(false);
         }
         setSubmitted(true);
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1908,7 +1920,7 @@ export default function SubmitClientView({
 
       setQueuedSubmission({ id: sub.id, scheduledFor: sub.scheduledFor.toString(), launchTier: 0 });
       setSubmitted(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      goToProfile("queued");
     } catch (err) {
       console.error("[submit] failed", err);
       const errMsg = err instanceof Error ? err.message : "Submission failed — please try again.";
@@ -3699,11 +3711,6 @@ export default function SubmitClientView({
                 )}
               </div>
 
-              {draftSavedFlash && (
-                <div className="text-[11px] font-mono text-signal uppercase tracking-wider text-right pt-1">
-                  ✓ Draft saved to your profile
-                </div>
-              )}
               <div className="flex flex-col sm:flex-row items-center justify-end gap-3 w-full pt-1">
                 {!isEmbeddedMode && (
                   <button
@@ -4324,11 +4331,6 @@ export default function SubmitClientView({
             </div>
 
             <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-end gap-2 w-full">
-              {draftSavedFlash && (
-                <span className="text-[11px] font-mono text-signal uppercase tracking-wider sm:mr-2">
-                  ✓ Draft saved to your profile
-                </span>
-              )}
               {!isEditMode && !onSaveProduct && (
                 <button
                   type="button"
