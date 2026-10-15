@@ -9,6 +9,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const AUTOFILL_UNAVAILABLE =
+  "Autofill isn't available right now. Please enter your product details manually below.";
+
 const BodySchema = z.object({
   url: z
     .string()
@@ -80,7 +83,9 @@ export async function POST(req: Request) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    // Provider / internal failures (billing, quota, missing key, bad JSON)
+    // stay in the server log; visitors only get a "fill it in yourself" note.
+    console.error("[autofill] extraction failed:", err);
+    return NextResponse.json({ error: AUTOFILL_UNAVAILABLE }, { status: 503 });
   }
 }

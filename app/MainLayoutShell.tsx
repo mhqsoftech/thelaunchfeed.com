@@ -923,16 +923,18 @@ export default function MainLayoutShell({
             })}
           </nav>
 
-          <div className="hidden lg:block flex-1 max-w-md ml-auto">{searchField(inputRef)}</div>
+          {/* Full search box from xl; below that the icon opens the search sheet so the
+              nav, Submit and profile buttons never get pushed off-screen. */}
+          <div className="hidden xl:block flex-1 min-w-0 max-w-md ml-auto">{searchField(inputRef)}</div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto lg:ml-0 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto xl:ml-0 shrink-0">
             <button
               type="button"
               onClick={() => {
                 setMobileSearchOpen((v) => !v);
                 setTimeout(() => mobileInputRef.current?.focus(), 30);
               }}
-              className="lg:hidden w-10 h-10 flex items-center justify-center rounded-full text-ink-dim hover:text-ink hover:bg-surface"
+              className="xl:hidden w-10 h-10 flex items-center justify-center rounded-full text-ink-dim hover:text-ink hover:bg-surface"
               aria-label="Search"
               aria-expanded={mobileSearchOpen}
             >
@@ -947,7 +949,7 @@ export default function MainLayoutShell({
                 title={`${userSession.name}'s dashboard`}
               >
                 <Avatar src={userSession.image} name={userSession.name || userSession.handle || "Me"} size={30} round />
-                <span className="hidden xl:inline text-sm font-medium text-ink max-w-[120px] truncate">{userSession.handle}</span>
+                <span className="hidden 2xl:inline text-sm font-medium text-ink max-w-[120px] truncate">{userSession.handle}</span>
               </Link>
             ) : (
               <Link
@@ -962,7 +964,7 @@ export default function MainLayoutShell({
 
         {/* Mobile search sheet */}
         {mobileSearchOpen && (
-          <div className="lg:hidden absolute inset-x-0 top-full border-b border-hairline bg-void px-4 py-3 shadow-[var(--shadow-lift)]">
+          <div className="xl:hidden absolute inset-x-0 top-full border-b border-hairline bg-void px-4 py-3 shadow-[var(--shadow-lift)]">
             {searchField(mobileInputRef, true)}
           </div>
         )}

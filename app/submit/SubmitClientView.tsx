@@ -36,6 +36,12 @@ import {
   findRevenueProvider,
 } from "../lib/revenueTelemetrySDK";
 
+/** Shown when autofill can't run; raw provider errors never reach visitors. */
+const AUTOFILL_MANUAL_NOTICE = "Autofill isn't available right now. Please enter your product details manually below.";
+
+/** An autofill message our API chose to show the visitor. */
+class AutofillNotice extends Error {}
+
 /** Drafts are cached in localStorage — never let a payment API key land there. */
 function secretFreeJson(value: unknown): string {
   return JSON.stringify(value, (k, v) => (k === "apiKey" || k === "apiSecret" ? "" : v));
@@ -1385,9 +1391,9 @@ export default function SubmitClientView({
           body: JSON.stringify({ url: autofillUrl.trim() }),
         }).catch(() => null),
       ]);
-      const json = await aiRes.json();
-      if (!aiRes.ok || !json.ok) {
-        throw new Error(json?.error || `Extraction failed (${aiRes.status})`);
+      const json = await aiRes.json().catch(() => null);
+      if (!aiRes.ok || !json?.ok) {
+        throw new AutofillNotice(json?.error || AUTOFILL_MANUAL_NOTICE);
       }
       const d = json.data as {
         name: string; tagline: string; category: string; makerName: string; makerHandle: string;
@@ -1517,7 +1523,8 @@ export default function SubmitClientView({
         }
       }
     } catch (err) {
-      setAutofillError(err instanceof Error ? err.message : "Extraction failed");
+      // Only messages our API chose to show; network / parse errors get the generic note.
+      setAutofillError(err instanceof AutofillNotice ? err.message : AUTOFILL_MANUAL_NOTICE);
     } finally {
       setIsExtracting(false);
     }

@@ -849,9 +849,11 @@ export default function ProfileClientView({
         <h1 className="sr-only">Your Profile</h1>
         {/* ── Sticky Tab Header & Attached Preview Sub-Strip ── */}
         <div className="sticky -top-4 z-30 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2 pb-2.5">
+          {/* Wraps instead of overflowing: with the side rails the column can be
+              ~640px, so the action buttons drop to their own right-aligned row. */}
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-2 sm:gap-x-4 pb-2.5">
             {/* Left cluster: back-nav + tab buttons */}
-            <div className="w-full sm:w-auto flex items-center gap-1.5 sm:gap-3">
+            <div className="w-full sm:w-auto min-w-0 flex items-center gap-1.5 sm:gap-3">
               {/* Mobile compact back button */}
               <Link
                 href="/"
@@ -871,7 +873,7 @@ export default function ProfileClientView({
               <span className="hidden sm:block h-4 w-px bg-hairline shrink-0" aria-hidden />
 
               {/* 4 Tabs: fit 100% of remaining width on mobile */}
-              <div className="flex-1 grid grid-cols-4 gap-1 sm:flex sm:items-center sm:gap-1">
+              <div className="flex-1 grid grid-cols-4 gap-1 sm:flex sm:flex-wrap sm:items-center sm:gap-1">
                 {(
                   [
                     { id: "products", label: "MY PRODUCTS", shortLabel: "Products" },
@@ -901,7 +903,7 @@ export default function ProfileClientView({
             </div>
 
             {/* Action buttons: Single row across 100% mobile width */}
-            <div className="w-full grid grid-cols-3 gap-1 sm:flex sm:w-auto sm:items-center sm:gap-1.5">
+            <div className="w-full grid grid-cols-3 gap-1 sm:flex sm:flex-wrap sm:justify-end sm:w-auto sm:ml-auto sm:items-center sm:gap-1.5">
               <button
                 type="button"
                 onClick={() => setIsPreviewing(!isPreviewing)}
