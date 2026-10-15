@@ -105,13 +105,8 @@ export async function postComment(input: z.infer<typeof PostSchema>): Promise<Co
     data: { commentCount: { increment: 1 } },
   });
 
-  try {
-    const { inngest } = await import("@/lib/inngest");
-    await inngest.send({
-      name: "comment.posted",
-      data: { commentId: comment.id, productId: product.id },
-    });
-  } catch {}
+  const { emit } = await import("@/lib/jobs");
+  await emit("comment.posted", { commentId: comment.id, productId: product.id });
 
   invalidateCommentsCache(parsed.productSlug);
   revalidatePath(`/product/${parsed.productSlug}`);

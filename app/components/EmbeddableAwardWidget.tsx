@@ -256,7 +256,7 @@ export function LaunchFeedBadge() {
         </div>
 
         {/* ─── BADGE DISPLAY CARD ─── */}
-        <div className="p-4 sm:p-6 border border-hairline bg-surface/20 flex flex-col items-center justify-center min-h-[90px] overflow-hidden gap-3 sm:gap-4 rounded-xs">
+        <div className="p-4 sm:p-6 border border-hairline bg-surface/20 flex flex-col items-center justify-center min-h-[90px] overflow-hidden gap-3 sm:gap-4 rounded-lg">
           {/* Real rendered vector SVG from endpoint */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -272,13 +272,13 @@ export function LaunchFeedBadge() {
             <a
               href={`/api/badge/${productSlug}?theme=${selectedTheme}&award=${selectedAward}&download=true`}
               download
-              className="w-full sm:w-auto px-3.5 py-1.5 bg-signal text-void text-[10px] font-mono font-bold uppercase tracking-wider hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 shadow-xs rounded-xs"
+              className="w-full sm:w-auto px-3.5 py-1.5 bg-signal text-void text-[10px] font-mono font-bold uppercase tracking-wider hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 shadow-xs rounded-lg"
             >
               <span>↓ Download SVG Asset</span>
             </a>
             <a
               href={`/badges/${productSlug}`}
-              className="w-full sm:w-auto px-3 py-1.5 border border-hairline hover:border-ink bg-void text-ink text-[10px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center justify-center rounded-xs"
+              className="w-full sm:w-auto px-3 py-1.5 border border-hairline hover:border-ink bg-void text-ink text-[10px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center justify-center rounded-lg"
             >
               <span>View Full Trophy Kit ↗</span>
             </a>
@@ -298,7 +298,7 @@ export function LaunchFeedBadge() {
                 key={fmt}
                 type="button"
                 onClick={() => setSelectedFormat(fmt)}
-                className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-xs ${
+                className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-lg ${
                   selectedFormat === fmt
                     ? "border-signal bg-signal text-void"
                     : "border-hairline bg-surface text-ink-dim hover:text-ink"
@@ -316,14 +316,14 @@ export function LaunchFeedBadge() {
             readOnly
             value={currentCode}
             rows={selectedFormat === "react" ? 5 : 4}
-            className="w-full border border-hairline bg-surface/30 p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-xs"
+            className="w-full border border-hairline bg-surface/30 p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-lg"
           />
 
           <div className="flex justify-end">
             <button
               type="button"
               onClick={() => handleCopy(currentCode, selectedFormat)}
-              className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-xs"
+              className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-lg"
             >
               {copiedFormat === selectedFormat ? (
                 <span className="text-signal font-bold flex items-center gap-1">

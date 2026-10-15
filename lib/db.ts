@@ -54,7 +54,12 @@ export type FullPrismaClient = PrismaClient & {
 
 export function getDb(): PrismaClient {
   const current = globalForPrisma.prisma;
-  if (!current || typeof (current as any).directoryLead?.findMany !== "function") {
+  // Rebuild a dev-HMR-cached client generated before newer models existed.
+  if (
+    !current ||
+    typeof (current as any).directoryLead?.findMany !== "function" ||
+    typeof (current as any).badgeVerification?.findMany !== "function"
+  ) {
     const { client, pool } = createPrismaClient();
     globalForPrisma.prisma = client;
     globalForPrisma.pool = pool;

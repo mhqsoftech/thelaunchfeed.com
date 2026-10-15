@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import MainLayoutShell from "@/app/MainLayoutShell";
 import ContactClientView from "./ContactClientView";
 import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
 
@@ -46,12 +47,12 @@ export default function ContactPage() {
   };
 
   return (
-    <>
+    <MainLayoutShell rails={false}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
       <ContactClientView />
-    </>
+    </MainLayoutShell>
   );
 }

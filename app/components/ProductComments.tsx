@@ -227,7 +227,7 @@ export default function ProductComments({
             <div className="text-[11px] uppercase text-ink-dim flex items-center gap-2 flex-wrap">
               <span>Posting as <strong className="text-ink">{session.name}</strong> ({session.handle})</span>
               {isFounder && (
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase bg-signal text-void rounded-xs">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase bg-signal text-void rounded-lg">
                   <svg
                     className="w-2.5 h-2.5 shrink-0"
                     viewBox="0 0 24 24"
@@ -327,7 +327,7 @@ function CommentRow({
 
           {/* Distinctive Founder Tag */}
           {isCommentFounder && (
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider bg-signal text-void rounded-xs shadow-xs">
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider bg-signal text-void rounded-lg shadow-xs">
               <svg className="w-2.5 h-2.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
               </svg>

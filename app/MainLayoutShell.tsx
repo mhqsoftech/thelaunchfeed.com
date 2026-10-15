@@ -2,14 +2,17 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
-import { format, getWeek } from "date-fns";
-import { LaunchFeedLogo, LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
+import { usePathname } from "next/navigation";
+import { LaunchFeedLogo } from "@/components/ui/LaunchFeedLogo";
 import FeaturedOnFooterBar from "./components/FeaturedOnFooterBar";
 import { openCookieSettings } from "./lib/cookieConsent";
+import { NextLaunchCountdown } from "@/components/ui/NextLaunchCountdown";
+import { useLocalLaunchTime } from "@/components/ui/LaunchTime";
+import { OutboundLink } from "@/components/ui/OutboundLink";
+import { goHref } from "@/lib/outbound/links";
 import {
   slugify,
-  getProductGradientClass,
+  formatProductWebsiteUrl,
   applyTheme,
   getActiveTheme,
   ThemeMode,
@@ -20,10 +23,16 @@ import {
 /** Data shape returned by /api/layout-data. */
 type LayoutSlot = {
   id: string;
+  kind?: "PAID" | "CUSTOM";
   name: string;
   tagline: string;
   url: string;
+  /** true → the maker's own website (opens in a new tab). */
+  external?: boolean;
   logoUrl?: string | null;
+  /** Linked product, for click counting via /go/<productSlug>. */
+  productSlug?: string | null;
+  slotId?: string | null;
 };
 type LayoutProduct = {
   id: string;
@@ -36,94 +45,299 @@ type LayoutProduct = {
   category: string;
   logoUrl?: string | null;
 };
+type LayoutFounder = {
+  id?: string;
+  username: string;
+  name?: string;
+  image?: string | null;
+  totalVotes?: number;
+  productsCount?: number;
+};
+type LayoutCategory = { id?: string; slug: string; name: string; productCount?: number };
 
-// Module-level in-memory cache to prevent layout flicker across client page transitions
-let memoryLayoutCache: {
+type LayoutCache = {
   featured: LayoutSlot[];
   rotating: LayoutSlot[];
-  topProducts: LayoutProduct[];
-  weeklyProducts?: LayoutProduct[];
-  monthlyProducts?: LayoutProduct[];
-  topFounders?: any[];
-} | null = null;
-
-function getInitialLayoutData(): {
-  featured: LayoutSlot[];
-  rotating: LayoutSlot[];
-  topProducts: LayoutProduct[];
   weeklyProducts: LayoutProduct[];
   monthlyProducts: LayoutProduct[];
-  topFounders: any[];
-} {
-  if (memoryLayoutCache) {
-    return {
-      featured: memoryLayoutCache.featured || [],
-      rotating: memoryLayoutCache.rotating || [],
-      topProducts: memoryLayoutCache.topProducts || [],
-      weeklyProducts: memoryLayoutCache.weeklyProducts || memoryLayoutCache.topProducts || [],
-      monthlyProducts: memoryLayoutCache.monthlyProducts || memoryLayoutCache.topProducts || [],
-      topFounders: memoryLayoutCache.topFounders || [],
+  topFounders: LayoutFounder[];
+  categories?: LayoutCategory[];
+};
+
+// Module-level cache so client-side navigations never flash empty rails.
+let memoryLayoutCache: LayoutCache | null = null;
+
+function readLayoutCache(): LayoutCache | null {
+  if (memoryLayoutCache) return memoryLayoutCache;
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem("tlf-layout-cache-v2");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<LayoutCache>;
+    memoryLayoutCache = {
+      featured: parsed.featured ?? [],
+      rotating: parsed.rotating ?? [],
+      weeklyProducts: parsed.weeklyProducts ?? [],
+      monthlyProducts: parsed.monthlyProducts ?? [],
+      topFounders: parsed.topFounders ?? [],
+      categories: parsed.categories,
     };
+    return memoryLayoutCache;
+  } catch {
+    return null;
   }
-  if (typeof window !== "undefined") {
-    try {
-      const raw = sessionStorage.getItem("tlf-layout-cache");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") {
-          const cacheObj = {
-            featured: Array.isArray(parsed.featured) ? parsed.featured : [],
-            rotating: Array.isArray(parsed.rotating) ? parsed.rotating : [],
-            topProducts: Array.isArray(parsed.topProducts) ? parsed.topProducts : [],
-            weeklyProducts: Array.isArray(parsed.weeklyProducts)
-              ? parsed.weeklyProducts
-              : Array.isArray(parsed.topProducts)
-              ? parsed.topProducts
-              : [],
-            monthlyProducts: Array.isArray(parsed.monthlyProducts)
-              ? parsed.monthlyProducts
-              : Array.isArray(parsed.topProducts)
-              ? parsed.topProducts
-              : [],
-            topFounders: Array.isArray(parsed.topFounders) ? parsed.topFounders : [],
-          };
-          memoryLayoutCache = cacheObj;
-          return cacheObj;
-        }
-      }
-    } catch {}
-  }
-  return {
-    featured: [],
-    rotating: [],
-    topProducts: [],
-    weeklyProducts: [],
-    monthlyProducts: [],
-    topFounders: [],
-  };
 }
 
-const DEFAULT_CATEGORIES = [
-  { slug: "ai", name: "AI & Machine Learning", productCount: 5 },
-  { slug: "dev-tools", name: "Developer Tools", productCount: 4 },
-  { slug: "design", name: "Design", productCount: 4 },
-  { slug: "saas", name: "SaaS", productCount: 2 },
-  { slug: "open-source", name: "Open Source", productCount: 2 },
-  { slug: "productivity", name: "Productivity", productCount: 1 },
-  { slug: "fintech", name: "Fintech", productCount: 1 },
-  { slug: "seo-ai-visibility", name: "SEO & AI Visibility", productCount: 1 },
+const DEFAULT_CATEGORIES: LayoutCategory[] = [
+  { slug: "ai", name: "AI & Machine Learning" },
+  { slug: "dev-tools", name: "Developer Tools" },
+  { slug: "design", name: "Design" },
+  { slug: "saas", name: "SaaS" },
+  { slug: "open-source", name: "Open Source" },
+  { slug: "productivity", name: "Productivity" },
+  { slug: "fintech", name: "Fintech" },
+  { slug: "seo-ai-visibility", name: "SEO & AI Visibility" },
 ];
+
+const NAV_ITEMS: Array<{ href: string; label: string; match: (p: string) => boolean }> = [
+  { href: "/", label: "Today", match: (p) => p === "/" },
+  { href: "/leaderboard/weekly", label: "Leaderboards", match: (p) => p.startsWith("/leaderboard") },
+  { href: "/categories", label: "Categories", match: (p) => p.startsWith("/categor") },
+  { href: "/founders", label: "Founders", match: (p) => p.startsWith("/founder") },
+  { href: "/badges", label: "Badges", match: (p) => p.startsWith("/badges") },
+];
+
+/**
+ * Featured / Spotlight cards link straight to the maker's website (the URL
+ * entered at submission) with ?ref=thelaunchfeed attribution, counted via
+ * /go/<slug>?src=featured|spotlight. Paid slots are marked rel="sponsored"
+ * as Google requires for paid placements.
+ */
+function SlotLink({
+  slot,
+  src,
+  className,
+  tabIndex,
+  children,
+}: {
+  slot: LayoutSlot;
+  src: "featured" | "spotlight";
+  className?: string;
+  tabIndex?: number;
+  children: React.ReactNode;
+}) {
+  const external = slot.external ?? /^https?:\/\//i.test(slot.url || "");
+  if (external) {
+    const rel = slot.kind === "PAID" ? "sponsored noopener" : "noopener";
+    if (slot.productSlug) {
+      return (
+        <OutboundLink
+          href={formatProductWebsiteUrl(slot.url)}
+          goHref={goHref(slot.productSlug, src, slot.slotId)}
+          rel={rel}
+          className={className}
+          tabIndex={tabIndex}
+          title={`Visit ${slot.name}`}
+        >
+          {children}
+        </OutboundLink>
+      );
+    }
+    return (
+      <a
+        href={formatProductWebsiteUrl(slot.url)}
+        target="_blank"
+        rel={rel}
+        className={className}
+        tabIndex={tabIndex}
+        title={`Visit ${slot.name}`}
+      >
+        {children}
+      </a>
+    );
+  }
+  const href = slot.url && slot.url !== "#" ? slot.url : `/product/${slugify(slot.name)}`;
+  return (
+    <Link href={href} className={className} tabIndex={tabIndex}>
+      {children}
+    </Link>
+  );
+}
+
+/* ─────────────────────────── small pieces ─────────────────────────── */
+
+function Avatar({
+  src,
+  name,
+  size = 32,
+  round = false,
+}: {
+  src?: string | null;
+  name: string;
+  size?: number;
+  round?: boolean;
+}) {
+  return (
+    <span
+      className={`shrink-0 overflow-hidden border border-hairline bg-surface flex items-center justify-center text-[10px] font-mono font-bold text-ink-dim ${
+        round ? "rounded-full" : "rounded-lg"
+      }`}
+      style={{ width: size, height: size }}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" width={size} height={size} loading="lazy" decoding="async" className="w-full h-full object-cover" />
+      ) : (
+        name.substring(0, 2).toUpperCase()
+      )}
+    </span>
+  );
+}
+
+function Icon({ d, className = "w-5 h-5" }: { d: string; className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+
+const ICONS = {
+  search: "M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15z",
+  home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
+  trophy: "M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3",
+  plus: "M12 5v14M5 12h14",
+  user: "M20 21a8 8 0 1 0-16 0M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  close: "M18 6 6 18M6 6l12 12",
+  arrowUp: "M12 19V5M5 12l7-7 7 7",
+};
+
+/** The brand's 2×2 signal matrix; a lit square sweeps around it like radar. */
+function SignalMatrix({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" className="tlf-matrix shrink-0" aria-hidden="true" style={{ shapeRendering: "crispEdges" }}>
+      <rect x="0.5" y="0.5" width="6.5" height="6.5" />
+      <rect x="9" y="0.5" width="6.5" height="6.5" />
+      <rect x="9" y="9" width="6.5" height="6.5" />
+      <rect x="0.5" y="9" width="6.5" height="6.5" />
+    </svg>
+  );
+}
+
+/** Primary CTA — same pill geometry as the "Log in" button beside it. */
+function LaunchButton() {
+  const local = useLocalLaunchTime();
+  return (
+    <Link
+      href="/submit"
+      className="tlf-launch group hidden sm:inline-flex items-center gap-2.5 h-10 pl-4 pr-5 rounded-full text-sm font-semibold whitespace-nowrap"
+      title={`Submit your product — next batch goes live at ${local?.label ?? "6:00 AM IST"}`}
+    >
+      <span className="tlf-launch-main absolute inset-0 rounded-full" aria-hidden />
+      <SignalMatrix size={15} />
+      <span className="relative">Submit product</span>
+    </Link>
+  );
+}
+
+/** Countdown pill to the next 6:00 AM IST batch (wide screens). */
+function NextBatchPill() {
+  return (
+    <span className="hidden 2xl:inline-flex">
+      <NextLaunchCountdown variant="compact" />
+    </span>
+  );
+}
+
+/**
+ * Off-desktop Spotlight: a single non-scrolling row of logo + name chips.
+ * The row holds as many as the screen fits (3 on small phones → 6 on
+ * tablets) and advances to the next set of paid slots every 15 seconds.
+ */
+function MobileSpotlight({ slots }: { slots: LayoutSlot[] }) {
+  const [perRow, setPerRow] = useState(3);
+  const [page, setPage] = useState(0);
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    const fit = () => {
+      const w = window.innerWidth;
+      setPerRow(w < 400 ? 3 : w < 560 ? 4 : w < 900 ? 5 : 6);
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
+  const count = Math.min(perRow, slots.length);
+  const pages = Math.max(1, Math.ceil(slots.length / perRow));
+
+  useEffect(() => {
+    setPage((p) => p % pages);
+  }, [pages]);
+
+  useEffect(() => {
+    if (pages <= 1) return;
+    const id = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setPage((p) => (p + 1) % pages);
+        setFading(false);
+      }, 300);
+    }, 15_000);
+    return () => clearInterval(id);
+  }, [pages]);
+
+  // Wrap around so the last set is always a full row.
+  const visible = Array.from({ length: count }, (_, i) => slots[(page * perRow + i) % slots.length]);
+
+  return (
+    <section aria-label="Spotlight (sponsored)" className="xl:hidden mb-5">
+      <div className="flex items-center justify-between mb-1.5 px-0.5">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-ink-faint">Spotlight · Sponsored</span>
+        {pages > 1 && (
+          <span className="flex items-center gap-1" aria-hidden>
+            {Array.from({ length: pages }, (_, i) => (
+              <span key={i} className={`h-1 rounded-full transition-all ${i === page ? "w-3 bg-signal" : "w-1 bg-hairline"}`} />
+            ))}
+          </span>
+        )}
+      </div>
+      <ul
+        className={`grid gap-1.5 transition-opacity duration-300 ${fading ? "opacity-0" : "opacity-100"}`}
+        style={{ gridTemplateColumns: `repeat(${count}, minmax(0, 1fr))` }}
+      >
+        {visible.map((p, i) => (
+          <li key={`${p.id}-${i}`} className="min-w-0">
+            <SlotLink
+              slot={p}
+              src="spotlight"
+              className="flex items-center gap-1.5 min-w-0 h-10 pl-1.5 pr-2.5 rounded-full border border-hairline bg-card hover:border-signal/50 transition-colors"
+            >
+              <Avatar src={p.logoUrl} name={p.name} size={26} round />
+              <span className="min-w-0 truncate text-xs font-semibold text-ink">{p.name}</span>
+            </SlotLink>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/* ─────────────────────────── shell ─────────────────────────── */
 
 export default function MainLayoutShell({
   children,
   leftSidebar,
+  rails = true,
 }: {
   children: React.ReactNode;
+  /** Replaces the left "top this week" rail (e.g. the submit wizard's progress). */
   leftSidebar?: React.ReactNode;
+  /** false = single centered reading column (legal / about / contact pages). */
+  rails?: boolean;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const centerScrollRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname() || "/";
   const [rotateIndex, setRotateIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -146,19 +360,29 @@ export default function MainLayoutShell({
       name: string;
       title: string;
       image?: string | null;
-      bio?: string | null;
-      level?: { level: number; label: string; tone: string; badge: string };
       productsCount: number;
       totalVotes: number;
     }>;
   }>({ products: [], founders: [] });
   const [isSearching, setIsSearching] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [userSession, setUserSession] = useState<UserSession | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const previousPageBeforeSearchRef = useRef<string | null>(null);
+  const mobileInputRef = useRef<HTMLInputElement>(null);
 
-  // Global search effect across all database items
+  const [mounted, setMounted] = useState(false);
+  const [isLoadingLayout, setIsLoadingLayout] = useState(true);
+  const [featured, setFeatured] = useState<LayoutSlot[]>([]);
+  const [rotating, setRotating] = useState<LayoutSlot[]>([]);
+  const [weeklyProducts, setWeeklyProducts] = useState<LayoutProduct[]>([]);
+  const [monthlyProducts, setMonthlyProducts] = useState<LayoutProduct[]>([]);
+  const [categories, setCategories] = useState<LayoutCategory[]>(DEFAULT_CATEGORIES);
+  const [topFounders, setTopFounders] = useState<LayoutFounder[]>([]);
+  const [railTab, setRailTab] = useState<"weekly" | "monthly">("weekly");
+  const [rightRailTab, setRightRailTab] = useState<"categories" | "founders">("categories");
+
+  // Global search across products + founders (debounced).
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
@@ -166,1275 +390,809 @@ export default function MainLayoutShell({
       setIsSearching(false);
       return;
     }
-
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
         const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(data);
-        }
+        if (res.ok) setSearchResults(await res.json());
       } catch (err) {
         console.error("Global search query failed:", err);
       } finally {
         setIsSearching(false);
       }
-    }, 120);
-
+    }, 150);
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const [mounted, setMounted] = useState(false);
-  const [isLoadingLayout, setIsLoadingLayout] = useState(true);
-  const [featured, setFeatured] = useState<LayoutSlot[]>([]);
-  const [rotating, setRotating] = useState<LayoutSlot[]>([]);
-  const [topProducts, setTopProducts] = useState<LayoutProduct[]>([]);
-  const [weeklyProducts, setWeeklyProducts] = useState<LayoutProduct[]>([]);
-  const [monthlyProducts, setMonthlyProducts] = useState<LayoutProduct[]>([]);
-  const [categories, setCategories] = useState<{ id?: string; slug: string; name: string; productCount?: number }[]>(DEFAULT_CATEGORIES);
-  const [topFounders, setTopFounders] = useState<any[]>([]);
-  const [railTab, setRailTab] = useState<"weekly" | "monthly">("weekly");
-  const [rightRailTab, setRightRailTab] = useState<"categories" | "founders">("categories");
-
-  const currentRailProducts = railTab === "weekly" ? weeklyProducts : monthlyProducts;
-  const railCategoryGroups = (() => {
-    const map = new Map<string, LayoutProduct[]>();
-    currentRailProducts.forEach((p) => {
-      const cat = p.category || "General";
-      if (!map.has(cat)) map.set(cat, []);
-      map.get(cat)!.push(p);
-    });
-    return Array.from(map.entries()).map(([catName, prods]) => {
-      const sorted = [...prods].sort((a, b) => b.votes - a.votes);
-      const matched = categories.find(
-        (c) => c.name.toLowerCase() === catName.toLowerCase() || c.slug === slugify(catName)
-      );
-      return {
-        name: catName,
-        slug: matched?.slug || slugify(catName),
-        top5: sorted.slice(0, 5),
-      };
-    });
-  })();
-
-  // Pull featured + rotating slots + weekly & monthly products from DB with stale-while-revalidate client caching.
+  // Layout data (spotlight slots, rails) with stale-while-revalidate caching.
   useEffect(() => {
     setMounted(true);
-    // Instantly hydrate from client cache on mount without causing SSR hydration mismatches
-    const initial = getInitialLayoutData();
-    const hasCachedData =
-      initial.featured.length > 0 ||
-      initial.rotating.length > 0 ||
-      initial.weeklyProducts.length > 0 ||
-      initial.monthlyProducts.length > 0 ||
-      initial.topFounders.length > 0;
-
-    if (hasCachedData) {
-      setFeatured(initial.featured);
-      setRotating(initial.rotating);
-      setTopProducts(initial.topProducts);
-      setWeeklyProducts(initial.weeklyProducts);
-      setMonthlyProducts(initial.monthlyProducts);
-      if (initial.topFounders.length > 0) {
-        setTopFounders(initial.topFounders);
-      }
+    const cached = readLayoutCache();
+    if (cached) {
+      setFeatured(cached.featured);
+      setRotating(cached.rotating);
+      setWeeklyProducts(cached.weeklyProducts);
+      setMonthlyProducts(cached.monthlyProducts);
+      if (cached.topFounders.length) setTopFounders(cached.topFounders);
+      if (cached.categories?.length) setCategories(cached.categories);
       setIsLoadingLayout(false);
     }
 
     let cancelled = false;
-    const load = async () => {
+    (async () => {
       try {
-        const r = await fetch("/api/layout-data", { cache: "no-store" });
+        const r = await fetch("/api/layout-data");
         if (!r.ok) return;
         const data = await r.json();
         if (cancelled) return;
-        const newWeekly = Array.isArray(data.weeklyProducts)
-          ? data.weeklyProducts
-          : Array.isArray(data.topProducts)
-          ? data.topProducts
-          : [];
-        const newMonthly = Array.isArray(data.monthlyProducts)
-          ? data.monthlyProducts
-          : Array.isArray(data.topProducts)
-          ? data.topProducts
-          : [];
-        if (Array.isArray(data.categories) && data.categories.length > 0) {
-          setCategories(data.categories);
-        }
-        if (Array.isArray(data.topFounders) && data.topFounders.length > 0) {
-          setTopFounders(data.topFounders);
-        }
-        const newCache = {
+        const weekly: LayoutProduct[] = data.weeklyProducts ?? data.topProducts ?? [];
+        const monthly: LayoutProduct[] = data.monthlyProducts ?? data.topProducts ?? [];
+        const next: LayoutCache = {
           featured: data.featured ?? [],
           rotating: data.rotating ?? [],
-          topProducts: newWeekly,
-          weeklyProducts: newWeekly,
-          monthlyProducts: newMonthly,
+          weeklyProducts: weekly,
+          monthlyProducts: monthly,
           topFounders: data.topFounders ?? [],
+          categories: Array.isArray(data.categories) && data.categories.length > 0 ? data.categories : undefined,
         };
-        memoryLayoutCache = newCache;
+        memoryLayoutCache = next;
         try {
-          sessionStorage.setItem("tlf-layout-cache", JSON.stringify(newCache));
+          sessionStorage.setItem("tlf-layout-cache-v2", JSON.stringify(next));
         } catch {}
-        setFeatured(newCache.featured);
-        setRotating(newCache.rotating);
-        setTopProducts(newWeekly);
-        setWeeklyProducts(newWeekly);
-        setMonthlyProducts(newMonthly);
+        setFeatured(next.featured);
+        setRotating(next.rotating);
+        setWeeklyProducts(weekly);
+        setMonthlyProducts(monthly);
+        if (next.topFounders.length) setTopFounders(next.topFounders);
+        if (next.categories) setCategories(next.categories);
       } catch (err) {
         console.error("Layout data fetch error:", err);
       } finally {
-        if (!cancelled) {
-          setIsLoadingLayout(false);
-        }
+        if (!cancelled) setIsLoadingLayout(false);
       }
-    };
-    load();
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const currentDate = new Date();
-  const currentWeekStr = `WEEK ${getWeek(currentDate)}`;
-  const currentMonthStr = format(currentDate, "MMM''yy").toUpperCase();
-
-  // Sync theme state and user session on mount
+  // Theme + session sync.
   useEffect(() => {
     setThemeMode(getActiveTheme());
-
-    // Hydrate immediately from localStorage for fast paint, then always
-    // verify against the server to catch stale / expired sessions.
     const stored = getStoredSession();
     if (stored) setUserSession(stored);
-
-    const handleThemeChange = (e: Event) => {
-      const customEv = e as CustomEvent<ThemeMode>;
-      if (customEv.detail) {
-        setThemeMode(customEv.detail);
-      }
+    const onTheme = (e: Event) => {
+      const d = (e as CustomEvent<ThemeMode>).detail;
+      if (d) setThemeMode(d);
     };
-
-    const handleAuthChange = (e: Event) => {
-      const customEv = e as CustomEvent<UserSession | null>;
-      const s = customEv.detail !== undefined ? customEv.detail : getStoredSession();
-      setUserSession(s);
+    const onAuth = (e: Event) => {
+      const d = (e as CustomEvent<UserSession | null>).detail;
+      setUserSession(d !== undefined ? d : getStoredSession());
     };
-
-    window.addEventListener("themeChanged", handleThemeChange);
-    window.addEventListener("authChanged", handleAuthChange);
-
+    window.addEventListener("themeChanged", onTheme);
+    window.addEventListener("authChanged", onAuth);
     return () => {
-      window.removeEventListener("themeChanged", handleThemeChange);
-      window.removeEventListener("authChanged", handleAuthChange);
+      window.removeEventListener("themeChanged", onTheme);
+      window.removeEventListener("authChanged", onAuth);
     };
   }, []);
 
-  // ⌘K Keyboard shortcut listener
+  // ⌘K / Ctrl+K / "/" focuses search.
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = (e.target as HTMLElement)?.closest?.("input, textarea, [contenteditable=true]");
+      if (((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") || (e.key === "/" && !typing)) {
         e.preventDefault();
-        inputRef.current?.focus();
+        if (window.matchMedia("(min-width: 1024px)").matches) {
+          inputRef.current?.focus();
+        } else {
+          setMobileSearchOpen(true);
+          setTimeout(() => mobileInputRef.current?.focus(), 30);
+        }
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Rotating products interval — 4 slots visible (2 left + 2 right).
-  // Every 10s, advance by 4 so both pairs refresh together with the next
-  // batch. Wraps around; no cap on how many slots the admin can add.
+  // Spotlight rotation: 4 visible paid slots, advance every 10s.
   useEffect(() => {
-    if (rotating.length <= 4) return; // nothing to rotate to
+    if (rotating.length <= 4) return;
     const interval = setInterval(() => {
       setIsFading(true);
       setTimeout(() => {
         setRotateIndex((prev) => (prev + 4) % rotating.length);
         setIsFading(false);
-      }, 500);
+      }, 400);
     }, 10000);
-
     return () => clearInterval(interval);
   }, [rotating.length]);
 
+  // Keep html scroll-padding in sync with the pinned header height.
+  useEffect(() => {
+    document.documentElement.style.setProperty("--tlf-header-h", `${mounted && featured.length > 0 ? 100 : 60}px`);
+  }, [mounted, featured.length]);
+
+  // Deep links like /?q=notion (the WebSite SearchAction target) open search.
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setSearchQuery(q);
+  }, []);
+
+  // Close the mobile search sheet on navigation.
+  useEffect(() => {
+    setMobileSearchOpen(false);
+  }, [pathname]);
+
   const N = rotating.length;
-  const pickAt = (offset: number) => (N > 0 ? rotating[(rotateIndex + offset) % N] : undefined);
-  // Take at most 2 items per side and drop any undefined slots so the
-  // renderer never sees a missing entry when the pool has < 4 items.
-  const leftProducts = [pickAt(0), pickAt(1)].filter((p): p is LayoutSlot => !!p);
-  const rightProducts = [pickAt(2), pickAt(3)].filter((p): p is LayoutSlot => !!p);
+  const spotlight = Array.from({ length: Math.min(4, N) }, (_, i) => rotating[(rotateIndex + i) % N]);
 
-  const trimmedQuery = searchQuery.trim().toLowerCase();
-  const liveSearchResults = trimmedQuery
-    ? topProducts.filter(
-        (p) =>
-          p.name.toLowerCase().includes(trimmedQuery) ||
-          p.tagline.toLowerCase().includes(trimmedQuery) ||
-          p.maker.toLowerCase().includes(trimmedQuery) ||
-          p.makerName.toLowerCase().includes(trimmedQuery) ||
-          p.category.toLowerCase().includes(trimmedQuery)
-      ).slice(0, 8)
-    : [];
+  const updateSearch = (val: string) => {
+    setSearchQuery(val);
+    window.dispatchEvent(new CustomEvent("searchQueryChanged", { detail: val }));
+  };
+  const clearSearch = () => updateSearch("");
 
-  return (
-    <div className="flex flex-col h-screen overflow-hidden bg-void text-ink font-mono">
-      {/* Top Fixed Header: Sponsored strip + Search & Submit bar with rotating products */}
-      <div className="shrink-0 z-30 bg-void border-b border-hairline">
-        {/* Sponsored marquee strip — full width edge-to-edge floating products */}
-        <div className="border-b border-hairline overflow-hidden relative w-full" suppressHydrationWarning>
-          {mounted && featured.length > 0 ? (
-            <div className="overflow-hidden w-full flex marquee-container" suppressHydrationWarning>
-              <div className="marquee-track flex shrink-0 items-center" suppressHydrationWarning>
-                {[...featured, ...featured].map((p, i) => (
-                  <Link
-                    key={i}
-                    href={p.url && p.url !== "#" ? p.url : `/product/${slugify(p.name)}`}
-                    className={`${getProductGradientClass(p.name)} flex-shrink-0 w-[180px] sm:w-[250px] mr-2 sm:mr-3 px-2.5 py-1.5 sm:px-3 sm:py-2 my-1.5 sm:my-2 border border-hairline bg-surface hover:bg-raised transition-colors cursor-pointer flex items-center gap-2.5`}
-                  >
-                    {/* Logo Icon */}
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xs bg-void border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                      {p.logoUrl ? (
-                        <img width="64" height="64"
-                          src={p.logoUrl}
-                          alt={p.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        p.name.substring(0, 2).toUpperCase()
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-mono text-[11px] sm:text-xs font-medium text-ink truncate leading-tight">
-                        {p.name}
-                      </h4>
-                      <p className="text-ink-dim text-[10px] sm:text-[11px] font-mono truncate mt-0.5 leading-tight">
-                        {p.tagline}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-              <div className="marquee-track flex shrink-0 items-center" aria-hidden="true">
-                {[...featured, ...featured].map((p, i) => (
-                  <Link
-                    key={`clone-${i}`}
-                    href={p.url && p.url !== "#" ? p.url : `/product/${slugify(p.name)}`}
-                    className={`${getProductGradientClass(p.name)} flex-shrink-0 w-[180px] sm:w-[250px] mr-2 sm:mr-3 px-2.5 py-1.5 sm:px-3 sm:py-2 my-1.5 sm:my-2 border border-hairline bg-surface hover:bg-raised transition-colors cursor-pointer flex items-center gap-2.5`}
-                  >
-                    {/* Logo Icon */}
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xs bg-void border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                      {p.logoUrl ? (
-                        <img width="64" height="64"
-                          src={p.logoUrl}
-                          alt={p.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        p.name.substring(0, 2).toUpperCase()
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-mono text-[11px] sm:text-xs font-medium text-ink truncate leading-tight">
-                        {p.name}
-                      </h4>
-                      <p className="text-ink-dim text-[10px] sm:text-[11px] font-mono truncate mt-0.5 leading-tight">
-                        {p.tagline}
-                      </p>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="h-9 sm:h-12 w-full" />
-          )}
+  const railProducts = railTab === "weekly" ? weeklyProducts : monthlyProducts;
+  const railGroups = (() => {
+    const map = new Map<string, LayoutProduct[]>();
+    railProducts.forEach((p) => {
+      const cat = p.category || "General";
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(p);
+    });
+    return Array.from(map.entries()).map(([name, prods]) => {
+      const matched = categories.find((c) => c.name.toLowerCase() === name.toLowerCase() || c.slug === slugify(name));
+      return {
+        name,
+        slug: matched?.slug || slugify(name),
+        top: [...prods].sort((a, b) => b.votes - a.votes).slice(0, 5),
+      };
+    });
+  })();
+
+
+  const searching = searchQuery.trim().length > 0;
+  const showFeatured = mounted && featured.length > 0;
+  const headerH = showFeatured ? 100 : 60;
+
+  /* ─────────── search field (shared by desktop + mobile) ─────────── */
+  const searchField = (ref: React.RefObject<HTMLInputElement | null>, autoFocus = false) => (
+    <div className="relative flex items-center h-10 w-full rounded-full border border-hairline bg-card focus-within:border-ink-faint focus-within:shadow-[var(--shadow-card)] transition-colors">
+      <Icon d={ICONS.search} className="w-4 h-4 ml-3.5 text-ink-faint shrink-0" />
+      <input
+        ref={ref}
+        type="search"
+        autoFocus={autoFocus}
+        aria-label="Search products, makers and categories"
+        value={searchQuery}
+        onChange={(e) => updateSearch(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            clearSearch();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        placeholder="Search products, makers, categories…"
+        className="flex-1 min-w-0 bg-transparent px-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+      />
+      {searchQuery ? (
+        <button type="button" onClick={clearSearch} className="mr-2 p-1 rounded-full text-ink-faint hover:text-ink" aria-label="Clear search">
+          <Icon d={ICONS.close} className="w-4 h-4" />
+        </button>
+      ) : (
+        <kbd className="hidden lg:inline-flex mr-2.5 px-1.5 py-0.5 rounded-md border border-hairline text-[10px] font-mono text-ink-faint">⌘K</kbd>
+      )}
+    </div>
+  );
+
+  /* ─────────── search results (replaces page content while typing) ─────────── */
+  const searchView = (
+    <section aria-labelledby="search-heading" className="space-y-6">
+      <div className="flex items-end justify-between gap-3 border-b border-hairline pb-3">
+        <div className="min-w-0">
+          <p className="text-xs font-mono uppercase tracking-wider text-ink-faint">Search</p>
+          <h1 id="search-heading" className="text-xl sm:text-2xl font-semibold tracking-tight text-ink truncate">
+            “{searchQuery.trim()}”
+          </h1>
         </div>
+        <button
+          type="button"
+          onClick={clearSearch}
+          className="shrink-0 h-9 px-3 rounded-full border border-hairline text-xs font-medium text-ink-dim hover:text-ink hover:bg-surface"
+        >
+          Clear
+        </button>
+      </div>
 
-        {/* Search bar + Submit button with 2 left and 2 right rotating products expanding to edges */}
-        <div className="w-full px-[10px] py-2.5 sm:py-3 flex items-center justify-between gap-4 sm:gap-6">
-          {/* Left 2 Rotating Products expanding towards left edge */}
-          <div className="hidden xl:flex items-center divide-x divide-hairline border-r border-hairline pr-4 sm:pr-6 shrink-0 w-[360px]">
-            {leftProducts.map((p, i) => (
-              <Link
-                key={i}
-                href={p.url && p.url !== "#" ? p.url : `/product/${slugify(p.name)}`}
-                className={`${getProductGradientClass(p.name)} flex-1 min-w-0 px-2.5 py-1.5 transition-all duration-500 cursor-pointer hover:bg-surface flex items-center gap-2 ${
-                  isFading ? "opacity-0 scale-95" : "opacity-100 scale-100"
-                }`}
-              >
-                {/* Logo Icon */}
-                <div className="w-6 h-6 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                  {p.logoUrl ? (
-                    <img width="64" height="64"
-                      src={p.logoUrl}
-                      alt={p.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    p.name.substring(0, 2).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h5 className="font-mono text-xs font-medium text-ink truncate leading-tight">
-                    {p.name}
-                  </h5>
-                  <p className="text-ink-dim text-[11px] font-mono truncate mt-0.5 leading-tight">
-                    {p.tagline}
-                  </p>
-                </div>
-              </Link>
-            ))}
-          </div>
+      {isSearching && (
+        <div className="space-y-2" aria-live="polite">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 rounded-[var(--radius-card)] bg-surface animate-pulse" />
+          ))}
+        </div>
+      )}
 
-          {/* Search bar + Submit button (Centered Prominent Search) */}
-          <div className="w-full xl:w-auto flex-1 max-w-2xl flex items-center gap-2 sm:gap-3 shrink-0">
-            <div className="h-10 min-w-0 flex-1 border border-hairline bg-surface px-2.5 sm:px-4 flex items-center gap-2 focus-within:border-ink transition-colors">
-              <kbd className="hidden sm:inline-flex text-ink-faint text-xs font-mono border border-hairline px-1.5 py-0.5 bg-void shrink-0">
-                ⌘K
-              </kbd>
-              <input
-                ref={inputRef}
-                type="search"
-                aria-label="Search products and makers"
-                value={searchQuery}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSearchQuery(val);
-                  window.dispatchEvent(
-                    new CustomEvent("searchQueryChanged", {
-                      detail: val,
-                    })
-                  );
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") {
-                    setSearchQuery("");
-                    window.dispatchEvent(new CustomEvent("searchQueryChanged", { detail: "" }));
-                  }
-                }}
-                placeholder="search products, makers..."
-                className="w-full min-w-0 bg-transparent text-ink font-mono text-xs sm:text-sm placeholder:text-ink-faint focus:outline-none truncate"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    window.dispatchEvent(
-                      new CustomEvent("searchQueryChanged", { detail: "" })
-                    );
-                  }}
-                  className="text-ink-faint hover:text-ink text-xs font-mono px-1 shrink-0 cursor-pointer"
-                  title="Clear search"
+      {!isSearching && searchResults.products.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">
+            Products · {searchResults.products.length}
+          </h2>
+          <ul className="space-y-2">
+            {searchResults.products.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={`/product/${p.slug || slugify(p.name)}`}
+                  onClick={clearSearch}
+                  className="flex items-center gap-3.5 p-3 rounded-[var(--radius-card)] border border-hairline bg-card hover:border-ink-faint hover:shadow-[var(--shadow-lift)] transition-all"
                 >
-                  ✕
-                </button>
-              )}
-            </div>
+                  <Avatar src={p.logoUrl} name={p.name} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-ink truncate">{p.name}</div>
+                    <div className="text-sm text-ink-dim truncate">{p.tagline}</div>
+                  </div>
+                  <span className="hidden sm:inline text-xs px-2 py-1 rounded-full bg-surface text-ink-dim">{p.category}</span>
+                  <span className="text-sm font-mono font-semibold text-ink tabular-nums">▲ {p.votes}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
-            {/* Submit Button — Completely visible on mobile & desktop */}
-            <Link
-              href="/submit"
-              className="h-10 px-2.5 sm:px-4 bg-signal text-void hover:opacity-90 border border-signal font-mono text-xs sm:text-sm font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shadow-xs"
-              title="Submit a product to The Launch Feed"
+      {!isSearching && searchResults.founders.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">
+            Founders · {searchResults.founders.length}
+          </h2>
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {searchResults.founders.map((f) => (
+              <li key={f.id}>
+                <Link
+                  href={`/founder/${f.username}`}
+                  onClick={clearSearch}
+                  className="flex items-center gap-3 p-3 rounded-[var(--radius-card)] border border-hairline bg-card hover:border-ink-faint transition-colors"
+                >
+                  <Avatar src={f.image} name={f.name || f.username} size={40} round />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-ink truncate">{f.name}</div>
+                    <div className="text-xs text-ink-dim truncate">
+                      @{f.username} · {f.productsCount} shipped · {f.totalVotes} votes
+                    </div>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!isSearching && searchResults.products.length === 0 && searchResults.founders.length === 0 && (
+        <div className="py-16 text-center rounded-[var(--radius-card)] border border-dashed border-hairline">
+          <p className="font-semibold text-ink">No matches for “{searchQuery.trim()}”</p>
+          <p className="mt-1 text-sm text-ink-dim">Try a product name, a maker&apos;s @handle, or browse by category.</p>
+          <Link href="/categories" onClick={clearSearch} className="inline-block mt-4 text-sm font-semibold text-signal hover:underline">
+            Browse all categories →
+          </Link>
+        </div>
+      )}
+    </section>
+  );
+
+  /* ─────────── rails ─────────── */
+  const leftRail = leftSidebar ?? (
+    <nav aria-label="Top products by category" className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">Top by category</h2>
+        <div role="tablist" aria-label="Timeframe" className="flex p-0.5 rounded-full bg-surface border border-hairline text-[11px] font-medium">
+          {(["weekly", "monthly"] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              type="button"
+              aria-selected={railTab === t}
+              onClick={() => setRailTab(t)}
+              className={`px-2.5 py-1 rounded-full transition-colors ${railTab === t ? "bg-card text-ink shadow-[var(--shadow-card)]" : "text-ink-dim hover:text-ink"}`}
             >
-              <span className="font-mono font-bold text-sm leading-none">+</span>
-              <span className="inline sm:hidden font-bold">Submit</span>
-              <span className="hidden sm:inline font-bold">Submit Product</span>
-            </Link>
+              {t === "weekly" ? "Week" : "Month"}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            {/* Auth Account Pill / Login Link — Uniform h-10 Height */}
+      {isLoadingLayout && railGroups.length === 0 ? (
+        <div className="space-y-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-10 rounded-lg bg-surface animate-pulse" />
+          ))}
+        </div>
+      ) : railGroups.length > 0 ? (
+        railGroups.map((group) => (
+          <div key={group.name} className="space-y-1">
+            <div className="flex items-baseline justify-between gap-2 px-1">
+              <h3 className="text-[13px] font-semibold text-ink truncate">{group.name}</h3>
+              <Link href={`/category/${group.slug}`} className="shrink-0 text-[11px] font-medium text-signal hover:underline">
+                All
+              </Link>
+            </div>
+            <ol className="space-y-0.5">
+              {group.top.map((p, i) => (
+                <li key={p.id}>
+                  <Link
+                    href={`/product/${p.slug || slugify(p.name)}`}
+                    className="group flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-surface transition-colors"
+                  >
+                    <span className={`w-4 text-center font-mono text-[11px] ${i === 0 ? "text-signal font-bold" : "text-ink-faint"}`}>{i + 1}</span>
+                    <Avatar src={p.logoUrl} name={p.name} size={24} />
+                    <span className="flex-1 min-w-0 text-[13px] text-ink truncate group-hover:text-signal">{p.name}</span>
+                    <span className="font-mono text-[11px] text-ink-faint tabular-nums">▲{p.votes}</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          </div>
+        ))
+      ) : (
+        <div className="p-4 rounded-[var(--radius-card)] border border-dashed border-hairline text-center space-y-2">
+          <p className="text-sm font-medium text-ink">No launches this {railTab === "weekly" ? "week" : "month"} yet</p>
+          <Link href="/submit" className="inline-block text-xs font-semibold text-signal hover:underline">
+            Be the first to launch →
+          </Link>
+        </div>
+      )}
+    </nav>
+  );
+
+  const spotlightBlock =
+    spotlight.length > 0 ? (
+      <section aria-labelledby="spotlight-heading" className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 id="spotlight-heading" className="text-xs font-mono uppercase tracking-wider text-ink-faint">
+            Spotlight
+          </h2>
+          <Link href="/submit" className="text-[11px] text-ink-faint hover:text-signal">
+            Sponsored · Get yours
+          </Link>
+        </div>
+        <ul className={`space-y-1.5 transition-opacity duration-300 ${isFading ? "opacity-0" : "opacity-100"}`}>
+          {spotlight.map((p, i) => (
+            <li key={`${p.id}-${i}`}>
+              <SlotLink
+                slot={p}
+                src="spotlight"
+                className="flex items-center gap-3 p-2.5 rounded-xl border border-hairline bg-card hover:border-signal/50 hover:shadow-[var(--shadow-lift)] transition-all"
+              >
+                <Avatar src={p.logoUrl} name={p.name} size={36} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-semibold text-ink truncate">{p.name}</div>
+                  <div className="text-xs text-ink-dim truncate">{p.tagline}</div>
+                </div>
+              </SlotLink>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null;
+
+  const rightRail = (
+    <div className="space-y-6">
+      {spotlightBlock}
+      <section className="space-y-3">
+        <div role="tablist" aria-label="Browse" className="flex p-0.5 rounded-full bg-surface border border-hairline text-xs font-medium">
+          {(["categories", "founders"] as const).map((t) => (
+            <button
+              key={t}
+              role="tab"
+              type="button"
+              aria-selected={rightRailTab === t}
+              onClick={() => setRightRailTab(t)}
+              className={`flex-1 px-3 py-1.5 rounded-full transition-colors ${rightRailTab === t ? "bg-card text-ink shadow-[var(--shadow-card)]" : "text-ink-dim hover:text-ink"}`}
+            >
+              {t === "categories" ? "Categories" : "Top founders"}
+            </button>
+          ))}
+        </div>
+        {rightRailTab === "categories" ? (
+          <ul className="space-y-0.5">
+            {categories.map((c) => (
+              <li key={c.slug}>
+                <Link
+                  href={`/category/${c.slug}`}
+                  className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors ${
+                    pathname === `/category/${c.slug}` ? "bg-signal-dim text-signal font-semibold" : "text-ink hover:bg-surface"
+                  }`}
+                >
+                  <span className="truncate">{c.name}</span>
+                  {typeof c.productCount === "number" && (
+                    <span className="font-mono text-[11px] text-ink-faint tabular-nums">{c.productCount}</span>
+                  )}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link href="/categories" className="block px-2.5 py-2 text-xs font-semibold text-signal hover:underline">
+                All categories →
+              </Link>
+            </li>
+          </ul>
+        ) : (
+          <ol className="space-y-0.5">
+            {isLoadingLayout && topFounders.length === 0
+              ? Array.from({ length: 8 }).map((_, i) => <li key={i} className="h-10 rounded-lg bg-surface animate-pulse" />)
+              : topFounders.slice(0, 25).map((f, i) => (
+                  <li key={f.id || f.username}>
+                    <Link href={`/founder/${f.username}`} className="group flex items-center gap-2.5 px-1.5 py-1.5 rounded-lg hover:bg-surface transition-colors">
+                      <span className={`w-5 text-center font-mono text-[11px] ${i < 3 ? "text-signal font-bold" : "text-ink-faint"}`}>{i + 1}</span>
+                      <Avatar src={f.image} name={f.name || f.username} size={26} round />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[13px] text-ink truncate group-hover:text-signal">{f.name || f.username}</span>
+                        <span className="block text-[11px] text-ink-faint truncate">@{f.username}</span>
+                      </span>
+                      <span className="font-mono text-[11px] text-ink-faint tabular-nums">
+                        {f.totalVotes ? `▲${f.totalVotes}` : `${f.productsCount || 0}`}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+            <li>
+              <Link href="/founders" className="block px-2.5 py-2 text-xs font-semibold text-signal hover:underline">
+                Top 100 founders →
+              </Link>
+            </li>
+          </ol>
+        )}
+      </section>
+    </div>
+  );
+
+  /* ─────────── render ─────────── */
+  return (
+    <div className="min-h-dvh flex flex-col bg-void text-ink" style={{ ["--tlf-header-h" as string]: `${headerH}px` }}>
+      {/* Featured strip + header are pinned together, so paid Featured slots
+          stay visible while scrolling. --tlf-header-h covers both. */}
+      <div className="sticky top-0 z-40">
+      {showFeatured && (
+        <div className="tlf-ticker relative h-10 overflow-hidden" aria-label="Featured products">
+          <div className="flex items-stretch h-full">
+            {/* "On air" tab */}
+            <span className="tlf-ticker-tab relative z-10 shrink-0 flex items-center gap-2 pl-3 sm:pl-4 pr-6 font-mono text-[10px] font-bold uppercase tracking-[0.18em]">
+              <span className="tlf-live-dot w-1.5 h-1.5 rounded-full bg-white" aria-hidden />
+              <span className="hidden sm:inline">Featured</span>
+              <span className="sm:hidden">Live</span>
+            </span>
+            <div className="tlf-ticker-viewport marquee-container flex overflow-hidden flex-1 -ml-3">
+              {[0, 1].map((track) => (
+                <ul
+                  key={track}
+                  className="marquee-track flex shrink-0 items-center h-10"
+                  aria-hidden={track === 1 ? "true" : undefined}
+                  // Full names + taglines make entries wide; scale the loop so the
+                  // ticker keeps a calm, readable pace (~9s per product).
+                  style={{ animationDuration: `${Math.max(40, featured.length * 2 * 9)}s` }}
+                >
+                  {[...featured, ...featured].map((p, i) => (
+                    <li key={`${track}-${i}`} className="flex items-center shrink-0">
+                      <SlotLink
+                        slot={p}
+                        src="featured"
+                        tabIndex={track === 1 ? -1 : undefined}
+                        className="tlf-ticker-item group flex w-max items-center gap-2.5 h-10 px-4 whitespace-nowrap"
+                      >
+                        <Avatar src={p.logoUrl} name={p.name} size={20} />
+                        <span className="tlf-ticker-name font-display font-black text-[13px] uppercase tracking-wider">{p.name}</span>
+                        {p.tagline && <span className="tlf-ticker-tagline text-xs">{p.tagline}</span>}
+                        <svg className="tlf-ticker-arrow w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} aria-hidden="true">
+                          <path strokeLinecap="square" d="M7 17 17 7M9 7h8v8" />
+                        </svg>
+                      </SlotLink>
+                      <span className="tlf-ticker-sep h-4 w-px" aria-hidden />
+                    </li>
+                  ))}
+                </ul>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Site header */}
+      <header className="relative h-[60px] border-b border-hairline bg-void/85 backdrop-blur-xl supports-[backdrop-filter]:bg-void/75">
+        <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3 lg:gap-6">
+          <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="The Launch Feed — home">
+            <LaunchFeedLogo size={22} />
+            <span className="font-display font-black text-[15px] sm:text-[17px] tracking-wide text-ink uppercase leading-none whitespace-nowrap">
+              The Launch <span className="text-signal">Feed</span>
+            </span>
+          </Link>
+
+          <nav aria-label="Primary" className="hidden lg:flex items-center gap-0.5">
+            {NAV_ITEMS.map((item) => {
+              const active = item.match(pathname);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${
+                    active ? "text-ink bg-surface" : "text-ink-dim hover:text-ink hover:bg-surface/70"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="hidden lg:block flex-1 max-w-md ml-auto">{searchField(inputRef)}</div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto lg:ml-0 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setMobileSearchOpen((v) => !v);
+                setTimeout(() => mobileInputRef.current?.focus(), 30);
+              }}
+              className="lg:hidden w-10 h-10 flex items-center justify-center rounded-full text-ink-dim hover:text-ink hover:bg-surface"
+              aria-label="Search"
+              aria-expanded={mobileSearchOpen}
+            >
+              <Icon d={ICONS.search} />
+            </button>
+            <NextBatchPill />
+            <LaunchButton />
             {userSession ? (
               <Link
                 href="/profile"
-                className="h-10 px-2.5 sm:px-3 border border-hairline bg-surface hover:bg-raised text-ink font-mono text-xs sm:text-sm font-bold transition-colors shrink-0 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                title={`View ${userSession.name}'s Profile & Dashboard`}
+                className="hidden sm:flex items-center gap-2 h-10 pl-1 pr-3 rounded-full border border-hairline bg-card hover:border-ink-faint transition-colors"
+                title={`${userSession.name}'s dashboard`}
               >
-                <span className="w-5 h-5 rounded-xs bg-ink text-void text-[10px] font-bold flex items-center justify-center shrink-0 overflow-hidden">
-                  {userSession.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img width="64" height="64"
-                      src={userSession.image}
-                      alt={`${userSession.name || "Your"} avatar`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    userSession.avatar
-                  )}
-                </span>
-                <span className="hidden md:inline truncate">{userSession.handle}</span>
+                <Avatar src={userSession.image} name={userSession.name || userSession.handle || "Me"} size={30} round />
+                <span className="hidden xl:inline text-sm font-medium text-ink max-w-[120px] truncate">{userSession.handle}</span>
               </Link>
             ) : (
               <Link
                 href="/login"
-                className="h-10 px-2.5 sm:px-3.5 border border-hairline bg-void hover:bg-surface text-ink font-mono text-xs sm:text-sm font-bold transition-colors shrink-0 flex items-center justify-center gap-1 cursor-pointer whitespace-nowrap"
+                className="hidden sm:inline-flex items-center h-10 px-4 rounded-full border border-hairline text-sm font-medium text-ink hover:bg-surface transition-colors"
               >
-                <span>[ Login ]</span>
+                Log in
               </Link>
             )}
-          </div>
-
-          {/* Right 2 Rotating Products expanding towards right edge */}
-          <div className="hidden xl:flex items-center divide-x divide-hairline border-l border-hairline pl-4 sm:pl-6 shrink-0 w-[360px]">
-            {rightProducts.map((p, i) => (
-              <Link
-                key={i}
-                href={p.url && p.url !== "#" ? p.url : `/product/${slugify(p.name)}`}
-                className={`${getProductGradientClass(p.name)} flex-1 min-w-0 px-2.5 py-1.5 transition-all duration-500 cursor-pointer hover:bg-surface flex items-center gap-2 ${
-                  isFading ? "opacity-0 scale-95" : "opacity-100 scale-100"
-                }`}
-              >
-                {/* Logo Icon */}
-                <div className="w-6 h-6 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                  {p.logoUrl ? (
-                    <img width="64" height="64"
-                      src={p.logoUrl}
-                      alt={p.name}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    p.name.substring(0, 2).toUpperCase()
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h5 className="font-mono text-xs font-medium text-ink truncate leading-tight">
-                    {p.name}
-                  </h5>
-                  <p className="text-ink-dim text-[11px] font-mono truncate mt-0.5 leading-tight">
-                    {p.tagline}
-                  </p>
-                </div>
-              </Link>
-            ))}
           </div>
         </div>
+
+        {/* Mobile search sheet */}
+        {mobileSearchOpen && (
+          <div className="lg:hidden absolute inset-x-0 top-full border-b border-hairline bg-void px-4 py-3 shadow-[var(--shadow-lift)]">
+            {searchField(mobileInputRef, true)}
+          </div>
+        )}
+      </header>
       </div>
 
-      {/* Three-column layout — fixed sidebars, scrollable center launchpad */}
-      <div className="flex-1 min-h-0 w-full px-[10px]">
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 h-full">
-          {/* Left rail — Weekly & Monthly Top Products by Category */}
-          <div className="hidden xl:flex xl:col-span-2 py-4 flex-col h-full min-h-0 overflow-hidden">
-            {leftSidebar ? (
-              leftSidebar
-            ) : (
-              <div className="flex flex-col h-full min-h-0">
-                <div className="h-10 flex items-end pb-2.5 border-b border-hairline shrink-0">
-                  <div className="w-full grid grid-cols-2 gap-1 bg-surface/60 p-0.5 border border-hairline rounded-xs text-xs font-mono">
-                    <button
-                      type="button"
-                      onClick={() => setRailTab("weekly")}
-                      className={`py-1 text-center rounded-xs transition-colors font-bold cursor-pointer ${
-                        railTab === "weekly"
-                          ? "bg-signal text-void shadow-xs"
-                          : "text-ink-dim hover:text-ink hover:bg-surface/50"
-                      }`}
-                    >
-                      Weekly
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRailTab("monthly")}
-                      className={`py-1 text-center rounded-xs transition-colors font-bold cursor-pointer ${
-                        railTab === "monthly"
-                          ? "bg-signal text-void shadow-xs"
-                          : "text-ink-dim hover:text-ink hover:bg-surface/50"
-                      }`}
-                    >
-                      Monthly
-                    </button>
-                  </div>
-                </div>
+      {/* Body */}
+      <div className="flex-1 w-full mx-auto max-w-[1600px] px-4 lg:px-6">
+        {rails ? (
+          <div className="xl:grid xl:grid-cols-[240px_minmax(0,1fr)_280px] 2xl:grid-cols-[260px_minmax(0,1fr)_300px] xl:gap-8">
+            <aside className="hidden xl:block pb-14">
+              <div className="tlf-rail overflow-y-auto no-scrollbar pt-6 pb-10 pr-1">{leftRail}</div>
+            </aside>
 
-                <div
-                  className={`flex-1 overflow-y-auto no-scrollbar flex flex-col gap-4 pt-3 pr-1 ${
-                    railCategoryGroups.length > 0 ? "justify-between" : "justify-start"
-                  }`}
-                >
-                  {isLoadingLayout ? (
-                    Array.from({ length: 10 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="p-2 border border-hairline bg-surface/20 rounded-xs flex items-center gap-2 animate-pulse"
-                      >
-                        <div className="w-4 h-4 bg-surface/60 rounded-xs shrink-0" />
-                        <div className="flex-1 space-y-1">
-                          <div className="h-3 bg-surface/80 w-3/4 rounded-xs" />
-                          <div className="h-2 bg-surface/40 w-1/2 rounded-xs" />
-                        </div>
-                      </div>
-                    ))
-                  ) : railCategoryGroups.length > 0 ? (
-                    railCategoryGroups.map((group) => (
-                      <div key={group.name} className="space-y-1.5">
-                        <div className="flex items-baseline justify-between border-b border-hairline pb-1">
-                          <span className="text-[11px] font-mono font-bold text-ink uppercase truncate">
-                            {group.name}
-                          </span>
-                          <Link
-                            href={`/category/${group.slug}`}
-                            className="text-[9px] font-mono text-signal hover:underline shrink-0 ml-1 font-bold"
-                          >
-                            Top 5 →
-                          </Link>
-                        </div>
+            <main id="main" className="tlf-main min-w-0 pt-5 sm:pt-6 pb-10 tlf-safe-bottom xl:pb-14">
+              {/* Mobile / tablet spotlight — one fixed row, rotates every 15s. */}
+              {!searching && rotating.length > 0 && <MobileSpotlight slots={rotating} />}
+              {searching ? searchView : children}
+            </main>
 
-                        <div className="space-y-1.5">
-                          {group.top5.map((product, i) => (
-                            <Link
-                              key={product.id}
-                              href={`/product/${product.slug || slugify(product.name)}`}
-                              className="p-2 border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/50 rounded-xs transition-all flex items-center gap-2 group block"
-                            >
-                              <span
-                                className={`font-display font-black text-xs w-4 text-center shrink-0 ${
-                                  i === 0 ? "text-signal font-bold" : "text-ink-faint"
-                                }`}
-                              >
-                                {String(i + 1).padStart(2, "0")}
-                              </span>
-
-                              <div className="w-5.5 h-5.5 rounded-xs bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                                {product.logoUrl ? (
-                                  <img width="64" height="64"
-                                    src={product.logoUrl}
-                                    alt={product.name}
-                                    loading="lazy"
-                                    decoding="async"
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  product.name.substring(0, 2).toUpperCase()
-                                )}
-                              </div>
-
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-mono text-ink truncate font-medium group-hover:text-signal transition-colors">
-                                  {product.name}
-                                </div>
-                                <div className="text-[10px] font-mono text-ink-faint truncate">
-                                  {product.maker}
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col items-center shrink-0 px-0.5">
-                                <span className="text-[10px] font-mono font-bold text-ink-dim group-hover:text-signal">
-                                  ▲{product.votes}
-                                </span>
-                              </div>
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-8 px-3 text-center border border-dashed border-hairline bg-surface/20 rounded-xs space-y-3">
-                      <div className="w-8 h-8 mx-auto rounded-full bg-surface border border-hairline flex items-center justify-center text-ink-dim">
-                        <svg className="w-4 h-4 text-ink-faint" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-[11px] font-mono font-bold text-ink uppercase tracking-wider">
-                          No {railTab === "weekly" ? "Weekly" : "Monthly"} Launches
-                        </div>
-                        <p className="text-[10px] font-mono text-ink-dim leading-relaxed">
-                          No projects ranked for this {railTab === "weekly" ? "week" : "month"} yet.
-                        </p>
-                      </div>
-                      <Link
-                        href="/submit"
-                        className="inline-block w-full py-1.5 px-2 text-[10px] font-mono font-bold border border-signal/40 bg-signal/5 text-signal hover:bg-signal hover:text-void rounded-xs transition-colors text-center"
-                      >
-                        + Submit Launch
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            <aside className="hidden xl:block pb-14" aria-label="Spotlight and browse">
+              <div className="tlf-rail overflow-y-auto no-scrollbar pt-6 pb-10 pl-1">{rightRail}</div>
+            </aside>
           </div>
+        ) : (
+          <main id="main" className="tlf-main min-w-0 pt-6 sm:pt-10 pb-12 tlf-safe-bottom xl:pb-16">
+            {searching ? <div className="max-w-3xl mx-auto">{searchView}</div> : children}
+          </main>
+        )}
+      </div>
 
-          {/* Daily center launchpad — scrollable feed + contained footer */}
-          <div ref={centerScrollRef} className="xl:col-span-8 order-1 xl:order-2 py-4 flex flex-col h-full min-h-0 overflow-y-auto no-scrollbar justify-between">
-            <div>
-              {searchQuery.trim().length > 0 ? (
-                <div className="space-y-6 font-mono text-ink">
-                  {/* Search Results Header aligned with left & right sidebar headers */}
-                  <div className="h-10 flex items-end justify-between pb-2.5 border-b border-hairline shrink-0">
-                    <div className="flex items-baseline gap-3 min-w-0">
-                      <h1 className="font-display text-xl sm:text-2xl font-black tracking-wider uppercase leading-none shrink-0 text-signal">
-                        Search Results
-                      </h1>
-                      <span className="text-ink-dim text-xs sm:text-sm font-mono tracking-widest leading-none pb-0.5 truncate">
-                        &ldquo;{searchQuery}&rdquo; ({searchResults.products.length + searchResults.founders.length} FOUND)
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery("");
-                        window.dispatchEvent(new CustomEvent("searchQueryChanged", { detail: "" }));
-                      }}
-                      className="px-2.5 py-1 text-xs font-mono border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink transition-colors cursor-pointer shrink-0"
-                    >
-                      [ ✕ CLEAR SEARCH ]
-                    </button>
-                  </div>
-
-                  {isSearching && (
-                    <div className="p-4 border border-signal/40 bg-signal/5 text-xs text-signal flex items-center justify-between animate-pulse">
-                      <span>[ QUERYING FULL POSTGRES REPOSITORY ACROSS PRODUCTS &amp; BUILDERS... ]</span>
-                      <span className="w-2 h-2 rounded-full bg-signal" />
-                    </div>
-                  )}
-
-                  {/* 1. MATCHING PRODUCTS */}
-                  {searchResults.products.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-hairline pb-1.5">
-                        <span className="text-xs font-bold uppercase tracking-wider text-ink-dim">
-                          Products ({searchResults.products.length})
-                        </span>
-                        <span className="text-[10px] text-ink-faint">ALL CATEGORIES</span>
-                      </div>
-                      <div className="divide-y divide-hairline border-b border-hairline">
-                        {searchResults.products.map((p, i) => (
-                          <Link
-                            key={p.id}
-                            href={`/product/${p.slug || slugify(p.name)}`}
-                            onClick={() => {
-                              setSearchQuery("");
-                              window.dispatchEvent(new CustomEvent("searchQueryChanged", { detail: "" }));
-                            }}
-                            className="flex items-center gap-3 sm:gap-4 py-3.5 px-3 sm:px-4 group hover:bg-surface transition-colors cursor-pointer block"
-                          >
-                            <span
-                              className={`font-display font-black text-xl sm:text-2xl w-8 sm:w-10 text-right ${
-                                i === 0 ? "text-signal" : "text-ink-faint"
-                              }`}
-                            >
-                              {String(i + 1).padStart(2, "0")}
-                            </span>
-
-                            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink group-hover:border-signal overflow-hidden relative">
-                              {p.logoUrl ? (
-                                <img width="64" height="64" src={p.logoUrl} alt={p.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                              ) : (
-                                <span>{p.name.substring(0, 2).toUpperCase()}</span>
-                              )}
-                            </div>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="font-mono text-sm font-bold text-ink group-hover:text-signal transition-colors truncate">
-                                  {p.name}
-                                </h3>
-                                <span className="text-ink-faint text-xs">·</span>
-                                <span className="text-ink-dim text-xs font-mono truncate max-w-md">
-                                  {p.tagline}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2.5 mt-1">
-                                <span className="text-ink-faint group-hover:text-ink text-xs font-mono">
-                                  {p.maker} ({p.makerName})
-                                </span>
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 border border-hairline text-ink-faint uppercase">
-                                  {p.category}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="text-right shrink-0 border border-hairline px-3 py-1.5 bg-surface/50 group-hover:border-ink transition-colors">
-                              <span className="font-mono text-xs font-bold text-signal block">{p.votes} VOTES</span>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 2. MATCHING FOUNDERS & BUILDERS */}
-                  {searchResults.founders.length > 0 && (
-                    <div className="space-y-3 pt-4">
-                      <div className="flex items-center justify-between border-b border-hairline pb-1.5">
-                        <span className="text-xs font-bold uppercase tracking-wider text-signal">
-                          Founders &amp; Builders ({searchResults.founders.length})
-                        </span>
-                        <span className="text-[10px] text-ink-faint">PRESTIGE DIRECTORY</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {searchResults.founders.map((f) => (
-                          <Link
-                            key={f.id}
-                            href={`/founder/${f.username}`}
-                            onClick={() => {
-                              setSearchQuery("");
-                              window.dispatchEvent(new CustomEvent("searchQueryChanged", { detail: "" }));
-                            }}
-                            className="p-3.5 border border-hairline bg-surface/30 hover:border-ink hover:bg-surface transition-colors flex items-center gap-3.5 group"
-                          >
-                            <div className="w-11 h-11 bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden relative">
-                              {f.image ? (
-                                <img width="64" height="64" src={f.image} alt={f.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                              ) : (
-                                <span>{f.name.substring(0, 2).toUpperCase()}</span>
-                              )}
-                            </div>
-                            <div className="min-w-0 flex-1 space-y-0.5">
-                              <div className="flex items-center justify-between gap-1">
-                                <span className="font-mono text-xs sm:text-sm font-bold text-ink group-hover:text-signal transition-colors truncate">
-                                  {f.name}
-                                </span>
-                                <span className="text-[10px] font-mono text-ink-faint truncate">
-                                  @{f.username}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-ink-dim truncate">
-                                {f.title || "Independent Builder"}
-                              </p>
-                              <div className="flex items-center gap-2 pt-1 text-[10px] font-mono text-ink-faint">
-                                <span className="text-signal font-bold">{f.productsCount} SHIPPED</span>
-                                <span>·</span>
-                                <span>{f.totalVotes} VOTES</span>
-                              </div>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* EMPTY STATE */}
-                  {!isSearching && searchResults.products.length === 0 && searchResults.founders.length === 0 && (
-                    <div className="py-16 text-center border border-hairline bg-surface/20 space-y-2 p-6">
-                      <div className="text-ink font-bold font-mono text-base">
-                        No products or builders found matching &ldquo;{searchQuery}&rdquo;
-                      </div>
-                      <p className="text-ink-dim text-xs max-w-md mx-auto">
-                        Try searching with a broader keyword, product name, founder username, or browse by category.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                children
-              )}
-            </div>
-
-            {/* Unified Clean Modern Footer Section */}
-            <footer className="mt-16 border-t border-hairline pt-10 pb-16 space-y-8 font-mono w-full shrink-0">
-              {/* Row 1: Main 4-Column Navigation Grid — Balanced 4 Columns */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 pb-8 border-b border-hairline w-full">
-                {/* Column 1: Brand, Motto & Social */}
-                <div className="space-y-3.5 min-w-0">
-                  <Link
-                    href="/"
-                    aria-label="The Launch Feed — home"
-                    className="inline-flex items-center hover:opacity-85 transition-opacity"
-                  >
-                    <LaunchFeedBrandLogo height={38} />
-                  </Link>
-                  <p className="text-xs text-ink-dim leading-relaxed font-sans">
-                    The 360° product intelligence platform &amp; daily leaderboard for indie makers, SaaS builders, and engineering teams.
-                  </p>
-                  <div className="text-[11px] font-mono text-signal font-bold pt-0.5">
-                    ship. vote. rise.
-                  </div>
-
-                  {/* Official Social Icons */}
-                  <div className="flex items-center gap-2 pt-1 text-ink-dim">
-                    <a
-                      href="https://x.com/thelaunchfeed"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 border border-hairline bg-surface hover:text-ink hover:border-signal/40 transition-colors"
-                      title="Follow @thelaunchfeed on 𝕏 (Twitter)"
-                      aria-label="Follow on 𝕏 (Twitter)"
-                    >
-                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                      </svg>
-                    </a>
-                    <a
-                      href="https://bsky.app/profile/thelaunchfeed.bsky.social"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 border border-hairline bg-surface hover:text-ink hover:border-signal/40 transition-colors"
-                      title="Follow @thelaunchfeed.bsky.social on Bluesky"
-                      aria-label="Follow on Bluesky"
-                    >
-                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 600 530" aria-hidden="true">
-                        <path d="M135.72 44.03C202.216 93.951 273.74 195.17 300 249.49c26.26-54.316 97.782-155.54 164.28-205.463C512.26 8.024 590 -19.44 590 69.24c0 17.7-10.15 148.79-16.11 170.07-20.68 73.94-96.14 92.86-163.23 81.42 117.3 19.95 147.16 86.06 82.72 152.16-122.34 125.55-175.83-31.51-189.53-71.76-2.51-7.38-3.68-10.83-3.85-7.88-.17-2.95-1.34.5-3.85 7.88-13.7 40.26-67.19 197.31-189.53 71.76-64.44-66.1-34.58-132.21 82.72-152.16-67.09 11.44-142.55-7.48-163.22-81.42C20.15 217.99 10 86.9 10 69.24c0-88.68 77.74-61.216 125.72-25.21z" />
-                      </svg>
-                    </a>
-                    <a
-                      href="https://t.me/thelaunchfeed"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 border border-hairline bg-surface hover:text-ink hover:border-signal/40 transition-colors"
-                      title="Telegram Channel"
-                      aria-label="Telegram Channel"
-                    >
-                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
-                      </svg>
-                    </a>
-                    <a
-                      href="https://chat.whatsapp.com/HxTenCRhtHa9PIviuQNl9U"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-1.5 border border-hairline bg-surface hover:text-ink hover:border-signal/40 transition-colors"
-                      title="WhatsApp Community"
-                      aria-label="WhatsApp Community"
-                    >
-                      <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                        <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38c1.45.79 3.08 1.21 4.74 1.21 5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.816 9.816 0 0012.04 2zm5.79 14.07c-.24.68-1.2 1.26-1.66 1.32-.44.06-1.01.09-3.26-.84-2.73-1.13-4.48-3.9-4.62-4.08-.13-.19-1.11-1.48-1.11-2.82 0-1.34.7-2 .95-2.27.24-.27.54-.34.72-.34.18 0 .36 0 .52.01.17.01.4.06.62.53.24.51.81 1.98.88 2.12.07.15.12.32.02.51-.09.19-.14.3-.29.47-.15.17-.31.38-.45.51-.15.15-.3.31-.13.61.17.3 1.05 1.74 2.26 2.82 1.55 1.38 2.86 1.81 3.27 2.01.41.2.65.17.89-.1.24-.27 1.03-1.2 1.3-1.61.27-.41.54-.34.91-.2.37.14 2.37 1.12 2.78 1.32.41.2.68.3.78.47.1.18.1.99-.14 1.67z" />
-                      </svg>
-                    </a>
-                  </div>
-                </div>
-
-                {/* Column 2: Leaderboards */}
-                <div className="space-y-3 min-w-0">
-                  <div className="text-xs font-bold text-ink uppercase tracking-wider border-b border-hairline pb-1.5 flex items-center justify-between">
-                    <span>Leaderboards</span>
-                    <span className="text-[9px] border border-signal/40 bg-signal/10 text-signal px-1 py-0.2 font-bold">DAILY</span>
-                  </div>
-                  <ul className="space-y-2 text-xs text-ink-dim">
-                    <li>
-                      <Link href="/" className="hover:text-ink transition-colors flex items-center gap-1.5 truncate">
-                        <span>Today&apos;s Daily Feed</span>
-                        <span className="text-[9px] border border-signal/40 text-signal px-1 py-0.2 shrink-0">LIVE</span>
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/" className="hover:text-ink transition-colors block truncate">
-                        Weekly Leaderboards
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/" className="hover:text-ink transition-colors block truncate">
-                        Monthly Leaderboards
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/" className="hover:text-ink transition-colors block truncate">
-                        2026 Yearly Champions
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/" className="hover:text-ink transition-colors block truncate">
-                        All-Time Hall of Fame
-                      </Link>
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Column 3: Platform */}
-                <div className="space-y-3 min-w-0">
-                  <div className="text-xs font-bold text-ink uppercase tracking-wider border-b border-hairline pb-1.5 flex items-center justify-between">
-                    <span>Platform</span>
-                    <span className="text-[9px] text-ink-faint font-normal">DISCOVER</span>
-                  </div>
-                  <ul className="space-y-2 text-xs text-ink-dim">
-                    <li>
-                      <Link href="/founders" className="hover:text-ink transition-colors flex items-center gap-1.5 truncate">
-                        <span className="font-bold text-ink hover:text-signal truncate">Top 100 Founders</span>
-                        <span className="text-[9px] border border-signal/40 bg-signal/10 text-signal px-1 py-0.2 font-bold shrink-0">TOP 100</span>
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/submit" className="hover:text-ink transition-colors flex items-center gap-1.5 truncate">
-                        <span className="truncate">Submit a Launch</span>
-                        <span className="text-[9px] border border-signal/40 text-signal px-1 py-0.2 shrink-0">$0 FREE</span>
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/profile" className="hover:text-ink transition-colors block truncate">
-                        Maker Dashboard
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/login" className="hover:text-ink transition-colors block truncate">
-                        Sign In / Register
-                      </Link>
-                    </li>
-                    <li>
-                      <a href="/sitemap.xml" className="hover:text-ink transition-colors block truncate">
-                        XML Sitemap
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-
-                {/* Column 4: Company & Legal */}
-                <div className="space-y-3 min-w-0">
-                  <div className="text-xs font-bold text-ink uppercase tracking-wider border-b border-hairline pb-1.5 flex items-center justify-between">
-                    <span>Company</span>
-                    <span className="text-[9px] text-ink-faint font-normal">LEGAL</span>
-                  </div>
-                  <ul className="space-y-2 text-xs text-ink-dim">
-                    <li>
-                      <Link href="/about" className="hover:text-ink transition-colors block truncate">
-                        About Platform
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/contact" className="hover:text-ink transition-colors block truncate">
-                        Contact &amp; Support
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/privacy" className="hover:text-ink transition-colors block truncate">
-                        Privacy Policy
-                      </Link>
-                    </li>
-                    <li>
-                      <Link href="/terms" className="hover:text-ink transition-colors block truncate">
-                        Terms of Service
-                      </Link>
-                    </li>
-                    <li>
-                      <button
-                        type="button"
-                        onClick={openCookieSettings}
-                        className="hover:text-signal transition-colors block truncate text-left cursor-pointer w-full text-ink-dim"
-                      >
-                        Cookie Preferences
-                      </button>
-                    </li>
-                    <li>
-                      <a
-                        href="/llms.txt"
-                        target="_blank"
-                        className="hover:text-ink transition-colors flex items-center gap-1 text-signal font-medium truncate"
-                      >
-                        <span className="truncate">AI Feed (llms.txt)</span>
-                        <span className="text-[9px] shrink-0">↗</span>
-                      </a>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              {/* Row 2: Categories Section */}
-              <div className="space-y-3 pb-8 border-b border-hairline w-full">
-                <div className="text-xs font-bold text-ink uppercase tracking-wider flex items-center justify-between">
-                  <span>Explore Categories</span>
-                  <span className="text-[10px] text-ink-faint font-normal">{categories.length} niches</span>
-                </div>
-                <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                  {categories.map((cat) => (
-                    <Link
-                      key={cat.slug}
-                      href={`/category/${cat.slug}`}
-                      className="px-2.5 py-1 text-[11px] font-mono border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/40 hover:text-signal text-ink-dim transition-all flex items-center gap-1.5 cursor-pointer rounded-xs"
-                    >
-                      <span>{cat.name}</span>
-                      <span className="text-ink-faint text-[9px]">→</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Featured On Online Directories Marquee Strip */}
-              <FeaturedOnFooterBar />
-
-              {/* Row 3: Bottom Creator Attribution & Theme Controls Bar */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1 text-xs text-ink-faint w-full">
-                {/* Left: Creator Attribution with Avatar */}
-                <div className="flex items-center gap-2 px-2.5 py-1 border border-hairline bg-surface/40 h-8 shrink-0">
-                  <img width="64" height="64"
-                    src="/menajulm.avif"
-                    alt="Menajul Hoque"
-                    className="w-4 h-4 rounded-full object-cover grayscale opacity-85 hover:grayscale-0 hover:opacity-100 transition-all border border-hairline"
-                  />
-                  <span className="text-[11px] font-mono text-ink-faint">Built by</span>
+      {/* Footer */}
+      <footer className="border-t border-hairline bg-surface/40 tlf-safe-bottom">
+        <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-12 space-y-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
+            <div className="col-span-2 space-y-4">
+              <Link href="/" className="inline-flex items-center gap-2" aria-label="The Launch Feed — home">
+                <LaunchFeedLogo size={22} />
+                <span className="font-display font-black text-lg tracking-wide uppercase text-ink">
+                  The Launch <span className="text-signal">Feed</span>
+                </span>
+              </Link>
+              <p className="text-sm text-ink-dim leading-relaxed max-w-sm">
+                The daily leaderboard for new software and AI products. Founders launch free, the community votes, and
+                the best tools graduate to the weekly, monthly and all-time boards.
+              </p>
+              <p className="text-xs font-mono text-signal font-semibold">ship. vote. rise.</p>
+              <div className="flex items-center gap-2">
+                {[
+                  { href: "https://x.com/thelaunchfeed", label: "X (Twitter)", d: "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z", fill: true },
+                  { href: "https://bsky.app/profile/thelaunchfeed.bsky.social", label: "Bluesky", d: "M12 10.8c-1.1-2.1-4-6-6.7-7.9C2.7 1 1.7 1.3 1 1.6.3 2 .2 3.1.2 3.7s.4 5.3.6 6.1c.8 2.7 3.6 3.6 6.2 3.3-3.8.6-7.2 2-2.8 6.9 4.9 5 6.7-1.1 7.6-4.2.9 3.1 2 9 7.5 4.2 4.2-4.2 1.2-6.3-2.6-6.9 2.6.3 5.4-.6 6.2-3.3.2-.8.6-5.5.6-6.1s-.1-1.7-.8-2.1c-.7-.3-1.7-.6-4.3 1.3-2.7 1.9-5.6 5.8-6.7 7.9z", fill: true },
+                  { href: "https://t.me/thelaunchfeed", label: "Telegram", d: "M21.5 4.5 2.8 11.7c-1.3.5-1.3 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.6.1.9.8.9.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8L22.9 6c.3-1.3-.5-1.9-1.4-1.5zM8.8 14.4l9.6-6.1c.5-.3.9-.1.5.2l-8.2 7.4-.3 3.5z", fill: true },
+                ].map((s) => (
                   <a
-                    href="https://x.com/menajulm"
+                    key={s.href}
+                    href={s.href}
                     target="_blank"
-                    rel="noreferrer"
-                    className="text-[11px] font-mono font-bold text-ink hover:text-signal hover:underline transition-colors"
+                    rel="noopener"
+                    aria-label={`The Launch Feed on ${s.label}`}
+                    className="w-9 h-9 flex items-center justify-center rounded-full border border-hairline bg-card text-ink-dim hover:text-ink hover:border-ink-faint transition-colors"
                   >
-                    @menajulm (x)
-                  </a>
-                </div>
-
-                {/* Center: Copyright */}
-                <div className="text-[11px] font-mono text-ink-faint tracking-wider uppercase text-center sm:text-left truncate">
-                  &copy; {new Date().getFullYear()} THE LAUNCH FEED &middot; ALL RIGHTS RESERVED
-                </div>
-
-                {/* Right: Theme Controls & TOP Button */}
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* 3-Theme Segmented Control */}
-                  <div className="flex items-center border border-hairline bg-surface/40 p-0.5 rounded-sm gap-0.5 h-8">
-                    <button
-                      onClick={() => applyTheme("light")}
-                      className={`w-7 h-7 flex items-center justify-center transition-colors cursor-pointer rounded-xs ${
-                        themeMode === "light"
-                          ? "bg-ink text-void font-bold"
-                          : "text-ink-dim hover:text-ink hover:bg-surface"
-                      }`}
-                      title="Light Mode"
-                      aria-label="Light Mode"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <circle cx="12" cy="12" r="4" fill="currentColor" fillOpacity="0.2" />
-                        <path strokeLinecap="square" d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => applyTheme("void")}
-                      className={`w-7 h-7 flex items-center justify-center transition-colors cursor-pointer rounded-xs ${
-                        themeMode === "void"
-                          ? "bg-ink text-void font-bold"
-                          : "text-ink-dim hover:text-ink hover:bg-surface"
-                      }`}
-                      title="Void Dark Mode"
-                      aria-label="Void Dark Mode"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="square" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" fill="currentColor" fillOpacity="0.2" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={() => applyTheme("thermal")}
-                      className={`w-7 h-7 flex items-center justify-center transition-colors cursor-pointer rounded-xs ${
-                        themeMode === "thermal"
-                          ? "bg-[#38BDF8] text-[#050B14] font-bold"
-                          : "text-ink-dim hover:text-ink hover:bg-surface"
-                      }`}
-                      title="Thermal Dark Mode"
-                      aria-label="Thermal Dark Mode"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="square" d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 3.5z" fill="currentColor" fillOpacity="0.3" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {/* TOP Button */}
-                  <button
-                    onClick={() => {
-                      if (centerScrollRef.current) {
-                        centerScrollRef.current.scrollTo({ top: 0, behavior: "smooth" });
-                      }
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="h-8 px-3 flex items-center gap-1.5 justify-center border border-hairline bg-surface/40 hover:bg-raised text-[11px] font-mono font-bold text-ink hover:text-signal transition-colors cursor-pointer rounded-sm uppercase shrink-0"
-                  >
-                    <span>TOP</span>
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
-                    >
-                      <path strokeLinecap="square" strokeLinejoin="miter" d="M12 19V5M5 12l7-7 7 7" />
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" aria-hidden="true">
+                      <path d={s.d} />
                     </svg>
-                  </button>
-                </div>
-              </div>
-            </footer>
-          </div>
-
-          {/* Right rail — Product Categories & Top Builders Subtabs */}
-          <div className="hidden xl:flex xl:col-span-2 py-4 flex-col h-full min-h-0 overflow-hidden order-3">
-            <div className="h-10 flex items-end pb-2.5 border-b border-hairline shrink-0">
-              <div className="w-full grid grid-cols-2 gap-1 bg-surface/60 p-0.5 border border-hairline rounded-xs text-xs font-mono">
-                <button
-                  type="button"
-                  onClick={() => setRightRailTab("categories")}
-                  className={`py-1 px-1 text-center rounded-xs transition-colors font-bold cursor-pointer text-[11px] sm:text-xs truncate ${
-                    rightRailTab === "categories"
-                      ? "bg-signal text-void shadow-xs"
-                      : "text-ink-dim hover:text-ink hover:bg-surface/50"
-                  }`}
-                >
-                  Categories
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRightRailTab("founders")}
-                  className={`py-1 px-1 flex items-center justify-center gap-1 rounded-xs transition-colors font-bold cursor-pointer text-[11px] sm:text-xs truncate ${
-                    rightRailTab === "founders"
-                      ? "bg-signal text-void shadow-xs"
-                      : "text-ink-dim hover:text-ink hover:bg-surface/50"
-                  }`}
-                >
-                  <svg
-                    className="w-3 h-3 shrink-0"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2.5}
-                  >
-                    <path strokeLinecap="square" strokeLinejoin="miter" d="M12 19V5M5 12l7-7 7 7" />
-                  </svg>
-                  <span>50 Founders</span>
-                </button>
+                  </a>
+                ))}
               </div>
             </div>
 
-            {rightRailTab === "categories" ? (
-              <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col justify-between gap-1.5 pt-3 pr-1">
-                {categories.map((cat) => (
-                  <Link
-                    key={cat.slug}
-                    href={`/category/${cat.slug}`}
-                    className="p-2.5 border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/50 rounded-xs transition-all flex items-center justify-between group"
-                  >
-                    <span className="text-xs font-mono font-medium text-ink group-hover:text-signal transition-colors truncate">
-                      {cat.name}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-surface border border-hairline text-ink-dim group-hover:text-ink">
-                        {cat.productCount ?? 0}
-                      </span>
-                      <span className="text-ink-faint group-hover:text-signal font-mono text-[10px]">
-                        →
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              /* ── Top 50 Builders / Founders View ── */
-              <div
-                className={`flex-1 overflow-y-auto no-scrollbar flex flex-col gap-1.5 pt-3 pr-1 ${
-                  topFounders.length > 0 ? "justify-between" : "justify-start"
-                }`}
-              >
-                {isLoadingLayout ? (
-                  Array.from({ length: 10 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="p-2 border border-hairline bg-surface/20 rounded-xs flex items-center gap-2 animate-pulse"
-                    >
-                      <div className="w-5.5 h-5.5 bg-surface/60 rounded-full shrink-0" />
-                      <div className="flex-1 space-y-1">
-                        <div className="h-3 bg-surface/80 w-3/4 rounded-xs" />
-                        <div className="h-2 bg-surface/40 w-1/2 rounded-xs" />
-                      </div>
-                    </div>
-                  ))
-                ) : topFounders.length > 0 ? (
-                  topFounders.slice(0, 50).map((f, i) => (
-                    <Link
-                      key={f.id || f.username}
-                      href={`/founder/${f.username}`}
-                      className="p-2 border border-hairline bg-surface/30 hover:bg-surface hover:border-signal/50 rounded-xs transition-all flex items-center gap-2 group block"
-                    >
-                      <span
-                        className={`font-display font-black text-xs w-4 text-center shrink-0 ${
-                          i === 0
-                            ? "text-signal font-bold"
-                            : i === 1
-                            ? "text-signal/80 font-bold"
-                            : i === 2
-                            ? "text-signal/60 font-bold"
-                            : "text-ink-faint"
-                        }`}
-                      >
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-
-                      <div className="w-5.5 h-5.5 rounded-full bg-surface border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                        {f.image ? (
-                          <img width="64" height="64" src={f.image} alt={f.name || f.username} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                        ) : (
-                          (f.name || f.username).substring(0, 2).toUpperCase()
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-mono text-ink truncate font-medium group-hover:text-signal transition-colors">
-                          {f.name || f.username}
-                        </div>
-                        <div className="text-[10px] font-mono text-ink-faint truncate">
-                          @{f.username}
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col items-end shrink-0 px-0.5">
-                        <span className="text-[10px] font-mono font-bold text-ink-dim group-hover:text-signal">
-                          {f.totalVotes ? `▲${f.totalVotes}` : `${f.productsCount || 0} shipped`}
-                        </span>
-                      </div>
+            <FooterColumn
+              title="Leaderboards"
+              links={[
+                { href: "/", label: "Today's launches" },
+                { href: "/leaderboard/weekly", label: "Best of the week" },
+                { href: "/leaderboard/monthly", label: "Best of the month" },
+                { href: "/leaderboard/yearly", label: `${new Date().getFullYear()} champions` },
+                { href: "/leaderboard/all-time", label: "All-time hall of fame" },
+              ]}
+            />
+            <FooterColumn
+              title="Makers"
+              links={[
+                { href: "/submit", label: "Launch your product" },
+                { href: "/badges", label: "Winner badges" },
+                { href: "/founders", label: "Top 100 founders" },
+                { href: "/profile", label: "Maker dashboard" },
+                { href: "/contact", label: "Advertise & spotlight" },
+              ]}
+            />
+            <FooterColumn
+              title="Discover"
+              links={categories.slice(0, 5).map((c) => ({ href: `/category/${c.slug}`, label: c.name })).concat([
+                { href: "/categories", label: "All categories" },
+              ])}
+            />
+            <div className="space-y-3">
+              <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">Company</h2>
+              <ul className="space-y-2 text-sm">
+                {[
+                  { href: "/about", label: "About" },
+                  { href: "/contact", label: "Contact" },
+                  { href: "/privacy", label: "Privacy" },
+                  { href: "/terms", label: "Terms" },
+                ].map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="text-ink-dim hover:text-ink transition-colors">
+                      {l.label}
                     </Link>
-                  ))
-                ) : (
-                  <div className="py-8 px-3 text-center border border-dashed border-hairline bg-surface/20 rounded-xs space-y-2">
-                    <div className="text-[11px] font-mono font-bold text-ink uppercase tracking-wider">
-                      No Builders Found
-                    </div>
-                    <p className="text-[10px] font-mono text-ink-dim leading-relaxed">
-                      No registered founders to display yet.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+                  </li>
+                ))}
+                <li>
+                  <button type="button" onClick={openCookieSettings} className="text-ink-dim hover:text-ink transition-colors">
+                    Cookie preferences
+                  </button>
+                </li>
+                <li>
+                  <a href="/llms.txt" className="text-ink-dim hover:text-ink transition-colors">
+                    llms.txt (for AI)
+                  </a>
+                </li>
+                <li>
+                  <a href="/feed.xml" className="text-ink-dim hover:text-ink transition-colors">
+                    RSS feed
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Mobile-only floating bottom marquee — single row, right-to-left */}
-      {mounted && rotating.length > 0 && (
-        <div className="xl:hidden shrink-0 z-30 bg-void border-t border-hairline overflow-hidden relative w-full">
-          <div className="overflow-hidden w-full flex flex-nowrap marquee-container">
-            {[0, 1].map((trackIdx) => (
-              <div
-                key={trackIdx}
-                aria-hidden={trackIdx === 1 ? "true" : undefined}
-                className="marquee-track flex flex-nowrap shrink-0 items-center"
-                style={{ animationDirection: "reverse", animationDuration: "120s" }}
-              >
-                {[...rotating, ...rotating].map((p, i) => (
-                  <Link
-                    key={`${trackIdx}-${i}`}
-                    href={p.url && p.url !== "#" ? p.url : `/product/${slugify(p.name)}`}
-                    className={`${getProductGradientClass(p.name)} flex-shrink-0 w-[180px] sm:w-[250px] mr-2 sm:mr-3 px-2.5 py-1.5 sm:px-3 sm:py-2 my-1.5 sm:my-2 border border-hairline bg-surface hover:bg-raised transition-colors cursor-pointer flex items-center gap-2.5`}
+          <FeaturedOnFooterBar />
+
+          <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-6 border-t border-hairline text-xs text-ink-faint">
+            <p>© {new Date().getFullYear()} The Launch Feed. All rights reserved.</p>
+            <div className="flex items-center gap-3">
+              <a href="https://x.com/menajulm" target="_blank" rel="noopener" className="flex items-center gap-2 hover:text-ink transition-colors">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/menajulm.avif" alt="" width={20} height={20} className="w-5 h-5 rounded-full object-cover" />
+                Built by @menajulm
+              </a>
+              <div role="radiogroup" aria-label="Color theme" className="flex p-0.5 rounded-full border border-hairline bg-card">
+                {(["light", "void", "thermal"] as ThemeMode[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    role="radio"
+                    aria-checked={themeMode === t}
+                    onClick={() => applyTheme(t)}
+                    className={`px-2.5 py-1 rounded-full capitalize transition-colors ${themeMode === t ? "bg-ink text-void" : "text-ink-dim hover:text-ink"}`}
                   >
-                    <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-xs bg-void border border-hairline flex-shrink-0 flex items-center justify-center font-mono text-[9px] font-bold text-ink-dim overflow-hidden relative">
-                      {p.logoUrl ? (
-                        <img width="64" height="64" src={p.logoUrl} alt={p.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                      ) : (
-                        p.name.substring(0, 2).toUpperCase()
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="font-mono text-[11px] sm:text-xs font-medium text-ink truncate leading-tight">
-                        {p.name}
-                      </h4>
-                      <p className="text-ink-dim text-[10px] sm:text-[11px] font-mono truncate mt-0.5 leading-tight">
-                        {p.tagline}
-                      </p>
-                    </div>
-                  </Link>
+                    {t}
+                  </button>
                 ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
-      )}
+      </footer>
+
+      {/* Mobile tab bar */}
+      <nav
+        aria-label="Mobile"
+        className="xl:hidden fixed inset-x-0 bottom-0 z-40 border-t border-hairline bg-void/90 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]"
+      >
+        <ul className="mx-auto max-w-md grid grid-cols-5 h-16">
+          <MobileTab href="/" label="Today" icon={ICONS.home} active={pathname === "/"} />
+          <MobileTab href="/leaderboard/weekly" label="Top" icon={ICONS.trophy} active={pathname.startsWith("/leaderboard")} />
+          <li className="flex items-center justify-center">
+            <Link
+              href="/submit"
+              aria-label="Launch your product"
+              className="tlf-launch tlf-launch-fab -mt-5 flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl ring-4 ring-void"
+            >
+              <SignalMatrix size={18} />
+              <span className="text-[10px] font-bold uppercase tracking-wide leading-none">Launch</span>
+            </Link>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => {
+                setMobileSearchOpen(true);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                setTimeout(() => mobileInputRef.current?.focus(), 60);
+              }}
+              className={`w-full h-full flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${mobileSearchOpen ? "text-signal" : "text-ink-dim"}`}
+            >
+              <Icon d={ICONS.search} className="w-[22px] h-[22px]" />
+              Search
+            </button>
+          </li>
+          <MobileTab
+            href={userSession ? "/profile" : "/login"}
+            label={userSession ? "Me" : "Log in"}
+            icon={ICONS.user}
+            active={pathname.startsWith("/profile")}
+          />
+        </ul>
+      </nav>
     </div>
+  );
+}
+
+function FooterColumn({ title, links }: { title: string; links: Array<{ href: string; label: string }> }) {
+  return (
+    <div className="space-y-3">
+      <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">{title}</h2>
+      <ul className="space-y-2 text-sm">
+        {links.map((l) => (
+          <li key={l.href}>
+            <Link href={l.href} className="text-ink-dim hover:text-ink transition-colors">
+              {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function MobileTab({ href, label, icon, active }: { href: string; label: string; icon: string; active: boolean }) {
+  return (
+    <li>
+      <Link
+        href={href}
+        aria-current={active ? "page" : undefined}
+        className={`w-full h-full flex flex-col items-center justify-center gap-0.5 text-[11px] font-medium ${active ? "text-signal" : "text-ink-dim"}`}
+      >
+        <Icon d={icon} className="w-[22px] h-[22px]" />
+        {label}
+      </Link>
+    </li>
   );
 }

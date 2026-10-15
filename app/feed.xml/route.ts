@@ -44,7 +44,7 @@ export async function GET() {
       <title><![CDATA[${title}]]></title>
       <link>${itemUrl}</link>
       <guid isPermaLink="true">${itemUrl}</guid>
-      <description><![CDATA[${description}]]></description>
+      <description><![CDATA[${description}${p.websiteUrl ? `<p><a href="${siteUrl}/go/${encodeURIComponent(p.slug)}?src=feed">Visit ${p.name} ↗</a></p>` : ""}]]></description>
       <author><![CDATA[${maker}]]></author>
       <category><![CDATA[${catName}]]></category>
       <pubDate>${pubDate}</pubDate>

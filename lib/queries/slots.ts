@@ -6,9 +6,33 @@ export type PublicSlot = {
   kind: "PAID" | "CUSTOM";
   name: string;
   tagline: string;
+  /** Where the card links: the maker's own website when we have it. */
   url: string;
+  /** true when `url` leaves the site (open in a new tab, mark as sponsored if PAID). */
+  external: boolean;
   logoUrl?: string | null;
+  /** Linked product — external clicks go through /go/<productSlug> to be counted. */
+  productSlug?: string | null;
+  /** Real FeaturedSlot id (lets /go honour the slot's own custom URL). */
+  slotId?: string | null;
 };
+
+/**
+ * Featured / Spotlight cards send visitors straight to the product's real
+ * website (the URL the maker entered at submission), not our product page.
+ * Priority: an explicit external customUrl → the linked product's
+ * websiteUrl → our internal page as a last resort.
+ */
+function resolveSlotUrl(customUrl: string | null, product: { slug: string; websiteUrl: string } | null) {
+  const isExternal = (u?: string | null) => !!u && /^https?:\/\//i.test(u.trim());
+  if (isExternal(customUrl)) return { url: customUrl!.trim(), external: true };
+  if (product?.websiteUrl?.trim()) {
+    const site = product.websiteUrl.trim();
+    return { url: /^https?:\/\//i.test(site) ? site : `https://${site}`, external: true };
+  }
+  if (customUrl?.trim()) return { url: customUrl.trim(), external: false };
+  return { url: product ? `/product/${product.slug}` : "#", external: false };
+}
 
 type SlotCacheEntry = {
   timestamp: number;
@@ -43,7 +67,11 @@ export async function getPublicSlots(position: SlotPosition): Promise<PublicSlot
   const now = new Date();
   const rows = await prisma.featuredSlot.findMany({
     where: {
-      position,
+      // $10 Premium Spotlight buys BOTH placements: its paid ROTATING slot is
+      // also shown in the FEATURED strip (one purchase, one 30-day window).
+      ...(position === "FEATURED"
+        ? { OR: [{ position: "FEATURED" as const }, { position: "ROTATING" as const, kind: "PAID" as const }] }
+        : { position }),
       startsAt: { lte: now },
       AND: [
         {
@@ -75,7 +103,7 @@ export async function getPublicSlots(position: SlotPosition): Promise<PublicSlot
     },
     orderBy: [{ kind: "asc" }, { order: "asc" }],
     include: {
-      product: { select: { slug: true, name: true, tagline: true, logoUrl: true } },
+      product: { select: { slug: true, name: true, tagline: true, logoUrl: true, websiteUrl: true } },
     },
   });
 
@@ -86,8 +114,10 @@ export async function getPublicSlots(position: SlotPosition): Promise<PublicSlot
         kind: "PAID",
         name: s.customName || s.product?.name || "",
         tagline: s.customTagline ?? s.product?.tagline ?? "",
-        url: s.customUrl || (s.product ? `/product/${s.product.slug}` : "#"),
+        ...resolveSlotUrl(s.customUrl, s.product),
         logoUrl: s.customLogoUrl || s.product?.logoUrl || null,
+        productSlug: s.product?.slug ?? null,
+        slotId: s.id,
       };
     }
     return {
@@ -95,11 +125,20 @@ export async function getPublicSlots(position: SlotPosition): Promise<PublicSlot
       kind: "CUSTOM",
       name: s.customName || s.product?.name || "",
       tagline: s.customTagline ?? s.product?.tagline ?? "",
-      url: s.customUrl || (s.product ? `/product/${s.product.slug}` : "#"),
+      ...resolveSlotUrl(s.customUrl, s.product),
       logoUrl: s.customLogoUrl || s.product?.logoUrl || null,
     };
   });
 
-  slotsServerCache.set(cacheKey, { timestamp: Date.now(), data });
-  return data;
+  // A product with both a $5 and a $10 slot appears once.
+  const seen = new Set<string>();
+  const unique = data.filter((d) => {
+    const key = `${d.name}|${d.url}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  slotsServerCache.set(cacheKey, { timestamp: Date.now(), data: unique });
+  return unique;
 }

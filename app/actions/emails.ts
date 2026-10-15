@@ -25,30 +25,14 @@ export async function sendOne(input: {
   const admin = await requireAdmin();
   const parsed = SendSchema.parse(input);
 
-  try {
-    const { inngest } = await import("@/lib/inngest");
-    await inngest.send({
-      name: "email.send.requested",
-      data: {
-        templateId: parsed.templateId,
-        to: parsed.to,
-        vars: parsed.vars ?? {},
-        actorId: admin.id,
-        trigger: "manual",
-      },
-    });
-  } catch {
-    // Inngest not wired yet — log a QUEUED row so the admin log still shows it.
-    await prisma.emailLog.create({
-      data: {
-        toEmail: parsed.to,
-        templateId: parsed.templateId,
-        subject: `(queued) ${parsed.templateId}`,
-        status: "QUEUED",
-        triggerEvent: "manual",
-      },
-    });
-  }
+  const { emit } = await import("@/lib/jobs");
+  await emit("email.send.requested", {
+    templateId: parsed.templateId,
+    to: parsed.to,
+    vars: parsed.vars ?? {},
+    actorId: admin.id,
+    trigger: "manual",
+  });
 
   revalidatePath("/admin");
 }
@@ -61,33 +45,18 @@ export async function broadcastToAllUsers(input: {
   const parsed = BroadcastSchema.parse(input);
   const users = await prisma.user.findMany({ select: { id: true, email: true } });
 
-  try {
-    const { inngest } = await import("@/lib/inngest");
-    await inngest.send(
-      users.map((u) => ({
-        name: "email.send.requested" as const,
-        data: {
-          templateId: parsed.templateId,
-          to: u.email,
-          toUserId: u.id,
-          vars: parsed.vars ?? {},
-          actorId: admin.id,
-          trigger: "broadcast",
-        },
-      }))
-    );
-  } catch {
-    await prisma.emailLog.createMany({
-      data: users.map((u) => ({
-        toEmail: u.email,
-        toUserId: u.id,
-        templateId: parsed.templateId,
-        subject: `(queued) ${parsed.templateId}`,
-        status: "QUEUED" as const,
-        triggerEvent: "broadcast",
-      })),
-    });
-  }
+  const { emitMany } = await import("@/lib/jobs");
+  await emitMany(
+    "email.send.requested",
+    users.map((u) => ({
+      templateId: parsed.templateId,
+      to: u.email,
+      toUserId: u.id,
+      vars: parsed.vars ?? {},
+      actorId: admin.id,
+      trigger: "broadcast",
+    }))
+  );
 
   revalidatePath("/admin");
   return users.length;

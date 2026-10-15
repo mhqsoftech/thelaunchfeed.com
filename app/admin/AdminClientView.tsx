@@ -16,6 +16,7 @@ import {
   ThemeMode,
 } from "@/app/data";
 import { authClient } from "@/lib/auth-client";
+import SchedulerPanel from "./SchedulerPanel";
 
 // Types shared across the admin tabs — populated from /api/admin/summary.
 type AdminProduct = {
@@ -3523,11 +3524,12 @@ function AutomationTab() {
 
   return (
     <div className="space-y-4">
+      <SchedulerPanel />
       <p className="text-xs text-ink-dim leading-relaxed">
-        Automated emails fire when the matching Inngest event occurs. Toggling a rule off
-        suppresses the automatic send (the Inngest function consults{" "}
-        <span className="text-ink font-bold">isAutomationEnabled</span> before dispatching). Manual
-        sends from the Compose tab always work regardless.
+        Automated emails are queued as background jobs when the matching event occurs. Toggling a
+        rule off suppresses the automatic send (the job checks{" "}
+        <span className="text-ink font-bold">isAutomationEnabled</span> before dispatching and logs it
+        as SKIPPED). Manual sends from the Compose tab always work regardless.
       </p>
       <div className="border border-hairline overflow-x-auto">
         <table className="w-full text-sm min-w-[720px]">

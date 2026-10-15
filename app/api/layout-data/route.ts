@@ -1,12 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { getPublicSlots } from "@/lib/queries/slots";
 import { getTopFounders } from "@/lib/queries/founders";
 
 import { getCategoriesWithCounts } from "@/lib/queries/categories";
+import { heartbeat } from "@/lib/jobs";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 30;
+// Headroom for the traffic heartbeat that runs after the response.
+export const maxDuration = 60;
 
 let layoutServerCache: {
   timestamp: number;
@@ -20,6 +23,10 @@ const LAYOUT_CACHE_TTL_MS = 30_000; // 30 seconds
  * layout stays snappy.
  */
 export async function GET() {
+  // Every visit doubles as a scheduler heartbeat (throttled to ~1/min across
+  // all instances), so launches publish on time even with no external pinger.
+  after(() => heartbeat("traffic").catch((err) => console.error("[jobs] heartbeat failed:", err)));
+
   try {
     if (layoutServerCache && Date.now() - layoutServerCache.timestamp < LAYOUT_CACHE_TTL_MS) {
       return NextResponse.json(layoutServerCache.data, {
@@ -57,6 +64,7 @@ export async function GET() {
             tagline: true,
             voteCount: true,
             logoUrl: true,
+            websiteUrl: true,
             owner: { select: { username: true, name: true } },
             category: { select: { name: true, slug: true } },
           },
@@ -75,6 +83,7 @@ export async function GET() {
             tagline: true,
             voteCount: true,
             logoUrl: true,
+            websiteUrl: true,
             owner: { select: { username: true, name: true } },
             category: { select: { name: true, slug: true } },
           },
@@ -109,13 +118,20 @@ export async function GET() {
       categorySlug: p.category?.slug || "tech",
     });
 
-    const shapeSlot = (p: any, prefix: string) => ({
-      id: `${prefix}-${p.id}`,
-      name: p.name,
-      tagline: p.tagline,
-      url: `/product/${p.slug}`,
-      logoUrl: p.logoUrl ?? null,
-    });
+    // Organic fallback cards also go to the maker's real website.
+    const shapeSlot = (p: any, prefix: string) => {
+      const site = typeof p.websiteUrl === "string" ? p.websiteUrl.trim() : "";
+      return {
+        id: `${prefix}-${p.id}`,
+        kind: "CUSTOM" as const,
+        name: p.name,
+        tagline: p.tagline,
+        url: site ? (/^https?:\/\//i.test(site) ? site : `https://${site}`) : `/product/${p.slug}`,
+        external: Boolean(site),
+        logoUrl: p.logoUrl ?? null,
+        productSlug: p.slug ?? null,
+      };
+    };
 
     const finalFeatured =
       featured.length > 0

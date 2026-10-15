@@ -74,7 +74,7 @@ export default function CookieConsentBanner() {
       aria-label="Cookie and telemetry consent preferences"
       className="fixed bottom-3 left-3 right-3 sm:left-auto sm:right-5 sm:bottom-5 sm:max-w-md z-[9990] animate-in fade-in slide-in-from-bottom-4 duration-300 pointer-events-auto"
     >
-      <div className="bg-void/95 backdrop-blur-md border border-hairline shadow-2xl p-4 sm:p-5 rounded-xs space-y-3 font-mono text-ink text-xs">
+      <div className="bg-void/95 backdrop-blur-md border border-hairline shadow-2xl p-4 sm:p-5 rounded-lg space-y-3 font-mono text-ink text-xs">
         {/* Top Header Bar */}
         <div className="flex items-center justify-between gap-2 border-b border-hairline pb-2.5">
           <div className="flex items-center gap-2">
@@ -97,7 +97,7 @@ export default function CookieConsentBanner() {
         {showCustomize && (
           <div className="space-y-2 pt-1 border-t border-hairline font-mono text-[11px]">
             {/* Essential Cookies */}
-            <div className="flex items-start justify-between gap-3 p-2 bg-surface/40 border border-hairline rounded-xs">
+            <div className="flex items-start justify-between gap-3 p-2 bg-surface/40 border border-hairline rounded-lg">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-ink">Strictly Necessary</span>
@@ -117,7 +117,7 @@ export default function CookieConsentBanner() {
             </div>
 
             {/* Analytics & Telemetry */}
-            <div className="flex items-start justify-between gap-3 p-2 bg-surface/40 border border-hairline rounded-xs">
+            <div className="flex items-start justify-between gap-3 p-2 bg-surface/40 border border-hairline rounded-lg">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-ink">Analytics &amp; Heatmaps</span>
@@ -145,14 +145,14 @@ export default function CookieConsentBanner() {
               <button
                 type="button"
                 onClick={handleSaveCustom}
-                className="flex-1 px-3 py-1.5 bg-signal hover:opacity-90 text-void font-bold text-[11px] rounded-xs cursor-pointer transition-all text-center"
+                className="flex-1 px-3 py-1.5 bg-signal hover:opacity-90 text-void font-bold text-[11px] rounded-lg cursor-pointer transition-all text-center"
               >
                 Save Preferences
               </button>
               <button
                 type="button"
                 onClick={() => setShowCustomize(false)}
-                className="px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-[11px] rounded-xs cursor-pointer transition-all text-center"
+                className="px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-[11px] rounded-lg cursor-pointer transition-all text-center"
               >
                 Back
               </button>
@@ -162,14 +162,14 @@ export default function CookieConsentBanner() {
               <button
                 type="button"
                 onClick={handleAcceptAll}
-                className="flex-1 px-3 py-1.5 bg-signal hover:opacity-90 text-void font-bold text-[11px] rounded-xs cursor-pointer transition-all text-center"
+                className="flex-1 px-3 py-1.5 bg-signal hover:opacity-90 text-void font-bold text-[11px] rounded-lg cursor-pointer transition-all text-center"
               >
                 Accept All
               </button>
               <button
                 type="button"
                 onClick={handleRejectNonEssential}
-                className="px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-[11px] rounded-xs cursor-pointer transition-all text-center"
+                className="px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-[11px] rounded-lg cursor-pointer transition-all text-center"
               >
                 Reject Non-Essential
               </button>

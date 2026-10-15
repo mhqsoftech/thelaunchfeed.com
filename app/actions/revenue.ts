@@ -1,304 +1,182 @@
 "use server";
 
+/**
+ * Founder-facing revenue actions.
+ *
+ * Trust guarantees:
+ *  - A key is stored ONLY after the provider confirms live data (lib/revenue).
+ *  - Keys are encrypted at rest (AES-256-GCM, bound to owner + provider) and
+ *    are never sent back to the browser — the UI only ever sees `keyHint`.
+ *  - Revenue can only be attached to products the caller owns.
+ *  - A background job re-verifies every connection; revoked keys un-verify
+ *    their products automatically.
+ */
+
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser, getCurrentUser, requireAdmin } from "@/lib/auth";
-import { encryptPaymentApiKey, decryptPaymentApiKey } from "@/lib/crypto";
-import { fetchLiveRevenueFromSDK } from "@/app/lib/revenueTelemetrySDK";
-import type { RevenueProvider } from "@prisma/client";
-
-const VALID_PROVIDERS: Record<string, RevenueProvider> = {
-  stripe: "STRIPE",
-  razorpay: "RAZORPAY",
-  dodopayments: "DODOPAYMENTS",
-  paddle: "PADDLE",
-  lemonsqueezy: "LEMONSQUEEZY",
-  chargebee: "CHARGEBEE",
-  polar: "POLAR",
-  revenuecat: "REVENUECAT",
-  gumroad: "GUMROAD",
-  fastspring: "FASTSPRING",
-  paystack: "PAYSTACK",
-  square: "SQUARE",
-  creem: "CREEM",
-};
-
-function normalizeProvider(rawProvider: string): RevenueProvider {
-  const clean = rawProvider.trim().toLowerCase().replace(/[^a-z]/g, "");
-  if (VALID_PROVIDERS[clean]) return VALID_PROVIDERS[clean];
-  for (const [key, val] of Object.entries(VALID_PROVIDERS)) {
-    if (clean.includes(key) || key.includes(clean)) return val;
-  }
-  return "STRIPE";
-}
+import { CredentialError, ProviderUnavailableError, formatUsdMonthly, parseProviderId } from "@/lib/revenue";
+import { connectProvider, linkProductToConnection, providerIdFromEnum } from "@/lib/revenue/store";
+import { ensureRevenueColumns } from "@/lib/jobs/schema";
 
 const SaveKeySchema = z.object({
   provider: z.string().min(1),
-  apiKey: z.string().min(1, "API key is required"),
-  externalAccountId: z.string().optional(),
-  productId: z.string().optional(),
+  apiKey: z.string().min(8, "Paste the full API key").max(4096),
+  externalAccountId: z.string().max(200).optional(),
+  productId: z.string().max(100).optional(),
 });
 
 export type SaveKeyInput = z.infer<typeof SaveKeySchema>;
 
+// Per-user throttle: the verifier must not become a free key-checking oracle.
+const lastAttempt = new Map<string, number>();
+
 export async function savePaymentApiKey(input: SaveKeyInput) {
   const user = await requireUser();
   const parsed = SaveKeySchema.parse(input);
+  const provider = parseProviderId(parsed.provider);
+  if (!provider) throw new Error(`Unsupported payment provider "${parsed.provider}".`);
 
-  const providerEnum = normalizeProvider(parsed.provider);
-  const rawKey = parsed.apiKey.trim();
-  const externalAccountId = (parsed.externalAccountId || "").trim();
-
-  // Encrypt the payment API key before storing in the database
-  const encryptedAccessToken = encryptPaymentApiKey(rawKey);
-
-  // Upsert the RevenueConnection row with the encrypted access token
-  const connection = await prisma.revenueConnection.upsert({
-    where: {
-      userId_provider_externalAccountId: {
-        userId: user.id,
-        provider: providerEnum,
-        externalAccountId,
-      },
-    },
-    create: {
-      userId: user.id,
-      provider: providerEnum,
-      externalAccountId,
-      accessToken: encryptedAccessToken,
-      status: "ACTIVE",
-      lastSyncedAt: new Date(),
-    },
-    update: {
-      accessToken: encryptedAccessToken,
-      status: "ACTIVE",
-      lastSyncedAt: new Date(),
-      lastSyncError: null,
-    },
-  });
-
-  // Run live SDK telemetry calculation to verify and fetch MRR metrics
-  const telemetryResult = await fetchLiveRevenueFromSDK(parsed.provider, rawKey);
-  const mrrCents = telemetryResult.mrrCents;
-  const totalRevenueCents = telemetryResult.totalRevenueCents;
-
-  // TRUST GUARANTEE: if the provider's live API didn't actually answer with
-  // real data, we refuse to store anything that could later be rendered as
-  // "Verified Revenue". The connection is marked ERROR and revenue fields are
-  // zeroed. The user has to fix the key / provider setup and re-save before
-  // any number appears on their profile.
-  if (!telemetryResult.liveVerified) {
-    await prisma.revenueConnection.update({
-      where: { id: connection.id },
-      data: {
-        status: "ERROR",
-        mrrCents: 0,
-        arrCents: 0,
-        totalRevenueCents: 0,
-        monthlyHistoryJson: [] as any,
-        dailyHistoryJson: [] as any,
-        lastSyncError: "Live gateway API did not return real data — key rejected or provider unreachable. No revenue stored.",
-      },
-    });
-    // Throw so the caller surfaces the message to the user rather than
-    // silently succeeding with a zero-row (which would still render an
-    // encrypted key and a stored connection, giving a false sense of success).
-    throw new Error(
-      "Could not verify live revenue with the provider. No numbers were stored — trust guardrails prevented a fake 'Verified' badge. Double-check the API key / permissions and try again."
-    );
+  const now = Date.now();
+  if (now - (lastAttempt.get(user.id) ?? 0) < 8_000) {
+    throw new Error("Please wait a few seconds before verifying again.");
   }
+  lastAttempt.set(user.id, now);
 
-  // Persist the per-connection aggregate so multiple providers coexist without
-  // clobbering each other via the ProductRevenue (productId-unique) rows.
-  await prisma.revenueConnection.update({
-    where: { id: connection.id },
-    data: {
-      mrrCents,
-      arrCents: mrrCents * 12,
-      totalRevenueCents,
-      currency: "usd",
-      monthlyHistoryJson: telemetryResult.monthlyHistory as any,
-      dailyHistoryJson: telemetryResult.dailyHistory as any,
-    },
-  });
-
-  // If a productId is provided, link or update ProductRevenue
-  if (parsed.productId) {
-    await prisma.productRevenue.upsert({
-      where: { productId: parsed.productId },
-      create: {
-        productId: parsed.productId,
-        connectionId: connection.id,
-        mrrCents,
-        arrCents: mrrCents * 12,
-        totalRevenueCents,
-        currency: "usd",
-        isVerified: true,
-        verifiedAt: new Date(),
-        syncedAt: new Date(),
-      },
-      update: {
-        connectionId: connection.id,
-        mrrCents,
-        arrCents: mrrCents * 12,
-        totalRevenueCents,
-        isVerified: true,
-        verifiedAt: new Date(),
-        syncedAt: new Date(),
-      },
-    });
-  } else {
-    // Settings-tab flow: for products that don't yet have a ProductRevenue row,
-    // seed one against this connection so the product page shows verified MRR.
-    // Do NOT overwrite an existing ProductRevenue tied to a different connection —
-    // otherwise adding a second provider would silently reassign the first
-    // provider's product revenue rows.
-    const userProducts = await prisma.product.findMany({
-      where: { ownerId: user.id, revenue: null },
-      select: { id: true },
-    });
-    for (const p of userProducts) {
-      await prisma.productRevenue.create({
-        data: {
-          productId: p.id,
-          connectionId: connection.id,
-          mrrCents,
-          arrCents: mrrCents * 12,
-          totalRevenueCents,
-          currency: "usd",
-          isVerified: true,
-          verifiedAt: new Date(),
-          syncedAt: new Date(),
-        },
-      });
+  let result: Awaited<ReturnType<typeof connectProvider>>;
+  try {
+    result = await connectProvider(user.id, provider, parsed.apiKey.trim(), (parsed.externalAccountId || "").trim());
+  } catch (err) {
+    if (err instanceof CredentialError || err instanceof ProviderUnavailableError) {
+      // Nothing was stored. Surface the provider's reason to the founder.
+      throw new Error(`${err.message} No revenue was stored.`);
     }
+    console.error("[revenue] connect failed:", err instanceof Error ? err.message : err);
+    throw new Error("Revenue verification failed unexpectedly. No revenue was stored.");
+  }
+  const { connection, verified } = result;
+
+  // Attach to a product: the one requested (must be owned), or — when the
+  // founder has exactly one live product without verified revenue — that one.
+  let linkedProduct: { id: string; slug: string } | null = null;
+  if (parsed.productId) {
+    linkedProduct = await linkProductToConnection(user.id, connection.id, parsed.productId);
+  } else {
+    const candidates = await prisma.product.findMany({
+      where: { ownerId: user.id, status: "LIVE", revenue: null },
+      select: { id: true },
+      take: 2,
+    });
+    if (candidates.length === 1) linkedProduct = await linkProductToConnection(user.id, connection.id, candidates[0].id);
   }
 
-  if (user.username) {
-    revalidatePath(`/founder/${user.username}`);
-  }
+  if (user.username) revalidatePath(`/founder/${user.username}`);
+  if (linkedProduct) revalidatePath(`/product/${linkedProduct.slug}`);
   revalidatePath("/profile");
-  revalidatePath("/");
 
+  const mrrFormatted = formatUsdMonthly(verified.mrrCents);
   return {
     success: true,
     connectionId: connection.id,
-    provider: providerEnum,
-    rawProvider: parsed.provider,
-    // Return decrypted API key data so UI can display key's decrypted details
-    apiKey: rawKey,
+    provider: connection.provider,
+    keyHint: connection.keyHint,
     isEncryptedAtRest: true,
-    mrrFormatted: telemetryResult.mrrFormatted,
-    telemetryLog: telemetryResult.sdkHandshakeLog,
-    subscribersCount: telemetryResult.subscribersCount,
-    momGrowth: telemetryResult.momGrowth,
+    mrrCents: verified.mrrCents,
+    mrrFormatted,
+    revenue12mCents: verified.revenue12mCents,
+    subscribersCount: verified.activeSubscriptions,
+    momGrowth: verified.momGrowthPct === null ? null : `${verified.momGrowthPct >= 0 ? "+" : ""}${verified.momGrowthPct}% MoM`,
+    sourceCurrency: verified.sourceCurrency,
+    linkedProductId: linkedProduct?.id ?? null,
+    telemetryLog: [
+      `Verified live ${connection.provider} data at ${new Date(verified.verifiedAt).toUTCString()}.`,
+      `MRR: ${mrrFormatted} · ${verified.activeSubscriptions} active subscriptions.`,
+      `How: ${verified.method}`,
+      ...verified.warnings.map((w) => `Note: ${w}`),
+      "Key stored encrypted (AES-256-GCM) and never shown again. Re-verified automatically every ~12 hours.",
+    ].join("\n"),
     lastSyncedAt: connection.lastSyncedAt?.toISOString(),
   };
 }
 
+/** The founder's connections — masked key hints only, never the secret. */
 export async function getPaymentApiKeys() {
   const user = await getCurrentUser();
   if (!user) return [];
+  await ensureRevenueColumns();
 
   const connections = await prisma.revenueConnection.findMany({
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
-    include: {
-      revenues: {
-        include: {
-          product: {
-            select: { id: true, name: true, slug: true },
-          },
-        },
-      },
-    },
+    include: { revenues: { include: { product: { select: { id: true, name: true, slug: true } } } } },
   });
 
-  return connections.map((conn) => {
-    // Decrypt the stored access token to retrieve the original API key.
-    // Isolate per-row so one un-decryptable connection doesn't 500 the list.
-    let decryptedKey = "";
-    try {
-      decryptedKey = decryptPaymentApiKey(conn.accessToken);
-    } catch (err) {
-      console.error(`[revenue] decrypt failed for connection ${conn.id}:`, err);
-    }
-    const mrrCents = conn.mrrCents || conn.revenues.reduce((s, r) => s + (r.mrrCents || 0), 0);
+  return connections.map((conn) => ({
+    id: conn.id,
+    provider: conn.provider,
+    providerId: providerIdFromEnum(conn.provider),
+    externalAccountId: conn.externalAccountId,
+    status: conn.status,
+    lastSyncedAt: conn.lastSyncedAt?.toISOString(),
+    lastSyncError: conn.lastSyncError,
+    createdAt: conn.createdAt.toISOString(),
+    apiKeyMasked: conn.keyHint || "•••• (re-verify to refresh)",
+    mrrCents: conn.mrrCents,
+    totalRevenueCents: conn.totalRevenueCents,
+    mrrFormatted: conn.status === "ACTIVE" && conn.mrrCents > 0 ? formatUsdMonthly(conn.mrrCents) : "",
+    sourceCurrency: conn.sourceCurrency,
+    verificationMethod: conn.verificationMethod,
+    revenues: conn.revenues.map((r) => ({
+      id: r.id,
+      productId: r.productId,
+      productName: r.product?.name,
+      mrrCents: r.mrrCents,
+      mrrFormatted: formatUsdMonthly(r.mrrCents),
+      isVerified: r.isVerified,
+    })),
+  }));
+}
 
-    const fmt = (cents: number) =>
-      cents >= 100000
-        ? `$${(cents / 100000).toFixed(1)}K / mo`
-        : `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)} / mo`;
-
-    return {
-      id: conn.id,
-      provider: conn.provider,
-      externalAccountId: conn.externalAccountId,
-      status: conn.status,
-      lastSyncedAt: conn.lastSyncedAt?.toISOString(),
-      createdAt: conn.createdAt.toISOString(),
-      apiKey: decryptedKey,
-      apiKeyMasked: decryptedKey.length > 8
-        ? `${decryptedKey.slice(0, 6)}...${decryptedKey.slice(-4)}`
-        : decryptedKey,
-      mrrCents,
-      totalRevenueCents: conn.totalRevenueCents,
-      mrrFormatted: mrrCents > 0 ? fmt(mrrCents) : "",
-      revenues: conn.revenues.map((r) => ({
-        id: r.id,
-        productId: r.productId,
-        productName: r.product?.name,
-        mrrCents: r.mrrCents,
-        mrrFormatted: fmt(r.mrrCents),
-        isVerified: r.isVerified,
-      })),
-    };
-  });
+/** Attach a connection's verified revenue to one of the founder's products. */
+export async function linkRevenueToProduct(connectionId: string, productId: string) {
+  const user = await requireUser();
+  const product = await linkProductToConnection(user.id, connectionId, productId);
+  revalidatePath(`/product/${product.slug}`);
+  revalidatePath("/profile");
+  return { success: true };
 }
 
 export async function deletePaymentApiKey(connectionId: string) {
   const user = await requireUser();
-  const conn = await prisma.revenueConnection.findFirst({
-    where: { id: connectionId, userId: user.id },
-  });
+  const conn = await prisma.revenueConnection.findFirst({ where: { id: connectionId, userId: user.id } });
   if (!conn) return { success: false, error: "Connection not found" };
+  // Cascades to ProductRevenue + snapshots: the "Verified" badge disappears with the key.
   await prisma.revenueConnection.delete({ where: { id: conn.id } });
   if (user.username) revalidatePath(`/founder/${user.username}`);
   revalidatePath("/profile");
   return { success: true };
 }
 
+/** Masked status for one provider — kept for older callers; never returns the key. */
 export async function getPaymentApiKey(provider: string) {
   const user = await requireUser();
-  const providerEnum = normalizeProvider(provider);
-
+  const id = parseProviderId(provider);
+  if (!id) return null;
+  const { PROVIDER_ENUM } = await import("@/lib/revenue/store");
+  await ensureRevenueColumns();
   const conn = await prisma.revenueConnection.findFirst({
-    where: { userId: user.id, provider: providerEnum },
+    where: { userId: user.id, provider: PROVIDER_ENUM[id] },
     orderBy: { createdAt: "desc" },
   });
-
   if (!conn) return null;
-
-  let decryptedKey = "";
-  let decryptError: string | null = null;
-  try {
-    decryptedKey = decryptPaymentApiKey(conn.accessToken);
-  } catch (err: any) {
-    decryptError = err?.message || "decryption failed";
-  }
-
   return {
     id: conn.id,
     provider: conn.provider,
     externalAccountId: conn.externalAccountId,
     status: conn.status,
     lastSyncedAt: conn.lastSyncedAt?.toISOString(),
-    apiKey: decryptedKey,
-    decryptError,
-    apiKeyMasked: decryptedKey.length > 8
-      ? `${decryptedKey.slice(0, 6)}...${decryptedKey.slice(-4)}`
-      : decryptedKey,
+    apiKeyMasked: conn.keyHint,
   };
 }
 

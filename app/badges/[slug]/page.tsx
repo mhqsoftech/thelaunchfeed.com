@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import MainLayoutShell from "@/app/MainLayoutShell";
 import { notFound, redirect } from "next/navigation";
 import { getProductBySlug } from "@/lib/queries/products";
 import { computeAwardsForProductTimegated } from "@/lib/queries/awards";
@@ -96,7 +97,7 @@ export default async function ProductBadgesPage({
   };
 
   return (
-    <>
+    <MainLayoutShell rails={false}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -108,6 +109,6 @@ export default async function ProductBadgesPage({
         eligibleAwardIds={eligibleAwards}
         isProductSpecific={true}
       />
-    </>
+    </MainLayoutShell>
   );
 }

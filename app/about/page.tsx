@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import MainLayoutShell from "@/app/MainLayoutShell";
+import { LaunchTime } from "@/components/ui/LaunchTime";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
 import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
@@ -47,7 +49,7 @@ export default function AboutPage() {
   };
 
   return (
-    <>
+    <MainLayoutShell rails={false}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -79,7 +81,7 @@ export default function AboutPage() {
         </div>
 
       {/* Header Banner */}
-      <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 sm:space-y-4 rounded-xs">
+      <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 sm:space-y-4 rounded-lg">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="hover:opacity-90 transition-opacity">
             <LaunchFeedBrandLogo height={32} />
@@ -89,13 +91,13 @@ export default function AboutPage() {
           The Launch Feed is a high-signal, community-driven software leaderboard and 360° product intelligence engine. We help indie builders, bootstrapped SaaS founders, and engineering teams ship new products, verify real revenue, and earn prestige on a transparent daily leaderboard.
         </p>
         <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] sm:text-xs">
-          <span className="px-2 py-1 border border-signal/40 bg-signal/10 text-signal font-bold rounded-xs">
-            DAILY 6:00 AM IST DROPS
+          <span className="px-2 py-1 border border-signal/40 bg-signal/10 text-signal font-bold rounded-lg">
+            DAILY <LaunchTime /> DROPS
           </span>
-          <span className="px-2 py-1 border border-hairline bg-surface text-ink-dim rounded-xs">
+          <span className="px-2 py-1 border border-hairline bg-surface text-ink-dim rounded-lg">
             360° ARCHITECTURE SPECS
           </span>
-          <span className="px-2 py-1 border border-hairline bg-surface text-ink-dim rounded-xs">
+          <span className="px-2 py-1 border border-hairline bg-surface text-ink-dim rounded-lg">
             VERIFIED FOUNDER MRR
           </span>
         </div>
@@ -110,7 +112,7 @@ export default function AboutPage() {
           </h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans text-xs sm:text-sm text-ink-dim leading-relaxed">
-          <div className="p-4 sm:p-5 border border-hairline bg-surface/20 space-y-2 rounded-xs">
+          <div className="p-4 sm:p-5 border border-hairline bg-surface/20 space-y-2 rounded-lg">
             <h3 className="font-mono font-bold text-xs sm:text-sm text-ink flex items-center gap-2">
               <span className="text-signal">⚡</span>
               <span>The Problem with Legacy Launchpads</span>
@@ -119,7 +121,7 @@ export default function AboutPage() {
               Traditional product discovery directories have become saturated with spam, paid upvote rings, and surface-level marketing one-liners. Technical users, developers, and discerning customers get zero insight into how tools are actually built, their infrastructure, or authentic founder stories.
             </p>
           </div>
-          <div className="p-4 sm:p-5 border border-hairline bg-surface/20 space-y-2 rounded-xs">
+          <div className="p-4 sm:p-5 border border-hairline bg-surface/20 space-y-2 rounded-lg">
             <h3 className="font-mono font-bold text-xs sm:text-sm text-ink flex items-center gap-2">
               <span className="text-signal">✓</span>
               <span>The 360° Intelligence Solution</span>
@@ -140,39 +142,39 @@ export default function AboutPage() {
           </h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-xs">
+          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-lg">
             <div className="text-[10px] sm:text-xs font-mono font-bold text-signal uppercase">Pillar 01</div>
-            <div className="font-bold text-ink text-xs sm:text-sm">Automated 6:00 AM IST Daily Release Queue</div>
+            <div className="font-bold text-ink text-xs sm:text-sm">Automated <LaunchTime /> Daily Release Queue</div>
             <p className="font-sans text-xs text-ink-dim leading-relaxed">
-              Every submitted product enters the queue and automatically launches worldwide at exactly 6:00 AM IST (00:30 UTC). This guarantees an equal playing field where every product gets full 24-hour cycle exposure.
+              Every submitted product enters the queue and automatically launches worldwide at exactly <LaunchTime showIst />. This guarantees an equal playing field where every product gets full 24-hour cycle exposure.
             </p>
           </div>
-          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-xs">
+          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-lg">
             <div className="text-[10px] sm:text-xs font-mono font-bold text-signal uppercase">Pillar 02</div>
             <div className="font-bold text-ink text-xs sm:text-sm">Multi-Channel Social Broadcast</div>
             <p className="font-sans text-xs text-ink-dim leading-relaxed">
               Upon release, every product is automatically broadcasted across official 𝕏 (Twitter), Telegram, and WhatsApp broadcast channels, amplifying makers directly to engaged tech audiences.
             </p>
           </div>
-          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-xs">
+          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-lg">
             <div className="text-[10px] sm:text-xs font-mono font-bold text-signal uppercase">Pillar 03</div>
             <div className="font-bold text-ink text-xs sm:text-sm">Verified MRR &amp; Stripe Telemetry</div>
             <p className="font-sans text-xs text-ink-dim leading-relaxed">
               Founders can optionally connect read-only Stripe/Polar API keys. Our telemetry engine validates real MRR and displays cryptographic verified badges, celebrating radical financial transparency.
             </p>
           </div>
-          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-xs">
+          <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-lg">
             <div className="text-[10px] sm:text-xs font-mono font-bold text-signal uppercase">Pillar 04</div>
             <div className="font-bold text-ink text-xs sm:text-sm">AI Agent &amp; LLM Indexing (llms.txt)</div>
             <p className="font-sans text-xs text-ink-dim leading-relaxed">
-              All live listings generate structured Schema.org JSON-LD and live markdown feeds at <code className="px-1.5 py-0.5 border border-hairline bg-surface text-signal font-mono text-xs rounded-xs">/llms.txt</code> and <code className="px-1.5 py-0.5 border border-hairline bg-surface text-signal font-mono text-xs rounded-xs">/llms-full.txt</code>, ensuring products are cited and indexed by next-gen AI search engines like Perplexity, ChatGPT, and Claude.
+              All live listings generate structured Schema.org JSON-LD and live markdown feeds at <code className="px-1.5 py-0.5 border border-hairline bg-surface text-signal font-mono text-xs rounded-lg">/llms.txt</code> and <code className="px-1.5 py-0.5 border border-hairline bg-surface text-signal font-mono text-xs rounded-lg">/llms-full.txt</code>, ensuring products are cited and indexed by next-gen AI search engines like Perplexity, ChatGPT, and Claude.
             </p>
           </div>
         </div>
       </div>
 
       {/* Creator Attribution & Contact Callout */}
-      <div className="border border-hairline p-4 sm:p-7 bg-surface/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 rounded-xs">
+      <div className="border border-hairline p-4 sm:p-7 bg-surface/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-6 rounded-lg">
         <div className="flex items-center gap-3.5 sm:gap-4">
           <img width="64" height="64"
             src="/menajulm.avif"
@@ -196,13 +198,13 @@ export default function AboutPage() {
         <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Link
             href="/contact"
-            className="w-full sm:w-auto text-center px-4 py-2 border border-hairline bg-surface hover:bg-raised text-xs font-bold text-ink transition-colors rounded-xs"
+            className="w-full sm:w-auto text-center px-4 py-2 border border-hairline bg-surface hover:bg-raised text-xs font-bold text-ink transition-colors rounded-lg"
           >
             Contact Team
           </Link>
           <Link
             href="/submit"
-            className="w-full sm:w-auto text-center px-4 py-2 bg-signal text-void text-xs font-bold hover:bg-signal/90 transition-colors rounded-xs shadow-xs"
+            className="w-full sm:w-auto text-center px-4 py-2 bg-signal text-void text-xs font-bold hover:bg-signal/90 transition-colors rounded-lg shadow-xs"
           >
             Launch a Product ($0)
           </Link>
@@ -213,7 +215,7 @@ export default function AboutPage() {
       <div className="border-t border-hairline pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs w-full sm:w-auto justify-center"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-lg w-full sm:w-auto justify-center"
         >
           <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
           <span>Back to Leaderboard</span>
@@ -229,6 +231,6 @@ export default function AboutPage() {
         </div>
       </div>
     </div>
-    </>
+    </MainLayoutShell>
   );
 }

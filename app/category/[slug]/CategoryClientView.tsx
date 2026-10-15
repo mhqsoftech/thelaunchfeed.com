@@ -116,7 +116,7 @@ export default function CategoryClientView({
               >
                 <span>{c.name}</span>
                 <span
-                  className={`text-[10px] tabular-nums font-semibold px-1 rounded-xs ${
+                  className={`text-[10px] tabular-nums font-semibold px-1 rounded-lg ${
                     isActive
                       ? "bg-signal/15 text-signal"
                       : "bg-surface text-ink-faint"
@@ -192,7 +192,7 @@ export default function CategoryClientView({
                   <Link
                     href={`/product/${prod.slug}`}
                     aria-label={prod.name}
-                    className="w-10 h-10 sm:w-12 sm:h-12 bg-surface border border-hairline flex-shrink-0 rounded-xs flex items-center justify-center font-mono text-[10px] sm:text-xs font-bold text-ink-dim overflow-hidden relative"
+                    className="w-10 h-10 sm:w-12 sm:h-12 bg-surface border border-hairline flex-shrink-0 rounded-lg flex items-center justify-center font-mono text-[10px] sm:text-xs font-bold text-ink-dim overflow-hidden relative"
                   >
                     {prod.logoUrl ? (
                       <img width="64" height="64"
@@ -234,7 +234,7 @@ export default function CategoryClientView({
                           <img width="64" height="64"
                             src={prod.owner.image}
                             alt={`${prod.owner.name || prod.owner.username} avatar`}
-                            className="w-3.5 h-3.5 rounded-xs"
+                            className="w-3.5 h-3.5 rounded-lg"
                           />
                         )}
                         <span>{prod.owner.name || `@${prod.owner.username}`}</span>

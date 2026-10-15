@@ -15,14 +15,14 @@ datasource db {
 // ──────────────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
-  username      String   @unique
-  name          String   @default("")
+  id            String  @id @default(cuid())
+  username      String  @unique
+  name          String  @default("")
   title         String?
-  email         String   @unique
-  emailVerified Boolean  @default(false)
+  email         String  @unique
+  emailVerified Boolean @default(false)
   image         String?
-  bio           String?  @db.Text
+  bio           String? @db.Text
   websiteUrl    String?
   twitterHandle String?
   githubHandle  String?
@@ -116,42 +116,42 @@ model Verification {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // SUBMISSIONS  ·  everything a user submits before it becomes a live Product.
-// The Inngest scheduled-publish cron reads status=SCHEDULED where
+// The scheduled-publish job (lib/jobs) reads status=SCHEDULED where
 // scheduledFor <= now(), creates the Product, emits `product.launched`.
 // ──────────────────────────────────────────────────────────────────────────────
 
 model Submission {
-  id           String            @id @default(cuid())
-  ownerId      String
-  owner        User              @relation("SubmissionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation("SubmissionOwner", fields: [ownerId], references: [id], onDelete: Cascade)
 
-  name         String
-  tagline      String            @db.VarChar(255)
-  description  String?           @db.Text
-  websiteUrl   String
-  logoUrl      String?
-  screenshots  String[]
-  videoUrl     String?
-  tags         String[]
-  categoryId   String?
-  details      Json?
-  category     Category?         @relation(fields: [categoryId], references: [id])
+  name        String
+  tagline     String    @db.VarChar(255)
+  description String?   @db.Text
+  websiteUrl  String
+  logoUrl     String?
+  screenshots String[]
+  videoUrl    String?
+  tags        String[]
+  categoryId  String?
+  details     Json?
+  category    Category? @relation(fields: [categoryId], references: [id])
 
-  makerName    String
-  makerHandle  String
-  makerEmail   String
+  makerName   String
+  makerHandle String
+  makerEmail  String
 
-  status           SubmissionStatus @default(SCHEDULED)
-  scheduledFor     DateTime
-  publishedAt      DateTime?
-  rejectedAt       DateTime?
-  rejectionReason  String?          @db.Text
+  status          SubmissionStatus @default(SCHEDULED)
+  scheduledFor    DateTime
+  publishedAt     DateTime?
+  rejectedAt      DateTime?
+  rejectionReason String?          @db.Text
 
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  publishedProductId String?     @unique
-  publishedProduct   Product?    @relation("PublishedFromSubmission", fields: [publishedProductId], references: [id])
+  publishedProductId String?  @unique
+  publishedProduct   Product? @relation("PublishedFromSubmission", fields: [publishedProductId], references: [id])
 
   @@index([status, scheduledFor])
   @@index([ownerId])
@@ -201,12 +201,14 @@ model Product {
   weeklyRank  Int?
   monthlyRank Int?
 
-  votes         Vote[]
-  comments      Comment[]
-  revenue       ProductRevenue?
-  rankings      RankSnapshot[]
-  featuredSlots FeaturedSlot[]
-  fromSubmission Submission?    @relation("PublishedFromSubmission")
+  votes              Vote[]
+  comments           Comment[]
+  revenue            ProductRevenue?
+  rankings           RankSnapshot[]
+  featuredSlots      FeaturedSlot[]
+  outboundClicks     OutboundClick[]
+  outboundClickDaily OutboundClickDaily[]
+  fromSubmission     Submission?          @relation("PublishedFromSubmission")
 
   @@index([status, voteCount(sort: Desc), launchedAt(sort: Desc)])
   @@index([status, launchedAt(sort: Desc), voteCount(sort: Desc)])
@@ -285,10 +287,10 @@ model Comment {
   isDeleted Boolean  @default(false)
   isFlagged Boolean  @default(false)
 
-  product Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
-  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent  Comment?  @relation("Thread", fields: [parentId], references: [id])
-  replies Comment[] @relation("Thread")
+  product Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent  Comment?      @relation("Thread", fields: [parentId], references: [id])
+  replies Comment[]     @relation("Thread")
   flags   CommentFlag[]
 
   @@index([productId, createdAt])
@@ -296,11 +298,11 @@ model Comment {
 }
 
 model CommentFlag {
-  id         String   @id @default(cuid())
+  id         String          @id @default(cuid())
   commentId  String
   raisedById String
   reason     String?
-  createdAt  DateTime @default(now())
+  createdAt  DateTime        @default(now())
   resolvedAt DateTime?
   resolution FlagResolution?
 
@@ -362,10 +364,10 @@ model RevenueConnection {
 
   // Per-connection revenue aggregate — so a founder can wire up multiple providers
   // (e.g. Stripe + Dodo + Paddle) and each one keeps its own MRR without clobbering.
-  mrrCents          Int              @default(0)
-  arrCents          Int              @default(0)
-  totalRevenueCents Int              @default(0)
-  currency          String           @default("usd")
+  mrrCents          Int    @default(0)
+  arrCents          Int    @default(0)
+  totalRevenueCents Int    @default(0)
+  currency          String @default("usd")
   momGrowthPct      Float?
 
   // Historical buckets used to render the Verified Revenue chart across the
@@ -373,6 +375,12 @@ model RevenueConnection {
   // amountCents: number }. Populated on every sync from live gateway data.
   monthlyHistoryJson Json?
   dailyHistoryJson   Json?
+
+  // Display-safe key hint ("rk_live_…a1b2") so the UI never needs the secret,
+  // plus how the numbers were derived (shown to the founder for transparency).
+  keyHint            String  @default("")
+  sourceCurrency     String  @default("USD")
+  verificationMethod String? @db.Text
 
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   revenues ProductRevenue[]
@@ -452,13 +460,13 @@ model RevenueSnapshot {
 // ──────────────────────────────────────────────────────────────────────────────
 
 model FeaturedSlot {
-  id            String       @id @default(cuid())
-  kind          SlotKind
-  position      SlotPosition
-  order         Int          @default(0)
+  id       String       @id @default(cuid())
+  kind     SlotKind
+  position SlotPosition
+  order    Int          @default(0)
 
-  productId     String?
-  product       Product?     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   // Custom (admin-added, external URL) fields
   customName    String?
@@ -466,13 +474,13 @@ model FeaturedSlot {
   customUrl     String?
   customLogoUrl String?
 
-  startsAt      DateTime     @default(now())
-  endsAt        DateTime?
+  startsAt DateTime  @default(now())
+  endsAt   DateTime?
 
-  purchaseId    String?
-  purchase      FeaturedPurchase? @relation(fields: [purchaseId], references: [id])
+  purchaseId String?
+  purchase   FeaturedPurchase? @relation(fields: [purchaseId], references: [id])
 
-  createdAt     DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([purchaseId])
   @@index([position, order])
@@ -518,20 +526,20 @@ enum PurchaseStatus {
 // ──────────────────────────────────────────────────────────────────────────────
 
 model EmailLog {
-  id           String       @id @default(cuid())
+  id           String      @id @default(cuid())
   toEmail      String
   toUserId     String?
-  toUser       User?        @relation("EmailRecipient", fields: [toUserId], references: [id])
+  toUser       User?       @relation("EmailRecipient", fields: [toUserId], references: [id])
   templateId   String
   subject      String
-  html         String?      @db.Text
-  status       EmailStatus  @default(QUEUED)
-  provider     String       @default("resend")
+  html         String?     @db.Text
+  status       EmailStatus @default(QUEUED)
+  provider     String      @default("resend")
   providerId   String?
-  errorMessage String?      @db.Text
+  errorMessage String?     @db.Text
   triggerEvent String?
   meta         Json?
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime    @default(now())
   sentAt       DateTime?
 
   @@index([toEmail, createdAt])
@@ -639,4 +647,95 @@ model UsernameRedirect {
   @@index([userId])
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// BACKGROUND JOBS  ·  self-hosted replacement for Inngest (lib/jobs).
+// JobQueue is a durable outbox: every event / scheduled task becomes a row,
+// claimed with FOR UPDATE SKIP LOCKED, retried with exponential backoff.
+// CronState records the last slot each scheduled task ran for, so a missed
+// heartbeat is caught up on the next tick and a slot never runs twice.
+// ──────────────────────────────────────────────────────────────────────────────
 
+model JobQueue {
+  id          String    @id @default(cuid())
+  name        String
+  payload     Json      @default("{}")
+  status      String    @default("PENDING") // PENDING | RUNNING | DONE | FAILED
+  priority    Int       @default(0)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
+  runAt       DateTime  @default(now())
+  lockedUntil DateTime?
+  dedupeKey   String?   @unique
+  lastError   String?   @db.Text
+  result      Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  finishedAt  DateTime?
+
+  @@index([status, runAt])
+  @@index([name, createdAt])
+}
+
+model CronState {
+  name       String    @id
+  lastSlot   DateTime?
+  lastRunAt  DateTime?
+  lastStatus String?
+  lastError  String?   @db.Text
+  runCount   Int       @default(0)
+  updatedAt  DateTime  @updatedAt
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// FREE-LAUNCH BADGE VERIFICATION  ·  free launches must show our badge on the
+// maker's site (lib/free-launch.ts). One row per domain, refreshed by the
+// submit-time check, the badge image's Referer, and the nightly audit job.
+// ──────────────────────────────────────────────────────────────────────────────
+
+model BadgeVerification {
+  domain        String    @id
+  status        String    @default("PENDING") // VERIFIED | MISSING | PENDING
+  method        String? // html | referer
+  verifiedAt    DateTime?
+  lastSeenAt    DateTime?
+  lastCheckedAt DateTime?
+  lastError     String?   @db.Text
+  updatedAt     DateTime  @updatedAt
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// OUTBOUND CLICKS  ·  "visitors sent" proof for makers (app/go/[slug]).
+// OutboundClick holds one row per visitor × product × source × UTC day; the
+// visitor hash is sha256(daily salt + IP + UA), so no raw IPs are stored and
+// hashes can't be linked across days. Rows are kept 14 days, then folded into
+// OutboundClickDaily by the cron.outbound-rollup job (lib/outbound).
+// ──────────────────────────────────────────────────────────────────────────────
+
+model OutboundClick {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  source       String // product_page | featured | spotlight | feed | badge
+  day          DateTime @db.Date
+  visitorHash  String
+  referrerHost String?
+  clicks       Int      @default(1)
+  createdAt    DateTime @default(now())
+  lastClickAt  DateTime @default(now())
+
+  @@unique([productId, day, source, visitorHash])
+  @@index([day])
+}
+
+model OutboundClickDaily {
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  day       DateTime @db.Date
+  source    String // a placement, or "all" = distinct visitors across placements
+  visitors  Int      @default(0)
+  clicks    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([productId, day, source])
+  @@index([day])
+}

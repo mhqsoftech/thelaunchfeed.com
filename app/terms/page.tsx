@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import MainLayoutShell from "@/app/MainLayoutShell";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
 import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
@@ -48,7 +49,7 @@ export default function TermsOfServicePage() {
   };
 
   return (
-    <>
+    <MainLayoutShell rails={false}>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -80,7 +81,7 @@ export default function TermsOfServicePage() {
         </div>
 
       {/* Header Banner */}
-      <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 rounded-xs">
+      <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 rounded-lg">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="hover:opacity-90 transition-opacity">
             <LaunchFeedBrandLogo height={28} />
@@ -88,12 +89,12 @@ export default function TermsOfServicePage() {
         </div>
         <div className="text-xs text-ink-dim flex items-center gap-2 flex-wrap">
           <span>Effective &amp; Last Updated:</span>
-          <strong className="text-ink font-mono bg-surface px-1.5 py-0.5 border border-hairline rounded-xs">{lastUpdated}</strong>
+          <strong className="text-ink font-mono bg-surface px-1.5 py-0.5 border border-hairline rounded-lg">{lastUpdated}</strong>
         </div>
       </div>
 
       {/* Main Content Sections */}
-      <div className="border border-hairline p-4 sm:p-8 bg-void space-y-6 sm:space-y-8 font-sans text-xs sm:text-sm text-ink-dim leading-relaxed rounded-xs">
+      <div className="border border-hairline p-4 sm:p-8 bg-void space-y-6 sm:space-y-8 font-sans text-xs sm:text-sm text-ink-dim leading-relaxed rounded-lg">
         <section className="space-y-3">
           <h2 className="font-mono font-bold text-sm sm:text-base text-ink uppercase tracking-wider flex items-center gap-2">
             <span className="w-1.5 h-1.5 bg-signal rounded-full shrink-0" />
@@ -118,7 +119,7 @@ export default function TermsOfServicePage() {
             <li>Attempt to tamper with daily, weekly, monthly, or yearly leaderboard score algorithms.</li>
             <li>Post abusive, discriminatory, or unsolicited commercial messages in community comment sections.</li>
           </ul>
-          <p className="text-xs text-ink-faint bg-surface/40 p-2.5 border border-hairline rounded-xs">
+          <p className="text-xs text-ink-faint bg-surface/40 p-2.5 border border-hairline rounded-lg">
             Violations will result in immediate disqualification, removal from leaderboards, and permanent revocation of maker account privileges.
           </p>
         </section>
@@ -133,7 +134,7 @@ export default function TermsOfServicePage() {
           </p>
           <ul className="list-disc pl-4 sm:pl-5 space-y-2">
             <li>You confirm you own or possess all necessary rights and authorizations to publish the submitted assets.</li>
-            <li>You grant The Launch Feed a worldwide, non-exclusive, royalty-free license to host, display, broadcast on official social channels, and distribute machine-readable summaries via <code className="px-1.5 py-0.5 border border-hairline bg-surface text-signal font-mono text-xs rounded-xs">/llms.txt</code> for search engine indexing.</li>
+            <li>You grant The Launch Feed a worldwide, non-exclusive, royalty-free license to host, display, broadcast on official social channels, and distribute machine-readable summaries via <code className="px-1.5 py-0.5 border border-hairline bg-surface text-signal font-mono text-xs rounded-lg">/llms.txt</code> for search engine indexing.</li>
             <li>You retain all intellectual property ownership of your underlying software, brands, and codebases.</li>
           </ul>
         </section>
@@ -172,7 +173,7 @@ export default function TermsOfServicePage() {
         <div className="border-t border-hairline pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs w-full sm:w-auto justify-center"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-lg w-full sm:w-auto justify-center"
           >
             <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
             <span>Back to Leaderboard</span>
@@ -189,6 +190,6 @@ export default function TermsOfServicePage() {
         </div>
       </div>
     </div>
-    </>
+    </MainLayoutShell>
   );
 }

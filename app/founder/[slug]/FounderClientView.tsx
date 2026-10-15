@@ -210,7 +210,7 @@ export function FounderProfileContent({
       <div className="border border-hairline bg-surface/30 p-4 sm:p-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 sm:gap-4 min-w-0 flex-1">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-surface border border-hairline shrink-0 rounded-xs flex items-center justify-center font-mono text-lg sm:text-xl font-bold text-ink overflow-hidden">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-surface border border-hairline shrink-0 rounded-lg flex items-center justify-center font-mono text-lg sm:text-xl font-bold text-ink overflow-hidden">
               <FounderAvatar
                 src={founder.image}
                 name={founder.name}
@@ -489,7 +489,7 @@ export function FounderProfileContent({
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                   <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-surface border border-hairline rounded-sm flex items-center justify-center font-mono text-xs sm:text-sm font-bold text-ink shrink-0 overflow-hidden">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-surface border border-hairline rounded-lg flex items-center justify-center font-mono text-xs sm:text-sm font-bold text-ink shrink-0 overflow-hidden">
                       {prod.logoUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img width="64" height="64" src={prod.logoUrl} alt={prod.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
@@ -636,7 +636,7 @@ export function FounderProfileContent({
                 >
                   <div className="space-y-2.5">
                     <div className="flex items-start gap-3">
-                      <div className="w-11 h-11 bg-surface border border-hairline rounded-sm flex items-center justify-center font-mono font-bold text-xs text-ink shrink-0 overflow-hidden relative">
+                      <div className="w-11 h-11 bg-surface border border-hairline rounded-lg flex items-center justify-center font-mono font-bold text-xs text-ink shrink-0 overflow-hidden relative">
                         <FounderAvatar
                           src={sf.image}
                           name={displayName}

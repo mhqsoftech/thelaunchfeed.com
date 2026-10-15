@@ -16,7 +16,7 @@ export default function ManageCookieButton({
       onClick={openCookieSettings}
       className={
         className ||
-        "inline-flex items-center gap-1.5 px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink hover:text-signal transition-colors cursor-pointer rounded-xs"
+        "inline-flex items-center gap-1.5 px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink hover:text-signal transition-colors cursor-pointer rounded-lg"
       }
     >
       <span className="w-1.5 h-1.5 rounded-full bg-signal" />

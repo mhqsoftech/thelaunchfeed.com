@@ -214,7 +214,7 @@ export default function BadgesClientView({
     return availableTiers[0]?.id || "launch";
   });
 
-  const [selectedTheme, setSelectedTheme] = useState<BadgeThemeId>("dark");
+  const [selectedTheme, setSelectedTheme] = useState<BadgeThemeId>("light");
   const [format, setFormat] = useState<"html" | "markdown" | "react" | "url">("html");
   const [copied, setCopied] = useState<string | null>(null);
 
@@ -278,7 +278,7 @@ export function LaunchFeedBadge() {
   const currentTier = availableTiers.find((b) => b.id === selectedAward) || availableTiers[0] || BADGE_TIERS[0];
 
   return (
-    <main className="min-h-screen bg-void text-ink font-mono px-3 sm:px-6 lg:px-8 py-4 sm:py-10 max-w-6xl mx-auto space-y-5 sm:space-y-8 w-full overflow-x-hidden">
+    <div className="bg-void text-ink font-mono max-w-6xl mx-auto space-y-5 sm:space-y-8 w-full overflow-x-hidden">
       {/* Breadcrumb Navigation */}
       <nav aria-label="Breadcrumb" className="w-full min-w-0 flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs text-ink-dim border-b border-hairline pb-3 sm:pb-4 flex-wrap">
         <Link href="/" className="hover:text-ink transition-colors flex items-center gap-1 shrink-0">
@@ -301,7 +301,7 @@ export function LaunchFeedBadge() {
       </nav>
 
       {/* Hero Header */}
-      <div className="w-full border border-hairline bg-surface/30 p-3.5 sm:p-7 space-y-3 sm:space-y-4 rounded-xs min-w-0">
+      <div className="w-full border border-hairline bg-surface/30 p-3.5 sm:p-7 space-y-3 sm:space-y-4 rounded-lg min-w-0">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <LaunchFeedLogo size={28} />
@@ -320,7 +320,7 @@ export function LaunchFeedBadge() {
           {isProductSpecific && (
             <Link
               href={`/product/${cleanSlug}`}
-              className="w-full sm:w-auto text-center px-3.5 py-2 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-xs uppercase transition-colors shrink-0 rounded-xs"
+              className="w-full sm:w-auto text-center px-3.5 py-2 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-xs uppercase transition-colors shrink-0 rounded-lg"
             >
               View Live Product Page ↗
             </Link>
@@ -336,7 +336,7 @@ export function LaunchFeedBadge() {
         {/* Earned Awards Notice (non-product generic view) */}
         {!isProductSpecific && (
           <div className="pt-2 w-full min-w-0">
-            <div className="flex items-start gap-2.5 p-3 border border-signal/30 bg-signal/5 rounded-xs">
+            <div className="flex items-start gap-2.5 p-3 border border-signal/30 bg-signal/5 rounded-lg">
               <span className="text-signal text-base leading-none mt-0.5 shrink-0">⚡</span>
               <div className="min-w-0">
                 <p className="text-xs font-bold text-ink">
@@ -379,7 +379,7 @@ export function LaunchFeedBadge() {
                   key={cat.id}
                   type="button"
                   onClick={() => setActiveCategory(cat.id)}
-                  className={`px-2 py-1 uppercase font-bold border shrink-0 transition-colors rounded-xs cursor-pointer ${
+                  className={`px-2 py-1 uppercase font-bold border shrink-0 transition-colors rounded-lg cursor-pointer ${
                     activeCategory === cat.id
                       ? "border-signal bg-signal text-void"
                       : "border-hairline bg-surface/30 text-ink-dim hover:text-ink hover:bg-surface"
@@ -399,7 +399,7 @@ export function LaunchFeedBadge() {
                   key={tier.id}
                   type="button"
                   onClick={() => setSelectedAward(tier.id)}
-                  className={`w-full p-2 sm:p-2.5 border text-left transition-all cursor-pointer flex items-center justify-between gap-2 rounded-xs min-w-0 ${
+                  className={`w-full p-2 sm:p-2.5 border text-left transition-all cursor-pointer flex items-center justify-between gap-2 rounded-lg min-w-0 ${
                     isSelected
                       ? "border-signal bg-surface text-ink shadow-xs"
                       : "border-hairline bg-surface/20 text-ink-dim hover:bg-surface/60 hover:text-ink"
@@ -412,7 +412,7 @@ export function LaunchFeedBadge() {
                     <div className="text-[10px] text-ink-dim truncate mt-0.5">{tier.description}</div>
                   </div>
                   <span
-                    className={`text-[9px] font-bold px-1.5 py-0.5 border uppercase shrink-0 whitespace-nowrap rounded-xs ${
+                    className={`text-[9px] font-bold px-1.5 py-0.5 border uppercase shrink-0 whitespace-nowrap rounded-lg ${
                       isSelected
                         ? "border-signal text-signal bg-signal/10"
                         : "border-hairline text-ink-dim bg-surface"
@@ -440,7 +440,7 @@ export function LaunchFeedBadge() {
                   key={th.id}
                   type="button"
                   onClick={() => setSelectedTheme(th.id)}
-                  className={`p-2 sm:p-2.5 border text-left text-xs font-bold transition-all cursor-pointer rounded-xs min-w-0 ${
+                  className={`p-2 sm:p-2.5 border text-left text-xs font-bold transition-all cursor-pointer rounded-lg min-w-0 ${
                     selectedTheme === th.id
                       ? "border-signal bg-surface text-ink shadow-xs"
                       : "border-hairline bg-surface/30 text-ink-dim hover:bg-surface hover:text-ink"
@@ -456,7 +456,7 @@ export function LaunchFeedBadge() {
           </div>
 
           {/* Live Preview Display Card */}
-          <div className="w-full border border-hairline bg-surface/20 p-3.5 sm:p-6 space-y-3 sm:space-y-4 rounded-xs min-w-0">
+          <div className="w-full border border-hairline bg-surface/20 p-3.5 sm:p-6 space-y-3 sm:space-y-4 rounded-lg min-w-0">
             <div className="flex items-center justify-between">
               <div className="text-xs font-bold uppercase text-ink flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
@@ -467,7 +467,7 @@ export function LaunchFeedBadge() {
               </span>
             </div>
 
-            <div className="w-full p-3 sm:p-8 border border-hairline bg-void flex items-center justify-center min-h-[84px] sm:min-h-[120px] overflow-hidden rounded-xs">
+            <div className="w-full p-3 sm:p-8 border border-hairline bg-void flex items-center justify-center min-h-[84px] sm:min-h-[120px] overflow-hidden rounded-lg">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 key={`${cleanSlug}-${selectedTheme}-${selectedAward}`}
@@ -486,7 +486,7 @@ export function LaunchFeedBadge() {
                   <a
                     href={downloadUrl}
                     download
-                    className="w-full sm:w-auto px-3.5 py-2 bg-signal text-void font-bold text-xs uppercase flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs rounded-xs"
+                    className="w-full sm:w-auto px-3.5 py-2 bg-signal text-void font-bold text-xs uppercase flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity cursor-pointer shadow-xs rounded-lg"
                   >
                     <span>↓ Download SVG Asset</span>
                   </a>
@@ -495,7 +495,7 @@ export function LaunchFeedBadge() {
                     href={badgeImgUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full sm:w-auto px-3.5 py-2 border border-hairline hover:border-ink bg-surface hover:bg-raised text-ink font-bold text-xs uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer rounded-xs"
+                    className="w-full sm:w-auto px-3.5 py-2 border border-hairline hover:border-ink bg-surface hover:bg-raised text-ink font-bold text-xs uppercase flex items-center justify-center gap-1.5 transition-colors cursor-pointer rounded-lg"
                   >
                     <span>Open Vector URL ↗</span>
                   </a>
@@ -514,7 +514,7 @@ export function LaunchFeedBadge() {
 
           {/* Embed Code Generator — only for product-specific pages */}
           {isProductSpecific ? (
-            <div className="w-full border border-hairline bg-void p-3.5 sm:p-5 space-y-3 rounded-xs min-w-0">
+            <div className="w-full border border-hairline bg-void p-3.5 sm:p-5 space-y-3 rounded-lg min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-hairline pb-2.5">
                 <label className="text-xs font-bold text-ink uppercase tracking-wider">
                   3. Copy Embed Snippet
@@ -525,7 +525,7 @@ export function LaunchFeedBadge() {
                       key={fmt}
                       type="button"
                       onClick={() => setFormat(fmt)}
-                      className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-xs truncate ${
+                      className={`px-2 py-1 text-[10px] font-mono font-bold uppercase border transition-colors cursor-pointer text-center rounded-lg truncate ${
                         format === fmt
                           ? "border-signal bg-signal text-void"
                           : "border-hairline bg-surface text-ink-dim hover:text-ink"
@@ -542,14 +542,14 @@ export function LaunchFeedBadge() {
                   readOnly
                   value={currentSnippet}
                   rows={format === "react" ? 6 : 4}
-                  className="w-full border border-hairline bg-surface/30 p-2.5 sm:p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-xs break-all sm:break-normal"
+                  className="w-full border border-hairline bg-surface/30 p-2.5 sm:p-3 text-[11px] sm:text-xs font-mono text-signal font-bold focus:outline-none resize-none leading-relaxed rounded-lg break-all sm:break-normal"
                 />
 
                 <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={() => handleCopy(currentSnippet, format)}
-                    className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-xs"
+                    className="w-full sm:w-auto px-4 py-2 bg-ink text-void text-xs font-mono font-bold uppercase hover:bg-ink-dim transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md rounded-lg"
                   >
                     {copied === format ? (
                       <span className="text-signal font-bold">✓ Copied {format.toUpperCase()}!</span>
@@ -561,7 +561,7 @@ export function LaunchFeedBadge() {
               </div>
             </div>
           ) : (
-            <div className="w-full border border-hairline bg-surface/10 p-4 sm:p-5 rounded-xs min-w-0">
+            <div className="w-full border border-hairline bg-surface/10 p-4 sm:p-5 rounded-lg min-w-0">
               <div className="text-xs font-bold text-ink uppercase tracking-wider border-b border-hairline pb-2.5 mb-3">
                 3. Embed on Your Site
               </div>
@@ -570,7 +570,7 @@ export function LaunchFeedBadge() {
               </p>
               <Link
                 href="/"
-                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-[11px] uppercase transition-colors rounded-xs"
+                className="inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-[11px] uppercase transition-colors rounded-lg"
               >
                 <span>Browse Leaderboard →</span>
               </Link>
@@ -583,7 +583,7 @@ export function LaunchFeedBadge() {
       <div className="border-t border-hairline pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-ink-dim font-mono">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs w-full sm:w-auto justify-center"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-lg w-full sm:w-auto justify-center"
         >
           <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
           <span>Back to Leaderboards</span>
@@ -598,6 +598,6 @@ export function LaunchFeedBadge() {
           <Link href="/contact" className="hover:text-signal transition-colors">Contact</Link>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

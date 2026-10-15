@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { doto, geistSans, geistMono } from "./fonts";
 import SessionBridge from "./components/SessionBridge";
@@ -8,7 +8,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://thelaunchfeed.com"),
-  alternates: { canonical: "/" },
+  // No site-wide canonical: a canonical here is inherited by every page that
+  // forgets its own, silently pointing them all at the homepage.
   title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
   description:
     "Discover the best new tech products, SaaS apps, AI tools, and developer software every day. Real-time community voting, verified founder MRR, and instant launch scheduling.",
@@ -76,12 +77,22 @@ export const metadata: Metadata = {
   },
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF8" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090B" },
+  ],
+};
+
 /**
  * Theme-init script — runs synchronously before paint so the correct data-theme
  * attribute is on <html> before any paint. Reads localStorage("tlf-theme") first,
  * then falls back to the OS `prefers-color-scheme` value.
  */
-const themeInitScript = `(function(){try{var t=localStorage.getItem("tlf-theme");if(t!=="void"&&t!=="thermal"&&t!=="light"){t=matchMedia("(prefers-color-scheme: dark)").matches?"void":"light";}document.documentElement.setAttribute("data-theme",t);var bg=t==="void"?"#09090B":t==="thermal"?"#050B14":"#FFFFFF";var fg=t==="light"?"#0A0A0A":"#F4F4F5";var s=document.createElement("style");s.setAttribute("data-theme-preload","");s.textContent="html,body{background:"+bg+";color:"+fg+";}";document.head.appendChild(s);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();`;
+const themeInitScript = `(function(){try{var t=localStorage.getItem("tlf-theme");if(t!=="void"&&t!=="thermal"&&t!=="light"){t=matchMedia("(prefers-color-scheme: dark)").matches?"void":"light";}document.documentElement.setAttribute("data-theme",t);var bg=t==="void"?"#09090B":t==="thermal"?"#050B14":"#FAFAF8";var fg=t==="light"?"#111111":"#F4F4F5";var s=document.createElement("style");s.setAttribute("data-theme-preload","");s.textContent="html,body{background:"+bg+";color:"+fg+";}";document.head.appendChild(s);}catch(e){document.documentElement.setAttribute("data-theme","light");}})();`;
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -154,7 +165,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
       </head>
-      <body className="min-h-full flex flex-col bg-void text-ink font-mono">
+      <body className="min-h-full flex flex-col bg-void text-ink font-sans">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:px-3 focus:py-2 focus:bg-signal focus:text-void focus:font-bold focus:rounded-sm"
@@ -172,9 +183,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <SessionBridge />
         <CookieConsentBanner />
-        <main id="main" className="flex-1 flex flex-col">
-          {children}
-        </main>
+        {/* Page shells (MainLayoutShell) render the <header>/<main id="main">/<footer> landmarks. */}
+        <div className="flex-1 flex flex-col">{children}</div>
       </body>
     </html>
   );

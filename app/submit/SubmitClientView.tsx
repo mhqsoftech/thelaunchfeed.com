@@ -1,5 +1,7 @@
 "use client";
 
+import { LaunchTime, LocalReleaseDate } from "@/components/ui/LaunchTime";
+import { withLaunchTime } from "@/components/ui/withLaunchTime";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import MainLayoutShell from "../MainLayoutShell";
@@ -17,7 +19,8 @@ import { listCategories } from "@/app/actions/categories";
 import { savePaymentApiKey } from "@/app/actions/revenue";
 import SubmissionTimer from "../components/SubmissionTimer";
 import { LaunchFeedLogo } from "@/components/ui/LaunchFeedLogo";
-import { formatReleaseUtcWithIst } from "@/lib/schedule";
+import { FreeLaunchPanel } from "@/components/submit/FreeLaunchPanel";
+import { NextLaunchCountdown } from "@/components/ui/NextLaunchCountdown";
 
 type QueuedSubmission = {
   id: string;
@@ -29,9 +32,14 @@ type QueuedSubmission = {
 import { convertImageFileToAvifDataUrl } from "../lib/avifConverter";
 import {
   REVENUE_PROVIDERS,
-  fetchLiveRevenueFromSDK,
   PaymentProviderLogo,
+  findRevenueProvider,
 } from "../lib/revenueTelemetrySDK";
+
+/** Drafts are cached in localStorage — never let a payment API key land there. */
+function secretFreeJson(value: unknown): string {
+  return JSON.stringify(value, (k, v) => (k === "apiKey" || k === "apiSecret" ? "" : v));
+}
 
 // Merges two comma-separated strings, deduping case-insensitively, keeping the
 // first source's ordering. Used to union the deterministic architecture probe's
@@ -552,6 +560,11 @@ export default function SubmitClientView({
 
   // Launch tier selection ($0 / $5 / $10) — $10 Premium Spotlight selected by default
   const [launchTier, setLaunchTier] = useState<0 | 5 | 10>(10);
+  // Free ($0) launches unlock only after the badge + 3 upvotes requirements.
+  const [freeQualified, setFreeQualified] = useState(false);
+  const handleFreeQualified = React.useCallback((q: boolean) => setFreeQualified(q), []);
+  const freeLocked =
+    !isEmbeddedMode && launchTier === 0 && !freeQualified && (!isEditMode || editTarget?.status === "DRAFT");
 
   // Ownership & Authorization Confirmation State
   const [isAuthorizedConfirmed, setIsAuthorizedConfirmed] = useState(false);
@@ -675,7 +688,7 @@ export default function SubmitClientView({
           launchTier,
           isAuthorizedConfirmed,
         };
-        localStorage.setItem("tlf_submit_draft", JSON.stringify(draft));
+        localStorage.setItem("tlf_submit_draft", secretFreeJson(draft));
       } catch {}
     } else {
       try {
@@ -764,8 +777,7 @@ export default function SubmitClientView({
           roadmapQ4: activeForm.roadmapQ4,
           pricingPartner: activeForm.pricingPartner,
           revenue: activeForm.revenue,
-          apiKey: activeForm.apiKey,
-          faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
+                    faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
           supportEmail: activeForm.supportEmail,
           githubUrl: activeForm.githubUrl,
           videoUrl: parsedVideoUrl,
@@ -921,8 +933,7 @@ export default function SubmitClientView({
           roadmapQ4: activeForm.roadmapQ4,
           pricingPartner: activeForm.pricingPartner,
           revenue: activeForm.revenue,
-          apiKey: activeForm.apiKey,
-          faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
+                    faqs: activeFaqs.filter((f: any) => f.q?.trim() || f.a?.trim()),
           supportEmail: activeForm.supportEmail,
           githubUrl: activeForm.githubUrl,
           videoUrl: parsedDraftVideoUrl,
@@ -1028,7 +1039,7 @@ export default function SubmitClientView({
         roadmapQ3: initialProductData.roadmapQ3 || "Global Read-Replicas in Tokyo, Frankfurt, and São Paulo",
         roadmapQ4: initialProductData.roadmapQ4 || "Native LLM Function Calling & Automatic Embeddings Pipeline",
         pricingPartner: initialProductData.pricingPartner || "stripe",
-        apiKey: initialProductData.apiKey || "",
+        apiKey: "",
         revenueVerified: Boolean(initialProductData.revenueVerified || initialProductData.revenue),
         tags: formatTagsToString(initialProductData.tags),
         faq1Q: q1,
@@ -1096,7 +1107,7 @@ export default function SubmitClientView({
           roadmapQ4: dt.roadmapQ4 || prev.roadmapQ4,
           pricingPartner: dt.pricingPartner || prev.pricingPartner,
           revenue: dt.revenue || prev.revenue,
-          apiKey: dt.apiKey || prev.apiKey,
+          apiKey: prev.apiKey,
           supportEmail: dt.supportEmail || prev.supportEmail,
           githubUrl: dt.githubUrl || prev.githubUrl,
         }));
@@ -1556,8 +1567,8 @@ export default function SubmitClientView({
         isAuthorizedConfirmed,
       };
       try {
-        localStorage.setItem("tlf_pending_submission", JSON.stringify(pendingSubmission));
-        localStorage.setItem("tlf_submit_draft", JSON.stringify(pendingSubmission));
+        localStorage.setItem("tlf_pending_submission", secretFreeJson(pendingSubmission));
+        localStorage.setItem("tlf_submit_draft", secretFreeJson(pendingSubmission));
       } catch {}
       window.location.assign(`/handler/sign-in?after_auth_return_to=${encodeURIComponent("/submit?auto_save_draft=1")}`);
       return;
@@ -1587,8 +1598,7 @@ export default function SubmitClientView({
         roadmapQ4: formData.roadmapQ4,
         pricingPartner: formData.pricingPartner,
         revenue: formData.revenue,
-        apiKey: formData.apiKey,
-        faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
+                faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
         supportEmail: formData.supportEmail,
         githubUrl: formData.githubUrl,
         videoUrl: parsedVideoUrl,
@@ -1686,8 +1696,8 @@ export default function SubmitClientView({
         isAuthorizedConfirmed,
       };
       try {
-        localStorage.setItem("tlf_pending_submission", JSON.stringify(pendingSubmission));
-        localStorage.setItem("tlf_submit_draft", JSON.stringify(pendingSubmission));
+        localStorage.setItem("tlf_pending_submission", secretFreeJson(pendingSubmission));
+        localStorage.setItem("tlf_submit_draft", secretFreeJson(pendingSubmission));
       } catch {}
       window.location.assign(`/handler/sign-in?after_auth_return_to=${encodeURIComponent("/submit?auto_submit=1")}`);
       return;
@@ -1736,8 +1746,7 @@ export default function SubmitClientView({
         roadmapQ4: formData.roadmapQ4,
         pricingPartner: formData.pricingPartner,
         revenue: formData.revenue,
-        apiKey: formData.apiKey,
-        faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
+                faqs: faqs.filter((f) => f.q.trim() || f.a.trim()),
         supportEmail: formData.supportEmail,
         githubUrl: formData.githubUrl,
         videoUrl: parsedVideoUrl || undefined,
@@ -1836,8 +1845,8 @@ export default function SubmitClientView({
             isAuthorizedConfirmed,
           };
           try {
-            localStorage.setItem("tlf_pending_submission", JSON.stringify(pendingSubmission));
-            localStorage.setItem("tlf_submit_draft", JSON.stringify(pendingSubmission));
+            localStorage.setItem("tlf_pending_submission", secretFreeJson(pendingSubmission));
+            localStorage.setItem("tlf_submit_draft", secretFreeJson(pendingSubmission));
           } catch {}
           window.location.assign(`/handler/sign-in?after_auth_return_to=${encodeURIComponent("/submit?auto_submit=1")}`);
           return;
@@ -1911,8 +1920,8 @@ export default function SubmitClientView({
           isAuthorizedConfirmed,
         };
         try {
-          localStorage.setItem("tlf_pending_submission", JSON.stringify(pendingSubmission));
-          localStorage.setItem("tlf_submit_draft", JSON.stringify(pendingSubmission));
+          localStorage.setItem("tlf_pending_submission", secretFreeJson(pendingSubmission));
+          localStorage.setItem("tlf_submit_draft", secretFreeJson(pendingSubmission));
         } catch {}
         window.location.assign(`/handler/sign-in?after_auth_return_to=${encodeURIComponent("/submit?auto_submit=1")}`);
         return;
@@ -1940,8 +1949,8 @@ export default function SubmitClientView({
     <>
       {/* Breadcrumb — in edit mode we route back to the profile so the
           user doesn't lose their place; otherwise back to the feed. */}
-      <div className="h-10 flex items-center justify-between pb-2.5 border-b border-hairline shrink-0 gap-3">
-        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 sm:gap-2 text-xs font-mono text-ink-dim overflow-x-auto no-scrollbar py-0.5 min-w-0">
+      <div className="flex items-center justify-between shrink-0 gap-3 font-sans">
+        <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-ink-dim overflow-x-auto no-scrollbar py-0.5 min-w-0">
           <Link
             href="/"
             className="hover:text-ink transition-colors flex items-center gap-1 shrink-0"
@@ -1968,144 +1977,149 @@ export default function SubmitClientView({
 
         <Link
           href={editTarget ? "/profile" : "/"}
-          className="text-xs font-mono text-ink-dim hover:text-ink hidden sm:flex items-center gap-1 shrink-0 text-[11px]"
+          className="text-xs text-ink-dim hover:text-ink hidden sm:flex items-center gap-1 shrink-0"
         >
           {editTarget ? "← Back to Profile" : "← Feed"}
         </Link>
       </div>
 
 
-      {/* Progress Meter — High-Tech Segmented Block Meter */}
-      <div className="py-3.5 border-b border-hairline shrink-0 space-y-2.5 font-mono">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-ink flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
-            Shipment Meter
-          </span>
-          <span className="text-[11px] font-bold text-signal font-mono">
-            {progressPercent}%
-          </span>
-        </div>
+      {/* Shipment meter — progress ring + next step */}
+      {(() => {
+        const nextStep = STEP_DEFINITIONS.find((st) => !getStepStatus(st.step) && !isStepSkipped(st.step));
+        const r = 26;
+        const circ = 2 * Math.PI * r;
+        const goTo = (id: string) => {
+          if (activeTab !== "builder") setActiveTab("builder");
+          setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+        };
+        return (
+          <section aria-label="Shipment meter" className="mt-4 rounded-[var(--radius-card)] border border-hairline bg-card p-4 font-sans">
+            <div className="flex items-center gap-3.5">
+              <div className="relative w-16 h-16 shrink-0" role="progressbar" aria-valuenow={progressPercent} aria-valuemin={0} aria-valuemax={100} aria-label="Submission completeness">
+                <svg viewBox="0 0 64 64" className="w-16 h-16 -rotate-90" aria-hidden>
+                  <circle cx="32" cy="32" r={r} fill="none" stroke="var(--color-surface)" strokeWidth="6" />
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r={r}
+                    fill="none"
+                    stroke={progressPercent >= 100 ? "var(--color-verified)" : "var(--color-signal)"}
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray={circ}
+                    strokeDashoffset={circ * (1 - Math.min(100, progressPercent) / 100)}
+                    style={{ transition: "stroke-dashoffset 400ms ease" }}
+                  />
+                </svg>
+                <span className="absolute inset-0 flex items-center justify-center font-display font-black text-[15px] text-ink tabular-nums">
+                  {progressPercent}%
+                </span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-mono uppercase tracking-wider text-ink-faint">Shipment meter</p>
+                <p className="text-sm font-semibold text-ink leading-snug">
+                  {completedSteps === TOTAL_STEPS
+                    ? "Ready to ship"
+                    : `${TOTAL_STEPS - completedSteps} of ${TOTAL_STEPS} steps left`}
+                </p>
+                <p className="text-xs text-ink-dim">
+                  Goes live <LaunchTime />
+                </p>
+              </div>
+            </div>
+            {nextStep && (
+              <button
+                type="button"
+                onClick={() => goTo(nextStep.id)}
+                className="mt-3.5 w-full flex items-center justify-between gap-2 h-10 px-3.5 rounded-full bg-ink text-void text-xs font-semibold hover:opacity-90 transition-opacity"
+              >
+                <span className="truncate">Continue: {nextStep.title.replace(/^\d+\.\s*/, "")}</span>
+                <span aria-hidden>→</span>
+              </button>
+            )}
+          </section>
+        );
+      })()}
 
-        {/* 10-Segment Pixel-Block Meter */}
-        <div className="flex items-center gap-1 w-full">
-          {Array.from({ length: 10 }).map((_, i) => {
-            const isFilled = i < Math.round((progressPercent / 100) * 10);
-            return (
-              <div
-                key={i}
-                className={`h-2 flex-1 transition-all duration-300 ${
-                  isFilled
-                    ? "bg-signal"
-                    : "bg-surface/80 border border-hairline"
-                }`}
-              />
-            );
-          })}
-        </div>
-
-        <div className="flex items-center justify-between text-[9px] font-mono text-ink-dim">
-          <span>
-            {completedSteps === TOTAL_STEPS
-              ? "✓ READY TO SHIP"
-              : `${TOTAL_STEPS - completedSteps} STEPS REMAINING`}
-          </span>
-          <span className="text-ink-faint font-bold">
-            {completedSteps}/{TOTAL_STEPS}
-          </span>
-        </div>
-      </div>
-
-      {/* Step Timeline — scrollable when it overflows the sidebar height */}
-      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar divide-y divide-hairline">
+      {/* Step timeline */}
+      <ol className="mt-4 relative font-sans" aria-label="Submission steps">
+        <span className="absolute left-[13px] top-3 bottom-3 w-px bg-hairline" aria-hidden />
         {STEP_DEFINITIONS.map((step) => {
           const isDone = getStepStatus(step.step);
           const skipped = isStepSkipped(step.step);
           const { filled, total } = stepFieldProgress(step.step);
           const pct = total > 0 ? Math.round((filled / total) * 100) : skipped ? 100 : 0;
-          const barColor = skipped
-            ? "bg-ink-faint"
-            : pct === 100
-              ? "bg-emerald-500"
-              : pct > 0
-                ? "bg-signal"
-                : "bg-hairline";
+          const state = skipped ? "skipped" : isDone ? "done" : pct > 0 ? "progress" : "todo";
+          const num = step.step.toString().padStart(2, "0");
           return (
-            <div key={step.step} className="py-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeTab !== "builder") setActiveTab("builder");
-                  setTimeout(() => {
-                    const el = document.getElementById(step.id);
-                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                  }, 50);
-                }}
-                className="flex items-start gap-2 group cursor-pointer w-full"
+            <li key={step.step} className="relative pl-9 py-1.5">
+              <span
+                className={`absolute left-0 top-2.5 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-mono font-bold ring-4 ring-void ${
+                  state === "done"
+                    ? "bg-verified text-white"
+                    : state === "skipped"
+                    ? "bg-surface text-ink-faint border border-hairline"
+                    : state === "progress"
+                    ? "bg-signal text-white"
+                    : "bg-card text-ink-dim border border-hairline"
+                }`}
+                aria-hidden
               >
-                <span
-                  className={`w-2 h-2 rounded-xs shrink-0 mt-1 transition-all ${
-                    isDone
-                      ? skipped
-                        ? "bg-ink-faint"
-                        : "bg-emerald-500"
-                      : pct > 0
-                        ? "bg-signal"
-                        : "bg-surface border border-hairline group-hover:border-signal"
-                  }`}
-                />
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className={`text-[11px] font-bold uppercase truncate transition-colors leading-tight ${
-                      isDone
-                        ? skipped ? 'text-ink-faint line-through' : 'text-emerald-500'
-                        : 'text-ink group-hover:text-signal'
-                    }`}>
-                      {step.title}
-                    </div>
-                    <span className={`text-[9px] font-mono font-bold shrink-0 ${
-                      skipped ? "text-ink-faint" : pct === 100 ? "text-emerald-500" : pct > 0 ? "text-signal" : "text-ink-faint"
-                    }`}>
-                      {skipped ? "SKIP" : `${pct}%`}
+                {state === "done" ? "✓" : state === "skipped" ? "–" : num}
+              </span>
+              <div className="flex items-start gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (activeTab !== "builder") setActiveTab("builder");
+                    setTimeout(() => document.getElementById(step.id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+                  }}
+                  className="group flex-1 min-w-0 text-left rounded-xl px-2.5 py-2 -my-0.5 hover:bg-surface transition-colors"
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <span
+                      className={`text-[13px] font-semibold truncate ${
+                        state === "skipped" ? "text-ink-faint line-through" : "text-ink group-hover:text-signal"
+                      }`}
+                    >
+                      {step.title.replace(/^\d+\.\s*/, "")}
                     </span>
-                  </div>
-                  {/* Per-section pixel-block micro meter */}
-                  {total > 0 && (
-                    <div className="flex items-center gap-[2px] w-full">
-                      {Array.from({ length: total }).map((_, i) => (
-                        <div
-                          key={i}
-                          className={`h-1 flex-1 transition-all ${i < filled ? barColor : "bg-surface/80 border border-hairline"}`}
-                        />
-                      ))}
-                    </div>
-                  )}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-[9px] text-ink-faint truncate">
-                      {skipped
-                        ? "Skipped"
-                        : total > 0
-                          ? `${filled}/${total} filled · ${step.sub}`
-                          : step.sub}
-                    </div>
-                    {step.optional && !isDone && step.next && (
+                    <span
+                      className={`shrink-0 text-[11px] font-mono font-semibold tabular-nums ${
+                        state === "done" ? "text-verified" : state === "progress" ? "text-signal" : "text-ink-faint"
+                      }`}
+                    >
+                      {state === "skipped" ? "Skipped" : `${pct}%`}
+                    </span>
+                  </span>
+                  <span className="block text-[11px] text-ink-faint truncate">
+                    {total > 0 && !skipped ? `${filled}/${total} · ${step.sub}` : step.sub}
+                  </span>
+                  {total > 0 && !skipped && (
+                    <span className="mt-1.5 block h-1 rounded-full bg-surface overflow-hidden" aria-hidden>
                       <span
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSkipStep(step.step, step.next!);
-                        }}
-                        className="text-[8px] font-bold uppercase px-1 py-0.5 border border-hairline text-ink-faint hover:text-signal hover:border-signal transition-colors shrink-0 cursor-pointer"
-                      >
-                        skip
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </button>
-            </div>
+                        className={`block h-full rounded-full transition-all duration-300 ${state === "done" ? "bg-verified" : "bg-signal"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </span>
+                  )}
+                </button>
+                {step.optional && !isDone && step.next && (
+                  <button
+                    type="button"
+                    onClick={() => handleSkipStep(step.step, step.next!)}
+                    className="shrink-0 mt-2 h-6 px-2 rounded-full border border-hairline text-[10px] font-semibold text-ink-faint hover:text-signal hover:border-signal transition-colors"
+                    aria-label={`Skip ${step.title}`}
+                  >
+                    Skip
+                  </button>
+                )}
+              </div>
+            </li>
           );
         })}
-      </div>
+      </ol>
     </>
   );
 
@@ -2191,7 +2205,7 @@ export default function SubmitClientView({
                   }`}
                 >
                   <span
-                    className={`w-1.5 h-1.5 rounded-xs ${
+                    className={`w-1.5 h-1.5 rounded-lg ${
                       isDone && !skipped ? "bg-emerald-500" : pct > 0 ? "bg-signal" : "bg-hairline"
                     }`}
                   />
@@ -2213,11 +2227,11 @@ export default function SubmitClientView({
                 </h1>
                 <span className="text-[10px] font-mono px-2.5 py-1 border border-signal/60 bg-signal/10 text-signal uppercase font-bold flex items-center gap-1.5 self-start sm:shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
-                  {isEditMode ? "EDITING LIVE PRODUCT" : "NEXT RELEASE: 00:30 UTC · 6:00 AM IST"}
+                  {isEditMode ? "EDITING LIVE PRODUCT" : <>NEXT RELEASE: <LaunchTime showIst /></>}
                 </span>
               </div>
               <p className="text-xs text-ink-dim leading-relaxed">
-                Launch your software tool on the daily leaderboard with full 360-degree product intelligence, architecture specs, founder story, and revenue transparency. Submissions are queued for the upcoming 6:00 AM IST (00:30 UTC) daily release.
+                Launch your software tool on the daily leaderboard with full 360-degree product intelligence, architecture specs, founder story, and revenue transparency. Submissions are queued for the upcoming <LaunchTime showIst /> daily release.
               </p>
             </div>
 
@@ -2321,13 +2335,13 @@ export default function SubmitClientView({
             },
             authenticating: {
               title: "Verifying session…",
-              body: <>Confirming you're signed in with your account.</>,
+              body: <>Confirming you&apos;re signed in with your account.</>,
             },
             creating: {
               title: "Registering into the daily queue…",
               body: (
                 <>
-                  Registering <strong className="text-ink">{formData.name || "your product"}</strong> for the next 6:00 AM IST drop.
+                  Registering <strong className="text-ink">{formData.name || "your product"}</strong> for the next <LaunchTime /> drop.
                 </>
               ),
             },
@@ -2496,13 +2510,13 @@ export default function SubmitClientView({
                   <span className="text-ink-faint">Scheduled Release:</span>
                   <span className="text-signal font-bold">
                     {queuedSubmission?.scheduledFor
-                      ? formatReleaseUtcWithIst(queuedSubmission.scheduledFor)
-                      : "00:30 UTC · 6:00 AM IST"}
+                      ? <LocalReleaseDate value={queuedSubmission.scheduledFor} />
+                      : <LaunchTime showIst />}
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-hairline/60 pt-1 text-[11px]">
                   <span className="text-ink-faint">Auto-Publish Time:</span>
-                  <span className="text-ink font-bold">00:30 UTC · 6:00 AM IST</span>
+                  <span className="text-ink font-bold"><LaunchTime showIst /></span>
                 </div>
               </div>
 
@@ -3357,7 +3371,9 @@ export default function SubmitClientView({
                           })()}
                         </div>
                         <input
-                          type="text"
+                          type="password"
+                          autoComplete="off"
+                          spellCheck={false}
                           value={formData.apiKey || ""}
                           onChange={(e) =>
                             setFormData((prev) => ({
@@ -3410,47 +3426,21 @@ export default function SubmitClientView({
                         disabled={isExecutingSdk}
                         onClick={async () => {
                           setIsExecutingSdk(true);
-                          const activeProvId =
-                            formData.pricingPartner?.toLowerCase().includes("razor")
-                              ? "razorpay"
-                              : formData.pricingPartner?.toLowerCase().includes("dodo")
-                              ? "dodopayments"
-                              : formData.pricingPartner?.toLowerCase().includes("paddle")
-                              ? "paddle"
-                              : formData.pricingPartner?.toLowerCase().includes("lemon")
-                              ? "lemonsqueezy"
-                              : "stripe";
-
+                          const prov = findRevenueProvider(formData.pricingPartner);
                           try {
-                            if (formData.apiKey) {
-                              const res = await savePaymentApiKey({
-                                provider: activeProvId,
-                                apiKey: formData.apiKey,
-                              });
-                              setFormData((prev) => ({
-                                ...prev,
-                                revenue: res.mrrFormatted,
-                                revenueVerified: true,
-                                apiKey: res.apiKey,
-                              }));
-                              setSdkLog(
-                                `${res.telemetryLog}\n\n[ENCRYPTION CONFIRMED] Stored at rest as AES-256-GCM encrypted payload in RevenueConnection DB.`
-                              );
-                            } else {
-                              const res = await fetchLiveRevenueFromSDK(
-                                activeProvId,
-                                ""
-                              );
-                              setFormData((prev) => ({
-                                ...prev,
-                                revenue: res.mrrFormatted,
-                                revenueVerified: true,
-                              }));
-                              setSdkLog(res.sdkHandshakeLog);
-                            }
+                            if (!prov) throw new Error("Choose your payment provider first.");
+                            if (!formData.apiKey?.trim()) throw new Error(`Paste a read-only ${prov.name} key to verify revenue.`);
+                            const res = await savePaymentApiKey({ provider: prov.id, apiKey: formData.apiKey });
+                            setFormData((prev) => ({
+                              ...prev,
+                              revenue: res.mrrFormatted,
+                              revenueVerified: true,
+                              apiKey: "", // the key is stored encrypted server-side; drop it from the form
+                            }));
+                            setSdkLog(`${res.telemetryLog}\nKey on file: ${res.keyHint}`);
                           } catch (err) {
-                            const msg = err instanceof Error ? err.message : "SDK Handshake failed";
-                            setSdkLog(`[ERROR] ${msg}`);
+                            const msg = err instanceof Error ? err.message : "Verification failed";
+                            setSdkLog(`Not verified — ${msg}`);
                           } finally {
                             setIsExecutingSdk(false);
                           }
@@ -3460,19 +3450,11 @@ export default function SubmitClientView({
                         {isExecutingSdk ? (
                           <>
                             <span className="w-2 h-2 rounded-full bg-[#00D97E] animate-pulse" />
-                            <span>Executing SDK Handshake...</span>
+                            <span>Verifying with provider…</span>
                           </>
                         ) : (
                           <span>
-                            Fetch & Verify Live MRR via{" "}
-                            {(
-                              REVENUE_PROVIDERS.find(
-                                (p) =>
-                                  p.id === formData.pricingPartner ||
-                                  p.name === formData.pricingPartner
-                              ) || REVENUE_PROVIDERS[0]
-                            ).name}{" "}
-                            SDK
+                            Verify live revenue with {findRevenueProvider(formData.pricingPartner)?.name ?? "your provider"}
                           </span>
                         )}
                       </button>
@@ -3581,175 +3563,103 @@ export default function SubmitClientView({
               </div>
             </div>
 
-            {/* Launch Pricing Tier Selection — hidden when editing an existing product */}
+            {/* When will this go live? */}
+            {!isEmbeddedMode && !(isEditMode && editTarget?.status !== "DRAFT") && <NextLaunchCountdown />}
+
+            {/* Launch Pricing — what each tier actually gets */}
             {!isEmbeddedMode && (
-              <div className="border border-hairline bg-surface/30 p-4 sm:p-6 space-y-4">
-                <div className="flex items-center justify-between border-b border-hairline pb-2.5">
-                  <h2 className="font-mono text-xs sm:text-sm font-bold text-ink uppercase tracking-wider">
-                    Launch Pricing
-                  </h2>
-                  <span className="text-[10px] font-mono text-ink-faint uppercase">Select Tier</span>
+              <section className="rounded-[var(--radius-card)] border border-hairline bg-card p-4 sm:p-6 space-y-4 font-sans" aria-labelledby="pricing-heading">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <h2 id="pricing-heading" className="text-base font-semibold text-ink">Choose your launch</h2>
+                    <p className="text-sm text-ink-dim">Every launch goes live on the daily board. Paid tiers add 30 days of placement.</p>
+                  </div>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* $0 Free Tier */}
-                  <button
-                    type="button"
-                    onClick={() => setLaunchTier(0)}
-                    className={`p-4 border text-left flex flex-col justify-between space-y-3 transition-colors cursor-pointer ${
-                      launchTier === 0
-                        ? "border-ink bg-surface/60"
-                        : "border-hairline bg-void hover:border-ink/50"
-                    }`}
-                  >
-                    <div className="space-y-2.5">
-                      <div className="flex items-baseline justify-between">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xl font-bold text-ink font-mono">$0</span>
-                          <span className="text-[10px] font-mono text-ink-dim uppercase">Free Forever</span>
-                        </div>
-                        {launchTier === 0 ? (
-                          <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 border border-ink/40 bg-surface text-ink">
-                            SELECTED
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {([
+                    {
+                      tier: 0 as const,
+                      price: "$0",
+                      name: "Free launch",
+                      tag: "Community",
+                      perks: [
+                        "Live on the daily board at 6:00 AM IST",
+                        "Permanent product page + founder profile",
+                        "Launch announcement on our social channels",
+                        "Winner badges if you finish top 3",
+                        "Dofollow backlink while our badge is on your site",
+                      ],
+                      note: "Requires: embed our badge + upvote 3 launches",
+                    },
+                    {
+                      tier: 5 as const,
+                      price: "$5",
+                      name: "Featured",
+                      tag: "30 days",
+                      perks: [
+                        "Everything in Free — no badge or upvote steps",
+                        "30 days in the Featured ticker on every page",
+                        "Ticker links straight to your website",
+                        "Dofollow backlink, no badge required",
+                      ],
+                      note: "1 placement · Featured ticker",
+                    },
+                    {
+                      tier: 10 as const,
+                      price: "$10",
+                      name: "Premium Spotlight",
+                      tag: "Best value",
+                      perks: [
+                        "Everything in Featured",
+                        "30 days in the Featured ticker on every page",
+                        "PLUS 30 days in the Spotlight rail (sidebar on desktop, top strip on mobile)",
+                        "Shown ahead of free listings in both placements",
+                      ],
+                      note: "2 placements · Featured ticker + Spotlight",
+                    },
+                  ]).map((t) => {
+                    const active = launchTier === t.tier;
+                    return (
+                      <button
+                        key={t.tier}
+                        type="button"
+                        onClick={() => setLaunchTier(t.tier)}
+                        aria-pressed={active}
+                        className={`relative text-left rounded-xl border p-4 flex flex-col gap-3 transition-all ${
+                          active ? "border-signal bg-signal-dim/40 shadow-[var(--shadow-card)]" : "border-hairline hover:border-ink-faint"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="text-sm font-semibold text-ink">{t.name}</div>
+                            <div className="mt-0.5 flex items-baseline gap-1">
+                              <span className="font-display font-black text-2xl text-ink">{t.price}</span>
+                              {t.tier > 0 && <span className="text-xs text-ink-dim">one-time · 30 days</span>}
+                            </div>
+                          </div>
+                          <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${t.tier === 10 ? "bg-signal text-white" : "bg-surface text-ink-dim"}`}>
+                            {active ? "Selected" : t.tag}
                           </span>
-                        ) : (
-                          <span className="text-[9px] font-mono text-ink-faint uppercase">FREE</span>
-                        )}
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="text-xs font-bold text-ink uppercase font-mono">
-                          Free Community Launch
                         </div>
-                        <p className="text-[11px] text-ink-dim leading-relaxed">
-                          <strong className="text-ink font-medium">Flagship:</strong> Permanent dofollow SEO backlink &amp; dual 360° product specs pages.
-                        </p>
-                      </div>
-
-                      <ul className="space-y-1 text-[11px] text-ink-dim pt-2 border-t border-hairline/60">
-                        <li className="flex items-start gap-1.5">
-                          <span className="text-ink-faint">✓</span>
-                          <span>Auto-broadcast to 𝕏, Telegram &amp; WhatsApp</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="text-ink-faint">✓</span>
-                          <span>2 permanent indexable pages</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="text-ink-faint">✓</span>
-                          <span>Standard daily release queue (6:00 AM IST)</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </button>
-
-                  {/* $5 Featured Tier */}
-                  <button
-                    type="button"
-                    onClick={() => setLaunchTier(5)}
-                    className={`p-4 border text-left flex flex-col justify-between space-y-3 transition-colors cursor-pointer ${
-                      launchTier === 5
-                        ? "border-signal bg-signal/5"
-                        : "border-hairline bg-void hover:border-signal/50"
-                    }`}
-                  >
-                    <div className="space-y-2.5">
-                      <div className="flex items-baseline justify-between">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xl font-bold text-signal font-mono">$5</span>
-                          <span className="text-[10px] font-mono text-ink-dim">/ 30 days</span>
-                        </div>
-                        {launchTier === 5 ? (
-                          <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 border border-signal/40 bg-signal/15 text-signal">
-                            SELECTED
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-mono text-signal/80 px-1 py-0.5 border border-signal/20 uppercase">
-                            FEATURED
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="text-xs font-bold text-signal uppercase font-mono">
-                          Header Marquee
-                        </div>
-                        <p className="text-[11px] text-ink-dim leading-relaxed">
-                          <strong className="text-signal font-medium">Flagship:</strong> Pinned 24/7 in top header floating banner across all pages for 30 days.
-                        </p>
-                      </div>
-
-                      <ul className="space-y-1 text-[11px] text-ink-dim pt-2 border-t border-hairline/60">
-                        <li className="flex items-start gap-1.5 text-ink">
-                          <span className="text-signal">✓</span>
-                          <span>Everything in Free ($0 tier)</span>
-                        </li>
-                        <li className="flex items-start gap-1.5 text-ink">
-                          <span className="text-signal">✓</span>
-                          <span>Top floating marquee placement (30D)</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="text-signal">✓</span>
-                          <span>Instant activation + dashboard tracking</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </button>
-
-                  {/* $10 Spotlight Tier (Default) */}
-                  <button
-                    type="button"
-                    onClick={() => setLaunchTier(10)}
-                    className={`p-4 border text-left flex flex-col justify-between space-y-3 transition-colors cursor-pointer ${
-                      launchTier === 10
-                        ? "border-[#38BDF8] bg-[#38BDF8]/5"
-                        : "border-hairline bg-void hover:border-[#38BDF8]/50"
-                    }`}
-                  >
-                    <div className="space-y-2.5">
-                      <div className="flex items-baseline justify-between">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-xl font-bold text-ink font-mono">$10</span>
-                          <span className="text-[10px] font-mono text-[#38BDF8]">/ 30 days</span>
-                        </div>
-                        {launchTier === 10 ? (
-                          <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 border border-[#38BDF8]/40 bg-[#38BDF8]/15 text-[#38BDF8]">
-                            SELECTED
-                          </span>
-                        ) : (
-                          <span className="text-[9px] font-mono text-[#38BDF8]/80 px-1 py-0.5 border border-[#38BDF8]/20 uppercase">
-                            SPOTLIGHT
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="text-xs font-bold text-[#38BDF8] uppercase font-mono">
-                          Premium Spotlight
-                        </div>
-                        <p className="text-[11px] text-ink-dim leading-relaxed">
-                          <strong className="text-[#38BDF8] font-medium">Flagship:</strong> Rotating 15s spotlight placed directly beside ⌘K search &amp; submit.
-                        </p>
-                      </div>
-
-                      <ul className="space-y-1 text-[11px] text-ink-dim pt-2 border-t border-hairline/60">
-                        <li className="flex items-start gap-1.5 text-ink">
-                          <span className="text-[#38BDF8]">✓</span>
-                          <span>Everything in Free + Header placement</span>
-                        </li>
-                        <li className="flex items-start gap-1.5 text-ink">
-                          <span className="text-[#38BDF8]">✓</span>
-                          <span>Prime Search &amp; Submit spotlight (30D)</span>
-                        </li>
-                        <li className="flex items-start gap-1.5">
-                          <span className="text-[#38BDF8]">✓</span>
-                          <span>Maximum high-intent CTR &amp; conversions</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </button>
+                        <ul className="space-y-1.5 text-[13px] text-ink-dim">
+                          {t.perks.map((perk) => (
+                            <li key={perk} className="flex gap-2">
+                              <span className="text-signal" aria-hidden>✓</span>
+                              <span>{withLaunchTime(perk)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-auto pt-2 border-t border-hairline text-xs font-medium text-ink">{t.note}</div>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
+              </section>
+            )}
+
+            {/* Free launch requirements — badge + 3 upvotes */}
+            {!isEmbeddedMode && launchTier === 0 && !(isEditMode && editTarget?.status !== "DRAFT") && (
+              <FreeLaunchPanel websiteUrl={formData.websiteUrl} onQualifiedChange={handleFreeQualified} />
             )}
 
             {/* Submit Action Bar */}
@@ -3759,10 +3669,10 @@ export default function SubmitClientView({
                   {isEditMode
                     ? "Update and save your live product details instantly."
                     : launchTier === 10
-                    ? "Your product will be reviewed, scheduled, and activated in the $10 Prime Search Spotlight (beside search & submit) for 30 continuous days upon checkout."
+                    ? "After checkout your product is scheduled and, from launch, shown for 30 days in BOTH the Featured ticker and the Spotlight rail."
                     : launchTier === 5
-                    ? "Your product will be reviewed, scheduled, and pinned in the $5 Top Header Marquee for 30 continuous days upon checkout."
-                    : "By submitting, your product will be reviewed and scheduled for the daily free release queue (6:00 AM IST)."}
+                    ? "After checkout your product is scheduled and, from launch, shown for 30 days in the Featured ticker on every page."
+                    : withLaunchTime("Free launch: once your badge is verified and you've upvoted 3 launches, your product joins the daily free release queue (6:00 AM IST).")}
                 </p>
                 
                 {/* Authorization & Ownership Confirmation Checkbox — Only required for NEW product submissions */}
@@ -3851,11 +3761,11 @@ export default function SubmitClientView({
                 )}
                 <button
                   type="submit"
-                  disabled={isSubmitting || (!isEmbeddedMode && !isAuthorizedConfirmed)}
+                  disabled={isSubmitting || (!isEmbeddedMode && !isAuthorizedConfirmed) || freeLocked}
                   className={`w-full sm:w-auto px-6 py-2.5 text-xs font-bold uppercase transition-all flex items-center justify-center gap-2 shrink-0 active:scale-[0.99] ${
                     isSubmitting
                       ? "bg-signal text-void opacity-95 cursor-wait"
-                      : isEmbeddedMode || isAuthorizedConfirmed
+                      : !freeLocked && (isEmbeddedMode || isAuthorizedConfirmed)
                       ? launchTier === 10
                         ? "bg-[#38BDF8] text-void hover:bg-[#38BDF8]/90 cursor-pointer shadow-md font-bold"
                         : "bg-signal text-void hover:bg-signal/90 cursor-pointer shadow-sm font-bold"
@@ -3886,6 +3796,8 @@ export default function SubmitClientView({
                           ? "Proceed with $10 Spotlight Launch →"
                           : launchTier === 5
                           ? "Proceed with $5 Featured Launch →"
+                          : freeLocked
+                          ? "Complete the 2 free-launch steps above"
                           : "Submit Free Product Shipment →"}
                       </span>
                     </>
@@ -3953,10 +3865,10 @@ export default function SubmitClientView({
                   </h2>
                   <span className="text-[10px] font-mono text-signal">FULL-WIDTH EMBED ↗</span>
                 </div>
-                <div className="overflow-hidden rounded-xs border border-hairline bg-black">
+                <div className="overflow-hidden rounded-lg border border-hairline bg-black">
                   {(() => {
                     const url = formData.videoUrl.trim();
-                    const iframeCls = "w-full aspect-video rounded-xs border-0";
+                    const iframeCls = "w-full aspect-video rounded-lg border-0";
 
                     // YouTube (watch / youtu.be / shorts / embed)
                     const ytMatch = url.match(
@@ -4085,7 +3997,7 @@ export default function SubmitClientView({
                         <video
                           src={raw}
                           controls
-                          className="w-full aspect-video rounded-xs object-contain bg-black"
+                          className="w-full aspect-video rounded-lg object-contain bg-black"
                         />
                       );
                     }
@@ -4096,7 +4008,7 @@ export default function SubmitClientView({
                         <video
                           src={url}
                           controls
-                          className="w-full aspect-video rounded-xs object-contain bg-black"
+                          className="w-full aspect-video rounded-lg object-contain bg-black"
                         />
                       );
                     }
@@ -4610,7 +4522,7 @@ export default function SubmitClientView({
                     </div>
                     <div className="flex items-center gap-2 text-signal font-bold animate-pulse">
                       <span>●</span>
-                      <span>Transacting with Neon Postgres & Inngest queues...</span>
+                      <span>Transacting with Neon Postgres & launch queue...</span>
                     </div>
                   </div>
 

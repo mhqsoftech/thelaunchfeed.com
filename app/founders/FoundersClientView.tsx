@@ -78,7 +78,7 @@ export default function FoundersClientView({
               <span className="text-ink font-semibold shrink-0">Founders</span>
             </nav>
             <div className="flex items-center gap-2 shrink-0">
-              <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 border border-signal/40 bg-signal/5 text-signal rounded-xs">
+              <span className="font-mono text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 border border-signal/40 bg-signal/5 text-signal rounded-lg">
                 TOP 100 BUILDERS
               </span>
             </div>
@@ -162,139 +162,21 @@ export default function FoundersClientView({
         {/* Podium for Top 3 (if not searching / filtered to specific search) */}
         {!searchQuery && selectedLevel === "ALL" && founders.length >= 3 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 pt-1 w-full min-w-0">
-            {/* #2 Rank */}
-            {founders[1] && (
-              <div className="order-2 md:order-1 border border-hairline bg-surface/30 p-3.5 sm:p-4 relative space-y-3 flex flex-col justify-between hover:border-ink/30 transition-all min-w-0 overflow-hidden">
-                <div className="flex items-start justify-between gap-2 min-w-0 w-full">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                    <span className="font-display font-black text-xl sm:text-2xl text-ink-dim shrink-0">#02</span>
-                    <Link href={`/founder/${slugify(founders[1].name)}`} aria-label={founders[1].name} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xs bg-void border border-hairline overflow-hidden shrink-0 block"
-                    >
-                      {founders[1].image ? (
-                        <img width="64" height="64" src={founders[1].image} alt={founders[1].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-xs">
-                          {founders[1].name.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                    </Link>
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                      <Link
-                        href={`/founder/${slugify(founders[1].name)}`}
-                        className="text-xs sm:text-sm font-bold text-ink hover:text-signal transition-colors block leading-tight truncate"
-                      >
-                        {founders[1].name}
-                      </Link>
-                      <div className="text-[10px] text-ink-dim truncate mt-0.5">
-                        {founders[1].title || `@${founders[1].username}`}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setInspectingFounder(founders[1])}
-                    className="text-right cursor-pointer shrink-0 pl-1"
-                  >
-                    <div className="text-xs sm:text-sm font-bold text-ink whitespace-nowrap">{founders[1].points} PTS</div>
-                    <div className="text-[9px] uppercase font-bold text-ink-faint whitespace-nowrap">Level {founders[1].level.level}</div>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-ink-dim border-t border-hairline/80 pt-2">
-                  <span>{founders[1].productsCount} launched</span>
-                  <span>{founders[1].totalVotes} votes</span>
-                </div>
-              </div>
-            )}
-
-            {/* #1 Rank (Center Prominent) */}
-            {founders[0] && (
-              <div className="order-1 md:order-2 border-2 border-signal/50 bg-signal/5 p-3.5 sm:p-4 relative space-y-3 flex flex-col justify-between shadow-lg shadow-signal/5 min-w-0 overflow-hidden">
-                <div className="flex items-start justify-between gap-2 min-w-0 w-full">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                    <span className="font-display font-black text-2xl sm:text-3xl text-signal shrink-0">#01</span>
-                    <Link href={`/founder/${slugify(founders[0].name)}`} aria-label={founders[0].name} className="w-11 h-11 sm:w-12 sm:h-12 rounded-xs bg-void border border-signal/40 overflow-hidden shrink-0 block"
-                    >
-                      {founders[0].image ? (
-                        <img width="64" height="64" src={founders[0].image} alt={founders[0].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-sm">
-                          {founders[0].name.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                    </Link>
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                      <Link
-                        href={`/founder/${slugify(founders[0].name)}`}
-                        className="text-sm sm:text-base font-bold text-ink hover:text-signal transition-colors block leading-tight truncate"
-                      >
-                        {founders[0].name}
-                      </Link>
-                      <div className="text-[10px] sm:text-[11px] text-ink-dim truncate mt-0.5">
-                        {founders[0].title || `@${founders[0].username}`}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setInspectingFounder(founders[0])}
-                    className="text-right cursor-pointer shrink-0 pl-1"
-                  >
-                    <div className="text-sm sm:text-base font-black text-signal whitespace-nowrap">{founders[0].points} PTS</div>
-                    <div className="text-[9px] uppercase font-bold text-signal/80 whitespace-nowrap">★ Champion</div>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-ink-dim border-t border-signal/20 pt-2">
-                  <span>{founders[0].productsCount} launched</span>
-                  <span className="text-signal font-bold">{founders[0].totalVotes} votes</span>
-                </div>
-              </div>
-            )}
-
-            {/* #3 Rank */}
-            {founders[2] && (
-              <div className="order-3 border border-hairline bg-surface/30 p-3.5 sm:p-4 relative space-y-3 flex flex-col justify-between hover:border-ink/30 transition-all min-w-0 overflow-hidden">
-                <div className="flex items-start justify-between gap-2 min-w-0 w-full">
-                  <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
-                    <span className="font-display font-black text-xl sm:text-2xl text-ink-dim shrink-0">#03</span>
-                    <Link href={`/founder/${slugify(founders[2].name)}`} aria-label={founders[2].name} className="w-10 h-10 sm:w-11 sm:h-11 rounded-xs bg-void border border-hairline overflow-hidden shrink-0 block"
-                    >
-                      {founders[2].image ? (
-                        <img width="64" height="64" src={founders[2].image} alt={founders[2].name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center font-bold text-xs">
-                          {founders[2].name.substring(0, 2).toUpperCase()}
-                        </div>
-                      )}
-                    </Link>
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                      <Link
-                        href={`/founder/${slugify(founders[2].name)}`}
-                        className="text-xs sm:text-sm font-bold text-ink hover:text-signal transition-colors block leading-tight truncate"
-                      >
-                        {founders[2].name}
-                      </Link>
-                      <div className="text-[10px] text-ink-dim truncate mt-0.5">
-                        {founders[2].title || `@${founders[2].username}`}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setInspectingFounder(founders[2])}
-                    className="text-right cursor-pointer shrink-0 pl-1"
-                  >
-                    <div className="text-xs sm:text-sm font-bold text-ink whitespace-nowrap">{founders[2].points} PTS</div>
-                    <div className="text-[9px] uppercase font-bold text-ink-faint whitespace-nowrap">Level {founders[2].level.level}</div>
-                  </button>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-ink-dim border-t border-hairline/80 pt-2">
-                  <span>{founders[2].productsCount} launched</span>
-                  <span>{founders[2].totalVotes} votes</span>
-                </div>
-              </div>
+            {[1, 0, 2].map((idx) =>
+              founders[idx] ? (
+                <PodiumCard
+                  key={founders[idx].id ?? founders[idx].username}
+                  founder={founders[idx]}
+                  rank={idx + 1}
+                  onInspect={() => setInspectingFounder(founders[idx])}
+                />
+              ) : null
             )}
           </div>
         )}
 
         {/* Full Leaderboard Table */}
-        <div className="border border-hairline bg-void w-full min-w-0 overflow-hidden">
+        <div className="rounded-[var(--radius-card)] border border-hairline bg-card w-full min-w-0 overflow-hidden">
           <div className="p-3 sm:p-4 border-b border-hairline bg-surface/40 flex items-center justify-between">
             <div className="text-xs font-bold uppercase tracking-wider text-ink">
               Rankings ({filteredFounders.length} Builders)
@@ -326,7 +208,7 @@ export default function FoundersClientView({
 
                   <Link
                     href={`/founder/${slugify(founder.name)}`}
-                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-xs bg-surface border border-hairline shrink-0 overflow-hidden flex items-center justify-center font-bold text-xs"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-surface border border-hairline shrink-0 overflow-hidden flex items-center justify-center font-bold text-xs"
                   >
                     {founder.image ? (
                       <img width="64" height="64" src={founder.image} alt={founder.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
@@ -437,5 +319,56 @@ export default function FoundersClientView({
         )}
       </div>
     </MainLayoutShell>
+  );
+}
+
+/** Podium card for the top 3: rank + avatar + points on top, full name below. */
+function PodiumCard({ founder, rank, onInspect }: { founder: any; rank: number; onInspect: () => void }) {
+  const first = rank === 1;
+  const href = `/founder/${slugify(founder.name)}`;
+  return (
+    <div
+      className={`relative flex flex-col gap-3 p-4 rounded-[var(--radius-card)] border bg-card min-w-0 transition-all ${
+        first ? "md:order-2 order-1 border-signal/50 bg-signal-dim/30 shadow-[var(--shadow-lift)]" : `${rank === 2 ? "md:order-1 order-2" : "order-3"} border-hairline hover:border-ink-faint`
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className={`font-display font-black leading-none ${first ? "text-3xl text-signal" : "text-2xl text-ink-dim"}`}>
+            #{String(rank).padStart(2, "0")}
+          </span>
+          <Link
+            href={href}
+            aria-label={founder.name}
+            className={`${first ? "w-12 h-12" : "w-11 h-11"} rounded-full overflow-hidden border bg-surface shrink-0 ${first ? "border-signal/40" : "border-hairline"}`}
+          >
+            {founder.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img width={48} height={48} src={founder.image} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+            ) : (
+              <span className="w-full h-full flex items-center justify-center text-xs font-bold text-ink-dim">
+                {founder.name.substring(0, 2).toUpperCase()}
+              </span>
+            )}
+          </Link>
+        </div>
+        <button type="button" onClick={onInspect} className="text-right shrink-0 rounded-lg px-1.5 py-1 hover:bg-surface transition-colors" title="See how points are calculated">
+          <div className={`font-mono font-bold whitespace-nowrap ${first ? "text-base text-signal" : "text-sm text-ink"}`}>{founder.points} PTS</div>
+          <div className={`text-[10px] uppercase font-semibold whitespace-nowrap ${first ? "text-signal/80" : "text-ink-faint"}`}>
+            {first ? "★ Champion" : `Level ${founder.level.level}`}
+          </div>
+        </button>
+      </div>
+      <div className="min-w-0">
+        <Link href={href} className={`block font-semibold text-ink hover:text-signal transition-colors truncate ${first ? "text-base" : "text-sm"}`}>
+          {founder.name}
+        </Link>
+        <div className="text-xs text-ink-dim truncate">{founder.title || `@${founder.username}`}</div>
+      </div>
+      <div className={`flex items-center justify-between text-xs text-ink-dim pt-2.5 border-t ${first ? "border-signal/20" : "border-hairline"}`}>
+        <span>{founder.productsCount} launched</span>
+        <span className={first ? "text-signal font-semibold" : ""}>{founder.totalVotes} votes</span>
+      </div>
+    </div>
   );
 }

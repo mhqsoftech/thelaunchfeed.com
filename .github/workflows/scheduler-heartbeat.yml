@@ -1,0 +1,29 @@
+# Backup heartbeat for the self-hosted scheduler (lib/jobs). Free on public
+# repos. GitHub may delay scheduled runs by a few minutes under load, so the
+# Cloudflare Worker in workers/scheduler-heartbeat is the primary pinger —
+# this one just guarantees the queue keeps moving if that ever stops.
+#
+# Setup: Settings → Secrets and variables → Actions → add CRON_SECRET
+# (and optionally APP_URL, default https://thelaunchfeed.com).
+name: Scheduler heartbeat
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /api/cron
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET secret not set — skipping"; exit 0; fi
+          curl -fsS --max-time 90 -X POST "${APP_URL:-https://thelaunchfeed.com}/api/cron" \
+            -H "Authorization: Bearer $CRON_SECRET" -H "x-cron-source: github-actions"

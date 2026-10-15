@@ -1,5 +1,6 @@
 "use client";
 
+import { LaunchTime, LocalReleaseDate } from "@/components/ui/LaunchTime";
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -23,12 +24,14 @@ import {
   type InteractionProduct,
 } from "@/app/actions/interactions";
 import { FounderProfileContent } from "@/app/founder/[slug]/FounderClientView";
-import { formatReleaseUtcWithIst } from "@/lib/schedule";
 import {
   REVENUE_PROVIDERS,
   PaymentProviderLogo,
 } from "@/app/lib/revenueTelemetrySDK";
 import EmbeddableAwardWidget from "@/app/components/EmbeddableAwardWidget";
+import { VisitorsSentCard } from "@/components/profile/VisitorsSentCard";
+import { getMyVisitorStats } from "@/app/actions/outbound";
+import type { VisitorStats } from "@/lib/outbound/stats";
 import SubmitClientView from "@/app/submit/SubmitClientView";
 
 /* ─────────────────────────────────────────────────
@@ -86,7 +89,6 @@ export default function ProfileClientView({
   const [website, setWebsite] = useState("");
   const [twitter, setTwitter] = useState("");
   const [github, setGithub] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [image, setImage] = useState<string>("");
   const [imageError, setImageError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -236,9 +238,8 @@ export default function ProfileClientView({
     }
   };
   const [paymentProvider, setPaymentProvider] = useState<string>("stripe");
-  const [stripeApiKey, setStripeApiKey] = useState(
-    REVENUE_PROVIDERS[0].sampleKey
-  );
+  // The secret only lives in this input until it's submitted; the server never sends it back.
+  const [stripeApiKey, setStripeApiKey] = useState("");
   const [syncingPayments, setSyncingPayments] = useState(false);
   const [paymentsSuccess, setPaymentsSuccess] = useState(false);
   const [telemetryLog, setTelemetryLog] = useState("");
@@ -249,6 +250,8 @@ export default function ProfileClientView({
     mrrCents: number;
     mrrFormatted: string;
     lastSyncedAt?: string;
+    status?: string;
+    lastSyncError?: string | null;
   };
   const [connectedProviders, setConnectedProviders] = useState<ConnectedProvider[]>([]);
   const [deletingConnId, setDeletingConnId] = useState<string | null>(null);
@@ -264,6 +267,8 @@ export default function ProfileClientView({
           mrrCents: k.mrrCents || 0,
           mrrFormatted: k.mrrFormatted || "",
           lastSyncedAt: k.lastSyncedAt,
+          status: k.status,
+          lastSyncError: k.lastSyncError,
         }))
       );
     } catch {
@@ -388,7 +393,6 @@ export default function ProfileClientView({
     setWebsite(s.website || "");
     setTwitter(s.twitter || "");
     setGithub(s.github || "");
-    setApiKey(s.apiKey || "");
     setImage(s.image || "");
     // Seed the handle input with the current handle, lowercased so the
     // equality guards on the availability + update buttons treat the
@@ -544,10 +548,7 @@ export default function ProfileClientView({
         const keys = await getPaymentApiKeys();
         if (keys && keys.length > 0) {
           const latest = keys[0];
-          setPaymentProvider(latest.provider.toLowerCase());
-          if (latest.apiKey) {
-            setStripeApiKey(latest.apiKey);
-          }
+          setPaymentProvider(latest.providerId);
           if ((latest as any).mrrFormatted) {
             setRevenue((latest as any).mrrFormatted);
           } else if (latest.revenues && latest.revenues.length > 0) {
@@ -561,6 +562,8 @@ export default function ProfileClientView({
               mrrCents: k.mrrCents || 0,
               mrrFormatted: k.mrrFormatted || "",
               lastSyncedAt: k.lastSyncedAt,
+              status: k.status,
+              lastSyncError: k.lastSyncError,
             }))
           );
         }
@@ -730,13 +733,13 @@ export default function ProfileClientView({
         github: persisted.githubHandle || "",
         image: persisted.image ?? null,
         revenue,
-        apiKey,
+        apiKey: "", // secrets are never kept in the browser session
       };
       try {
         const meRes = await fetch("/api/me", { cache: "no-store" });
         if (meRes.ok) {
           const meData = (await meRes.json()) as { session: UserSession | null };
-          if (meData?.session) next = { ...meData.session, title: persisted.title || title, revenue, apiKey };
+          if (meData?.session) next = { ...meData.session, title: persisted.title || title, revenue, apiKey: "" };
         }
       } catch {
         /* ignore — local fallback already prepared */
@@ -774,6 +777,30 @@ export default function ProfileClientView({
     reader.readAsDataURL(file);
   };
 
+  /* "Visitors sent" per live product (owner-only server action). */
+  const liveProductIdsKey = productsList
+    .filter((p) => (p as MyProduct).status === "LIVE")
+    .map((p) => String(p.id))
+    .join(",");
+  const [visitorStats, setVisitorStats] = useState<Record<string, VisitorStats>>({});
+  const [loadingVisitorStats, setLoadingVisitorStats] = useState(false);
+  useEffect(() => {
+    if (activeTab !== "products" || !liveProductIdsKey) return;
+    let cancelled = false;
+    setLoadingVisitorStats(true);
+    getMyVisitorStats(liveProductIdsKey.split(","))
+      .then((res) => {
+        if (!cancelled && res.ok) setVisitorStats(res.stats);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setLoadingVisitorStats(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, liveProductIdsKey]);
+
   if (!session) {
     return (
       <MainLayoutShell>
@@ -806,6 +833,7 @@ export default function ProfileClientView({
 
   const draftProducts = productsList.filter((p) => (p as MyProduct).status === "DRAFT");
   const nonDraftProducts = productsList.filter((p) => (p as MyProduct).status !== "DRAFT");
+
 
   const previewRevenue = revenue || session.revenue;
   const isRevenueVerified = Boolean(
@@ -998,7 +1026,7 @@ export default function ProfileClientView({
             <div className="border border-hairline bg-surface/40 p-4 sm:p-6 md:p-8 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-hairline pb-4">
                 <div className="flex items-start gap-3 sm:gap-4 min-w-0">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-ink text-void border border-hairline shrink-0 rounded-xs flex items-center justify-center font-mono font-bold text-lg sm:text-2xl overflow-hidden">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-ink text-void border border-hairline shrink-0 rounded-lg flex items-center justify-center font-mono font-bold text-lg sm:text-2xl overflow-hidden">
                     {image || session.image ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img width="64" height="64"
@@ -1029,7 +1057,7 @@ export default function ProfileClientView({
                 </div>
 
                 {isRevenueVerified && (
-                  <div className="shrink-0 border border-verified/40 bg-void/60 rounded-xs px-3 py-2 sm:px-3.5 sm:py-2.5 flex flex-col sm:items-end gap-1.5">
+                  <div className="shrink-0 border border-verified/40 bg-void/60 rounded-lg px-3 py-2 sm:px-3.5 sm:py-2.5 flex flex-col sm:items-end gap-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono text-ink-faint uppercase tracking-wider">
                         Verified Revenue
@@ -1046,7 +1074,7 @@ export default function ProfileClientView({
                             key={name}
                             title={`Verified via ${name}`}
                             aria-label={`Verified via ${name}`}
-                            className="w-5 h-5 border border-verified/40 bg-surface rounded-xs flex items-center justify-center"
+                            className="w-5 h-5 border border-verified/40 bg-surface rounded-lg flex items-center justify-center"
                           >
                             <PaymentProviderLogo id={name} className="w-3 h-3" />
                           </div>
@@ -1240,13 +1268,13 @@ export default function ProfileClientView({
                       {[1, 2].map((n) => (
                         <div key={n} className="p-4 sm:p-5 border border-hairline bg-surface/20 space-y-3 animate-pulse">
                           <div className="flex items-center justify-between">
-                            <div className="h-4 bg-surface w-40 rounded-xs" />
-                            <div className="h-3 bg-surface w-16 rounded-xs" />
+                            <div className="h-4 bg-surface w-40 rounded-lg" />
+                            <div className="h-3 bg-surface w-16 rounded-lg" />
                           </div>
-                          <div className="h-3 bg-surface/60 w-3/4 rounded-xs" />
+                          <div className="h-3 bg-surface/60 w-3/4 rounded-lg" />
                           <div className="flex gap-2 pt-2 border-t border-hairline/40">
-                            <div className="h-3 bg-surface/40 w-24 rounded-xs" />
-                            <div className="h-3 bg-surface/40 w-20 rounded-xs" />
+                            <div className="h-3 bg-surface/40 w-24 rounded-lg" />
+                            <div className="h-3 bg-surface/40 w-20 rounded-lg" />
                           </div>
                         </div>
                       ))}
@@ -1276,9 +1304,9 @@ export default function ProfileClientView({
                     const isPending = status === "SCHEDULED";
                     const isRejected = status === "REJECTED";
                     const isNotLive = isPending || isRejected;
-                    const scheduledForLabel = (p as MyProduct).scheduledFor
-                      ? formatReleaseUtcWithIst((p as MyProduct).scheduledFor as string)
-                      : "";
+                    const scheduledForLabel = (p as MyProduct).scheduledFor ? (
+                      <LocalReleaseDate value={(p as MyProduct).scheduledFor as string} />
+                    ) : null;
                     const rejectionReason = (p as MyProduct).rejectionReason;
                     return (
                       <div key={p.id} className="space-y-3">
@@ -1341,6 +1369,10 @@ export default function ProfileClientView({
                               </div>
                               {rejectionReason}
                             </div>
+                          )}
+
+                          {!isNotLive && (
+                            <VisitorsSentCard stats={visitorStats[String(p.id)]} loading={loadingVisitorStats} />
                           )}
 
                           {/* Award Badges, Edit Details & Embed Trigger */}
@@ -1662,7 +1694,7 @@ export default function ProfileClientView({
                   <button
                     onClick={fetchSubscriptions}
                     disabled={loadingSubscriptions}
-                    className="px-2.5 py-1 text-[11px] border border-hairline bg-surface hover:bg-raised text-ink font-bold transition-colors cursor-pointer flex items-center gap-1 self-start sm:self-auto rounded-xs"
+                    className="px-2.5 py-1 text-[11px] border border-hairline bg-surface hover:bg-raised text-ink font-bold transition-colors cursor-pointer flex items-center gap-1 self-start sm:self-auto rounded-lg"
                   >
                     <span>↻</span>
                     <span>{loadingSubscriptions ? "Syncing..." : "Refresh Status"}</span>
@@ -1671,7 +1703,7 @@ export default function ProfileClientView({
 
                 {/* Checkout Success Notice Banner */}
                 {checkoutSuccessNotice && (
-                  <div className="p-4 border border-signal bg-signal/10 space-y-1.5 rounded-xs animate-in fade-in duration-300">
+                  <div className="p-4 border border-signal bg-signal/10 space-y-1.5 rounded-lg animate-in fade-in duration-300">
                     <div className="flex items-center gap-2 text-signal font-bold text-xs uppercase">
                       <span className="px-1.5 py-0.2 bg-signal text-void font-mono">CONFIRMED</span>
                       <span>Your 30-Day Placement is Activated &amp; Live on The Launch Feed!</span>
@@ -1707,13 +1739,13 @@ export default function ProfileClientView({
                         return (
                           <div
                             key={slot.id}
-                            className={`p-4 sm:p-5 border bg-surface/30 space-y-4 rounded-xs ${
+                            className={`p-4 sm:p-5 border bg-surface/30 space-y-4 rounded-lg ${
                               slot.isActive ? "border-hairline hover:border-ink/40" : "border-hairline/60 opacity-60"
                             }`}
                           >
                             <div className="flex items-start justify-between gap-3 flex-wrap">
                               <div className="flex items-start gap-3 min-w-0 flex-1">
-                                <div className="w-10 h-10 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden relative rounded-xs">
+                                <div className="w-10 h-10 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden relative rounded-lg">
                                   {slot.product?.logoUrl ? (
                                     <img width="64" height="64"
                                       src={slot.product.logoUrl}
@@ -1729,7 +1761,7 @@ export default function ProfileClientView({
                                     <span className="font-mono text-sm font-bold text-ink break-words">
                                       {slot.product?.name || "Product"}
                                     </span>
-                                    <span className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase ${tierColor} rounded-xs`}>
+                                    <span className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase ${tierColor} rounded-lg`}>
                                       {slot.headline}
                                     </span>
                                   </div>
@@ -1741,7 +1773,7 @@ export default function ProfileClientView({
 
                               <div className="flex items-center gap-2 shrink-0">
                                 <span
-                                  className={`text-[10px] font-mono px-2.5 py-1 border font-bold uppercase rounded-xs ${
+                                  className={`text-[10px] font-mono px-2.5 py-1 border font-bold uppercase rounded-lg ${
                                     slot.isActive
                                       ? "border-signal text-signal bg-void"
                                       : "border-hairline text-ink-dim"
@@ -1769,7 +1801,7 @@ export default function ProfileClientView({
                               </div>
 
                               {/* Progress bar */}
-                              <div className="w-full h-1.5 bg-void border border-hairline overflow-hidden rounded-xs">
+                              <div className="w-full h-1.5 bg-void border border-hairline overflow-hidden rounded-lg">
                                 <div
                                   className={`h-full ${barColor} transition-all`}
                                   style={{ width: `${Math.min(100, Math.max(0, 100 - slot.percentElapsed))}%` }}
@@ -1808,7 +1840,7 @@ export default function ProfileClientView({
                               <button
                                 onClick={() => triggerDodoCheckout(slot.product?.id || "", slot.tier)}
                                 disabled={isUpgradingProduct === `${slot.product?.id}-${slot.tier}`}
-                                className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-signal text-signal hover:bg-signal hover:text-void transition-colors shrink-0 cursor-pointer rounded-xs"
+                                className="px-3 py-1.5 text-[11px] font-mono font-bold uppercase border border-signal text-signal hover:bg-signal hover:text-void transition-colors shrink-0 cursor-pointer rounded-lg"
                               >
                                 {isUpgradingProduct === `${slot.product?.id}-${slot.tier}`
                                   ? "Loading Dodo..."
@@ -1820,7 +1852,7 @@ export default function ProfileClientView({
                       })}
                     </div>
                   ) : (
-                    <div className="p-5 sm:p-6 text-center border border-hairline bg-surface/20 text-xs font-mono text-ink-dim space-y-3 rounded-xs">
+                    <div className="p-5 sm:p-6 text-center border border-hairline bg-surface/20 text-xs font-mono text-ink-dim space-y-3 rounded-lg">
                       <p>No active paid launch placements yet.</p>
                       <p className="text-[11px] text-ink-faint">
                         Upgrade any of your live products below with $5 or $10 placement to get instant 30-day top visibility.
@@ -1831,7 +1863,7 @@ export default function ProfileClientView({
 
                 {/* 1-Click Feature Any Live Product Section */}
                 {productsList.length > 0 && (
-                  <div className="border border-hairline bg-surface/25 p-4 sm:p-6 space-y-4 rounded-xs">
+                  <div className="border border-hairline bg-surface/25 p-4 sm:p-6 space-y-4 rounded-lg">
                     <div className="border-b border-hairline pb-2.5">
                       <h3 className="text-xs font-bold text-ink uppercase tracking-wider font-mono flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-signal" />
@@ -1850,10 +1882,10 @@ export default function ProfileClientView({
                         return (
                           <div
                             key={p.id}
-                            className="p-3.5 sm:p-4 border border-hairline bg-void/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xs"
+                            className="p-3.5 sm:p-4 border border-hairline bg-void/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg"
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <div className="w-8 h-8 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden rounded-xs">
+                              <div className="w-8 h-8 bg-surface border border-hairline shrink-0 flex items-center justify-center font-mono font-bold text-xs text-ink overflow-hidden rounded-lg">
                                 {p.logoUrl ? (
                                   <img width="64" height="64" src={p.logoUrl} alt={p.name} className="w-full h-full object-cover" />
                                 ) : (
@@ -1883,14 +1915,14 @@ export default function ProfileClientView({
                               <button
                                 onClick={() => triggerDodoCheckout(p.id, 5)}
                                 disabled={isUpgradingProduct === `${p.id}-5`}
-                                className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-signal text-signal hover:bg-signal hover:text-void transition-colors cursor-pointer rounded-xs shrink-0"
+                                className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-signal text-signal hover:bg-signal hover:text-void transition-colors cursor-pointer rounded-lg shrink-0"
                               >
                                 {isUpgradingProduct === `${p.id}-5` ? "Loading..." : "Get $5 Header Floating →"}
                               </button>
                               <button
                                 onClick={() => triggerDodoCheckout(p.id, 10)}
                                 disabled={isUpgradingProduct === `${p.id}-10`}
-                                className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-[#38BDF8] text-[#38BDF8] hover:bg-[#38BDF8] hover:text-void transition-colors cursor-pointer rounded-xs shrink-0"
+                                className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase border border-[#38BDF8] text-[#38BDF8] hover:bg-[#38BDF8] hover:text-void transition-colors cursor-pointer rounded-lg shrink-0"
                               >
                                 {isUpgradingProduct === `${p.id}-10` ? "Loading..." : "Get $10 Spotlight →"}
                               </button>
@@ -1903,7 +1935,7 @@ export default function ProfileClientView({
                 )}
 
                 {/* Available Launch Placement Tiers Showcase */}
-                <div className="border border-hairline bg-surface/20 p-4 sm:p-6 space-y-4 rounded-xs">
+                <div className="border border-hairline bg-surface/20 p-4 sm:p-6 space-y-4 rounded-lg">
                   <div className="flex items-center justify-between border-b border-hairline pb-2">
                     <h3 className="text-xs font-bold text-ink uppercase tracking-wider font-mono">
                       Available Launch Placement Tiers
@@ -1925,7 +1957,7 @@ export default function ProfileClientView({
                         <ul className="text-[11px] text-ink-dim space-y-1 pt-2 border-t border-hairline/60">
                           <li>· Auto-broadcast to 𝕏, Telegram &amp; WhatsApp</li>
                           <li>· 2 permanent indexable product pages</li>
-                          <li>· Standard daily 6:00 AM IST release queue</li>
+                          <li>· Standard daily <LaunchTime /> release queue</li>
                         </ul>
                       </div>
                       <Link
@@ -2087,11 +2119,11 @@ export default function ProfileClientView({
                       {[1, 2].map((n) => (
                         <div key={n} className="p-3 sm:p-4 border border-hairline bg-surface/20 space-y-2 animate-pulse">
                           <div className="flex items-center justify-between">
-                            <div className="h-4 bg-surface w-32 rounded-xs" />
-                            <div className="h-3 bg-surface w-12 rounded-xs" />
+                            <div className="h-4 bg-surface w-32 rounded-lg" />
+                            <div className="h-3 bg-surface w-12 rounded-lg" />
                           </div>
-                          <div className="h-3 bg-surface/60 w-3/4 rounded-xs" />
-                          <div className="h-3 bg-surface/40 w-20 rounded-xs pt-1" />
+                          <div className="h-3 bg-surface/60 w-3/4 rounded-lg" />
+                          <div className="h-3 bg-surface/40 w-20 rounded-lg pt-1" />
                         </div>
                       ))}
                     </div>
@@ -2143,11 +2175,11 @@ export default function ProfileClientView({
                       {[1, 2].map((n) => (
                         <div key={n} className="p-3 sm:p-4 border border-hairline bg-surface/20 space-y-2 animate-pulse">
                           <div className="flex items-center justify-between">
-                            <div className="h-4 bg-surface w-32 rounded-xs" />
-                            <div className="h-3 bg-surface w-12 rounded-xs" />
+                            <div className="h-4 bg-surface w-32 rounded-lg" />
+                            <div className="h-3 bg-surface w-12 rounded-lg" />
                           </div>
-                          <div className="h-3 bg-surface/60 w-3/4 rounded-xs" />
-                          <div className="h-3 bg-surface/40 w-20 rounded-xs pt-1" />
+                          <div className="h-3 bg-surface/60 w-3/4 rounded-lg" />
+                          <div className="h-3 bg-surface/40 w-20 rounded-lg pt-1" />
                         </div>
                       ))}
                     </div>
@@ -2184,7 +2216,7 @@ export default function ProfileClientView({
 
                     {/* ── Profile Picture ── */}
                     <div className="flex items-start gap-4 border-b border-hairline pb-4">
-                      <div className="w-16 h-16 rounded-xs bg-void border border-hairline overflow-hidden flex items-center justify-center shrink-0">
+                      <div className="w-16 h-16 rounded-lg bg-void border border-hairline overflow-hidden flex items-center justify-center shrink-0">
                         {image ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img width="64" height="64"
@@ -2364,7 +2396,7 @@ export default function ProfileClientView({
                             return (
                               <span
                                 key={tier}
-                                className={`h-1 flex-1 rounded-sm transition-colors duration-200 ${colour}`}
+                                className={`h-1 flex-1 rounded-lg transition-colors duration-200 ${colour}`}
                               />
                             );
                           })}
@@ -2536,13 +2568,18 @@ export default function ProfileClientView({
                                     <div className="text-[10px] font-mono text-ink-faint truncate">
                                       {c.apiKeyMasked}
                                       {c.lastSyncedAt && (
-                                        <> · synced {new Date(c.lastSyncedAt).toLocaleDateString()}</>
+                                        <> · verified {new Date(c.lastSyncedAt).toLocaleString()}</>
                                       )}
                                     </div>
+                                    {c.status && c.status !== "ACTIVE" && (
+                                      <div className="text-[10px] font-mono text-signal" title={c.lastSyncError ?? undefined}>
+                                        {c.status === "REVOKED" ? "Key no longer works — reconnect to restore Verified MRR" : "Provider unreachable — retrying automatically"}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-[11px] font-mono font-bold text-signal">
+                                  <span className={`text-[11px] font-mono font-bold ${c.status === "ACTIVE" ? "text-verified" : "text-ink-faint line-through"}`}>
                                     {c.mrrFormatted || "$0 / mo"}
                                   </span>
                                   <button
@@ -2584,7 +2621,7 @@ export default function ProfileClientView({
                               type="button"
                               onClick={() => {
                                 setPaymentProvider(prov.id);
-                                setStripeApiKey(prov.sampleKey);
+                                setStripeApiKey("");
                               }}
                               className={`p-2 border text-left transition-colors cursor-pointer flex items-center gap-2 ${
                                 isSelected
@@ -2778,9 +2815,7 @@ export default function ProfileClientView({
                       apiKey: stripeApiKey,
                     });
                     if (res.success) {
-                      setTelemetryLog(
-                        `${res.telemetryLog}\n\n[ENCRYPTION CONFIRMED] Stored at rest as AES-256-GCM encrypted payload in RevenueConnection DB.`
-                      );
+                      setTelemetryLog(res.telemetryLog);
                       setPaymentsSuccess(true);
                       await refreshConnectedProviders();
                       // Clear key field so the founder can add another provider next
@@ -2808,7 +2843,7 @@ export default function ProfileClientView({
       {/* Aesthetic Delete Submission Confirmation Modal */}
       {submissionToDelete && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="w-full max-w-md border border-rose-500/40 bg-void p-5 sm:p-6 space-y-4 font-mono text-ink shadow-2xl relative rounded-xs">
+          <div className="w-full max-w-md border border-rose-500/40 bg-void p-5 sm:p-6 space-y-4 font-mono text-ink shadow-2xl relative rounded-lg">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
@@ -2832,7 +2867,7 @@ export default function ProfileClientView({
             </div>
 
             <div className="space-y-2.5 text-xs text-ink-dim leading-relaxed">
-              <div className="p-3 border border-hairline bg-surface/30 rounded-xs space-y-1">
+              <div className="p-3 border border-hairline bg-surface/30 rounded-lg space-y-1">
                 <div className="text-[10px] uppercase font-bold text-ink-faint">Item Name</div>
                 <div className="text-sm font-bold text-ink truncate">
                   {submissionToDelete.name || "Untitled submission"}
@@ -2853,7 +2888,7 @@ export default function ProfileClientView({
                 type="button"
                 disabled={deletingSubmission}
                 onClick={() => setSubmissionToDelete(null)}
-                className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 rounded-xs"
+                className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 rounded-lg"
               >
                 Cancel
               </button>
@@ -2861,7 +2896,7 @@ export default function ProfileClientView({
                 type="button"
                 disabled={deletingSubmission}
                 onClick={handleConfirmDeleteSubmission}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 rounded-xs shadow-xs"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 rounded-lg shadow-xs"
               >
                 {deletingSubmission ? (
                   <>

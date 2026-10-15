@@ -1,3 +1,4 @@
+import { withLaunchTime } from "@/components/ui/withLaunchTime";
 import Link from "next/link";
 
 type Variant = "founder" | "product" | "category" | "generic";
@@ -59,7 +60,7 @@ export default function PrimaryCTA({
         {c.heading}
       </h2>
       <p className="text-xs sm:text-sm text-ink-dim font-sans leading-relaxed max-w-2xl">
-        {c.body}
+        {withLaunchTime(c.body)}
       </p>
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Link

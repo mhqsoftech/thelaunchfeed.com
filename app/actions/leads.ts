@@ -301,10 +301,10 @@ export async function sendOutreachCampaignAction(
 }
 
 /**
- * Internal (no auth) worker used by admin-gated wrappers and by Inngest crons
+ * Internal (no auth) worker used by admin-gated wrappers and by scheduled jobs (lib/jobs)
  * that have no cookie context and therefore can't satisfy requireAdmin().
  * MUST NOT be re-exported to client code — it is only invoked from other
- * server-side functions in this file and from Inngest handlers.
+ * server-side functions in this file and from background job handlers.
  */
 async function _sendOutreachCampaignInternal(
   leadIds: string[],
@@ -485,7 +485,7 @@ export async function triggerAutoOutreachBatchAction() {
 }
 
 /**
- * Internal (no auth) — called by Inngest crons which have no session cookie
+ * Internal (no auth) — called by scheduled jobs (lib/jobs) which have no session cookie
  * and cannot satisfy requireAdmin(). Do not re-export to client code.
  */
 export async function triggerAutoOutreachBatchInternal() {
@@ -666,7 +666,7 @@ export async function runDailyDirectoryCrawlBatchAction(selectedDirIds?: string[
 }
 
 /**
- * Internal (no auth) — called from the Inngest cron. Do not re-export to
+ * Internal (no auth) — called from the scheduled crawler job. Do not re-export to
  * client code; heavy work that must not be triggerable by unauthenticated
  * or non-admin callers.
  */
@@ -787,7 +787,7 @@ export async function runDailyDirectoryCrawlBatchInternal(selectedDirIds?: strin
       : DEFAULT_AUTO_CONFIG;
 
     if (outreachConfig.enabled && outreachConfig.autoSendOnCrawl && newLeadsSaved > 0) {
-      // Use the no-auth internal — this path also runs from the Inngest cron
+      // Use the no-auth internal — this path also runs from the scheduled outreach job
       // via runDailyDirectoryCrawlBatchAction and would otherwise fail its
       // requireAdmin() check silently.
       await triggerAutoOutreachBatchInternal();

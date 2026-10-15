@@ -1,4 +1,7 @@
-import "dotenv/config";
+import { config } from "dotenv";
+
+// Same precedence as Next.js: .env.local overrides .env (both optional).
+config({ path: [".env.local", ".env"], quiet: true });
 import path from "node:path";
 import { defineConfig, env } from "prisma/config";
 

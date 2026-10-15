@@ -9,60 +9,80 @@
 }
 
 @theme {
-  /* Surfaces — Light Mode Default */
-  --color-void: #FFFFFF;
-  --color-surface: #F5F5F5;
-  --color-raised: #EBEBEB;
-  --color-hairline: #E0E0E0;
+  /* Surfaces — Light ("Paper") default */
+  --color-void: #FAFAF8;
+  --color-surface: #F3F2EF;
+  --color-raised: #EAE8E4;
+  --color-card: #FFFFFF;
+  --color-hairline: #E5E3DE;
 
-  /* Text */
-  --color-ink: #0A0A0A;
-  --color-ink-dim: #6B6B6B;
-  --color-ink-faint: #A0A0A0;
+  /* Text — ink-dim keeps ≥ 6:1, ink-faint is for decoration only */
+  --color-ink: #111111;
+  --color-ink-dim: #57564F;
+  --color-ink-faint: #8D8B84;
 
-  /* Signal & Verification Accents */
-  --color-signal: #D6002A;
-  --color-signal-dim: #FDE8EC;
-  --color-verified: #00D97E;
+  /* Electric Signal Orange (BRAND_IDENTITY.md). The light value is deepened
+     to #D14000 so orange text and white-on-orange buttons pass WCAG AA. */
+  --color-signal: #D14000;
+  --color-signal-bright: #FF4F00;
+  --color-signal-dim: #FFEFE6;
+  --color-verified: #00875A;
 
-  /* Fonts */
+  /* Featured ticker — follows the theme's surfaces */
+  --ticker-bg: var(--color-surface);
+  --ticker-fg: var(--color-ink);
+  --ticker-dim: var(--color-ink-dim);
+  --ticker-line: var(--color-hairline);
+
+  /* Fonts — sans for reading, mono for telemetry, Doto for the brand voice */
   --font-display: var(--font-doto), monospace;
-  --font-mono: var(--font-geist-mono), monospace;
-  --font-sans: var(--font-geist-sans), system-ui;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
 
   /* Radii */
   --radius-none: 0px;
   --radius-sm: 2px;
+  --radius-card: 14px;
+
+  /* Elevation */
+  --shadow-card: 0 1px 0 rgb(17 17 17 / 0.04), 0 1px 3px rgb(17 17 17 / 0.06);
+  --shadow-lift: 0 2px 4px rgb(17 17 17 / 0.04), 0 12px 32px -12px rgb(17 17 17 / 0.18);
 }
 
 /* Light Theme Overrides */
 :root[data-theme="light"],
 [data-theme="light"] {
-  --color-void: #FFFFFF;
-  --color-surface: #F5F5F5;
-  --color-raised: #EBEBEB;
-  --color-hairline: #E0E0E0;
-  --color-ink: #0A0A0A;
-  --color-ink-dim: #6B6B6B;
-  --color-ink-faint: #A0A0A0;
-  --color-signal: #D6002A;
-  --color-signal-dim: #FDE8EC;
-  --color-verified: #00D97E;
+  --color-void: #FAFAF8;
+  --color-surface: #F3F2EF;
+  --color-raised: #EAE8E4;
+  --color-card: #FFFFFF;
+  --color-hairline: #E5E3DE;
+  --color-ink: #111111;
+  --color-ink-dim: #57564F;
+  --color-ink-faint: #8D8B84;
+  --color-signal: #D14000;
+  --color-signal-bright: #FF4F00;
+  --color-signal-dim: #FFEFE6;
+  --color-verified: #00875A;
 }
 
 /* Void Dark Theme Overrides */
 :root[data-theme="void"],
 [data-theme="void"] {
   --color-void: #09090B;
-  --color-surface: #121215;
-  --color-raised: #1A1A1E;
-  --color-hairline: #27272A;
+  --color-surface: #131316;
+  --color-raised: #1B1B1F;
+  --color-card: #101013;
+  --color-hairline: #26262B;
   --color-ink: #F4F4F5;
   --color-ink-dim: #A1A1AA;
-  --color-ink-faint: #52525B;
-  --color-signal: #FF4500;
+  --color-ink-faint: #5C5C66;
+  --color-signal: #FF5A1F;
+  --color-signal-bright: #FF6A33;
   --color-signal-dim: #2A1208;
   --color-verified: #00D97E;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --shadow-lift: 0 16px 40px -16px rgb(0 0 0 / 0.7);
 }
 
 /* Thermal Dark Mode Overrides */
@@ -71,13 +91,17 @@
   --color-void: #050B14;
   --color-surface: #0F172A;
   --color-raised: #1E293B;
+  --color-card: #0A1220;
   --color-hairline: #1E293B;
   --color-ink: #F8FAFC;
   --color-ink-dim: #94A3B8;
   --color-ink-faint: #64748B;
   --color-signal: #38BDF8;
+  --color-signal-bright: #38BDF8;
   --color-signal-dim: #0C4A6E;
   --color-verified: #00D97E;
+  --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset;
+  --shadow-lift: 0 16px 40px -16px rgb(0 0 0 / 0.7);
 }
 
 /* Brand Logo Dual Theme Switching (Default dark, switches to light in data-theme="light") */
@@ -102,10 +126,282 @@
   border-color: var(--color-hairline);
 }
 
+:root {
+  --tlf-header-h: 60px;
+}
+
+html {
+  scroll-padding-top: calc(var(--tlf-header-h) + 12px);
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   background: var(--color-void);
   color: var(--color-ink);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "cv11";
+  text-rendering: optimizeLegibility;
+}
+
+/* Visible, consistent keyboard focus everywhere. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Page title bars written for the old inner-scroll shell ("sticky -top-4")
+   now stick just under the site header instead. */
+.tlf-main .sticky.-top-4 {
+  /* Keep 8px of the bar's own padding visible so its content never touches
+     the header's bottom border while stuck. */
+  top: calc(var(--tlf-header-h) - 0.5rem);
+}
+
+/* Sticky side rails: fill the viewport under the header and scroll alone. */
+.tlf-rail {
+  position: sticky;
+  top: var(--tlf-header-h);
+  max-height: calc(100dvh - var(--tlf-header-h));
+}
+
+/* Leaves room for the mobile tab bar + iOS home indicator. */
+/* Scoped below xl only: plain CSS outranks Tailwind's layered utilities, so
+   a desktop override here would wipe out xl:pb-* on <main>. */
+@media (max-width: 1279.98px) {
+  .tlf-safe-bottom {
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Live dot used by the launch countdown. */
+@keyframes tlf-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.8); }
+}
+.tlf-live-dot {
+  animation: tlf-pulse 1.6s ease-in-out infinite;
+}
+
+/* ── Launch console button ─────────────────────────────────────────────
+   Crisp, flat, brand-native: no glow. A 1px hard edge + inner highlight,
+   the 2x2 signal matrix sweeping like radar, and a "lift-off" on hover. */
+.tlf-launch {
+  --launch-bg: var(--color-signal);
+  position: relative;
+  color: #fff;
+  background: var(--launch-bg);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--launch-bg) 70%, #000),
+    inset 0 1px 0 rgb(255 255 255 / 0.22);
+  overflow: hidden;
+  transition: transform 160ms ease, background-color 160ms ease;
+}
+.tlf-launch:hover {
+  --launch-bg: color-mix(in oklab, var(--color-signal) 88%, #fff);
+}
+.tlf-launch:active {
+  transform: translateY(1px);
+}
+/* Scanline that wipes across on hover, like an ignition sequence. */
+.tlf-launch-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  transform: translateX(-110%);
+  pointer-events: none;
+}
+.tlf-launch:hover .tlf-launch-main::after {
+  transform: translateX(110%);
+  transition: transform 520ms ease;
+}
+
+.tlf-matrix rect {
+  fill: currentColor;
+  opacity: 0.35;
+  animation: tlf-sweep 2.4s steps(1, end) infinite;
+}
+.tlf-matrix rect:nth-child(2) { animation-delay: 0.6s; }
+.tlf-matrix rect:nth-child(3) { animation-delay: 1.2s; }
+.tlf-matrix rect:nth-child(4) { animation-delay: 1.8s; }
+@keyframes tlf-sweep {
+  0%   { opacity: 1; }
+  25%  { opacity: 0.85; }
+  50%  { opacity: 0.65; }
+  75%  { opacity: 0.35; }
+}
+.tlf-launch:hover .tlf-matrix {
+  transform: translateY(-1.5px);
+  transition: transform 180ms ease;
+}
+.tlf-launch:hover .tlf-matrix rect {
+  animation-duration: 0.8s;
+}
+.tlf-launch:hover .tlf-matrix rect:nth-child(2) { animation-delay: 0.2s; }
+.tlf-launch:hover .tlf-matrix rect:nth-child(3) { animation-delay: 0.4s; }
+.tlf-launch:hover .tlf-matrix rect:nth-child(4) { animation-delay: 0.6s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tlf-matrix rect { animation: none; }
+  .tlf-matrix rect:nth-child(1) { opacity: 1; }
+  .tlf-matrix rect:nth-child(2) { opacity: 0.85; }
+  .tlf-matrix rect:nth-child(3) { opacity: 0.35; }
+  .tlf-matrix rect:nth-child(4) { opacity: 0.65; }
+  .tlf-launch-main::after { display: none; }
+}
+
+/* Launch clock digit tiles (components/ui/NextLaunchCountdown). */
+.tlf-digit {
+  width: 2.1rem;
+  height: 2.75rem;
+  font-size: 1.6rem;
+  line-height: 1;
+}
+@media (min-width: 640px) {
+  .tlf-digit { width: 2.4rem; height: 3.1rem; font-size: 1.85rem; }
+}
+.tlf-digit::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--color-hairline);
+}
+.tlf-digit-roll {
+  display: inline-block;
+  animation: tlf-roll 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes tlf-roll {
+  from { transform: translateY(-60%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tlf-digit-roll { animation: none; }
+}
+
+/* ── Legacy page modernization ─────────────────────────────────────────
+   Older page views (product, category, founders, profile, submit, badges,
+   legal) were written as square "brutalist" boxes. Inside the page <main>,
+   any bordered box / control that doesn't set its own radius picks up the
+   new card geometry. Elements with an explicit rounded-* class are untouched. */
+.tlf-main :is(div, section, article, aside, header, nav, a, button, li, label, form, details, pre, figure, span, ul, ol, table):is([class~="border"], [class~="border-2"], [class~="border-4"]):not([class*="rounded"]) {
+  border-radius: 12px;
+}
+/* Filled header / footer strips inside a rounded legacy box follow its corners
+   (no overflow:hidden on the box, so dropdowns and tooltips aren't clipped). */
+.tlf-main :is([class~="border"], [class~="border-2"]):not([class*="rounded"]) > :first-child:is([class*="bg-"], [class*="border-b"]) {
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.tlf-main :is([class~="border"], [class~="border-2"]):not([class*="rounded"]) > :last-child:is([class*="bg-"], [class*="border-t"]) {
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
+}
+.tlf-main :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea):not([class*="rounded"]) {
+  border-radius: 10px;
+}
+.tlf-main :is(button, a)[class*="bg-signal"]:not([class*="rounded"]),
+.tlf-main button:not([class*="rounded"]) {
+  border-radius: 10px;
+}
+/* Old translucent box fills → the solid card surface used everywhere else. */
+.tlf-main :is([class~="border"], [class~="border-2"]):not([class*="rounded"]):is([class*="bg-surface/10"], [class*="bg-surface/15"], [class*="bg-surface/20"], [class*="bg-surface/30"], [class*="bg-surface/40"]) {
+  background-color: var(--color-card);
+}
+/* Tiny bordered chips / tags read best as pills. */
+.tlf-main :is(span, a, button, div)[class~="border"]:is([class*="text-[9px]"], [class*="text-[10px]"]):not([class*="rounded"]) {
+  border-radius: 999px;
+}
+/* Images sitting directly in a rounded box follow its corners. */
+.tlf-main [class~="border"]:not([class*="rounded"]) > img:only-child {
+  border-radius: inherit;
+}
+
+/* ── Featured ticker ────────────────────────────────────────────────────
+   Theme-matched band: an orange "on air" tab with a slanted edge, dot-matrix
+   product names, hairline dividers and faded edges. */
+.tlf-ticker {
+  background-color: var(--ticker-bg);
+  color: var(--ticker-fg);
+  border-bottom: 1px solid var(--ticker-line);
+}
+.tlf-ticker-tab {
+  color: #fff;
+  background: var(--color-signal-bright);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
+.tlf-ticker-viewport {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 64px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 64px), transparent 100%);
+}
+.tlf-ticker-name {
+  color: var(--ticker-fg);
+  transition: color 160ms ease;
+}
+.tlf-ticker-tagline {
+  color: var(--ticker-dim);
+  transition: color 160ms ease;
+}
+.tlf-ticker-sep {
+  background: var(--ticker-line);
+}
+.tlf-ticker-arrow {
+  color: var(--color-signal);
+  opacity: 0;
+  transform: translate(-4px, 4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.tlf-ticker-item {
+  position: relative;
+}
+.tlf-ticker-item::after {
+  /* orange underline that sweeps in on hover */
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 7px;
+  height: 1px;
+  background: var(--color-signal-bright);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 220ms ease;
+}
+.tlf-ticker-item:hover .tlf-ticker-name,
+.tlf-ticker-item:focus-visible .tlf-ticker-name {
+  color: var(--color-signal);
+}
+.tlf-ticker-item:hover .tlf-ticker-tagline {
+  color: var(--ticker-fg);
+}
+.tlf-ticker-item:hover .tlf-ticker-arrow,
+.tlf-ticker-item:focus-visible .tlf-ticker-arrow {
+  opacity: 1;
+  transform: none;
+}
+.tlf-ticker-item:hover::after {
+  transform: scaleX(1);
+}
+
+/* Signal stripes behind the hero headline (the 4-square opacity steps). */
+.tlf-signal-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--color-hairline) 70%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--color-hairline) 70%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse at top left, #000 0%, transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tlf-live-dot {
+    animation: none;
+  }
+  html {
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Only fade colors on explicit user-triggered theme changes (toggled via

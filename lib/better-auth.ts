@@ -207,27 +207,16 @@ export const auth = betterAuth({
           };
         },
         after: async (user) => {
-          // Fire the welcome email. We call sendAndLog directly (in-process)
-          // rather than dispatching through Inngest so it works in dev
-          // without inngest-cli, and so a failed dispatch doesn't silently
-          // eat the send. Respect the admin automation toggle for "welcome".
-          try {
-            const rule = await prisma.automationRule
-              .findUnique({ where: { templateId: "welcome" } })
-              .catch(() => null);
-            if (rule && rule.enabled === false) return;
-
-            const { sendAndLog } = await import("@/lib/inngest/functions");
-            await sendAndLog({
-              templateId: "welcome",
-              to: user.email,
-              toUserId: user.id,
-              vars: { userName: user.name || user.email, userEmail: user.email },
-              trigger: "on-signup",
-            });
-          } catch (e) {
-            console.error("[welcome-email] failed:", e);
-          }
+          // Welcome email runs as a background job; the job respects the
+          // admin's "welcome" automation toggle.
+          const { emit } = await import("@/lib/jobs");
+          await emit("email.send.requested", {
+            templateId: "welcome",
+            to: user.email,
+            toUserId: user.id,
+            vars: { userName: user.name || user.email, userEmail: user.email },
+            trigger: "on-signup",
+          });
         },
       },
     },

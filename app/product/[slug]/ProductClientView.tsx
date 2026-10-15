@@ -10,6 +10,8 @@ import ProductComments from "@/app/components/ProductComments";
 import EmbeddableAwardWidget, { type EmbedAwardId } from "@/app/components/EmbeddableAwardWidget";
 import PrimaryCTA from "@/components/ui/PrimaryCTA";
 import { slugify, getStoredSession, saveSession, UserSession, formatProductWebsiteUrl } from "@/app/data";
+import { OutboundLink } from "@/components/ui/OutboundLink";
+import { goHref } from "@/lib/outbound/links";
 import { toggleVote, toggleBookmark } from "@/app/actions/interactions";
 import { getAccoladeDetails, type AccoladeItem, type ProductAward } from "@/lib/awards";
 
@@ -173,7 +175,7 @@ function renderVideoEmbed(url: string) {
       <iframe
         src={`https://www.youtube-nocookie.com/embed/${ytMatch[1]}`}
         title="Product Video Demo"
-        className="w-full aspect-video rounded-xs border-0"
+        className="w-full aspect-video rounded-lg border-0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
       />
@@ -185,7 +187,7 @@ function renderVideoEmbed(url: string) {
       <iframe
         src={`https://www.loom.com/embed/${loomMatch[1]}`}
         title="Product Video Walkthrough"
-        className="w-full aspect-video rounded-xs border-0"
+        className="w-full aspect-video rounded-lg border-0"
         allowFullScreen
       />
     );
@@ -196,7 +198,7 @@ function renderVideoEmbed(url: string) {
       <iframe
         src={`https://player.vimeo.com/video/${vimeoMatch[1]}`}
         title="Product Video Demo"
-        className="w-full aspect-video rounded-xs border-0"
+        className="w-full aspect-video rounded-lg border-0"
         allowFullScreen
       />
     );
@@ -205,7 +207,7 @@ function renderVideoEmbed(url: string) {
     <video
       src={trimmed.startsWith("http") ? trimmed : `https://${trimmed}`}
       controls
-      className="w-full aspect-video rounded-xs object-contain bg-black"
+      className="w-full aspect-video rounded-lg object-contain bg-black"
     />
   );
 }
@@ -464,10 +466,6 @@ export default function ProductClientView({
     ...(product as any),
   };
 
-  const mrrText =
-    product.revenue ||
-    (d.revenue && typeof d.revenue === "string" && !d.revenue.includes("Pre-Revenue") ? d.revenue : null) ||
-    (d.apiKey ? "$14.2K / mo" : null);
 
   const pricingPartnerName = d.pricingPartner
     ? d.pricingPartner.charAt(0).toUpperCase() + d.pricingPartner.slice(1)
@@ -600,7 +598,7 @@ export default function ProductClientView({
                     rel="author"
                     className="flex items-center gap-1.5 text-ink hover:underline font-medium hover:text-signal transition-colors group"
                   >
-                    <span className="w-4 h-4 rounded-xs bg-surface border border-hairline flex items-center justify-center font-mono text-[8px] font-bold text-ink-dim overflow-hidden relative shrink-0">
+                    <span className="w-4 h-4 rounded-lg bg-surface border border-hairline flex items-center justify-center font-mono text-[8px] font-bold text-ink-dim overflow-hidden relative shrink-0">
                       {product.makerImage ? (
                         <img width="64" height="64" src={product.makerImage} alt={product.makerName} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
@@ -680,15 +678,17 @@ export default function ProductClientView({
           {/* Action Row */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-3 border-t border-hairline">
             <div className="flex items-center gap-2.5 flex-wrap">
-              <a
+              <OutboundLink
                 href={formatProductWebsiteUrl((product as any).websiteUrl || (product as any).website || `https://${slugify(product.name)}.com`)}
-                target="_blank"
-                rel="noreferrer"
+                // Counted as "visitors sent" on the maker's dashboard.
+                goHref={goHref(product.slug || slugify(product.name), "product_page")}
+                // Free launches keep a dofollow link only while our badge stays on their site.
+                rel={d.backlinkRel === "nofollow" ? "nofollow noopener" : "noopener"}
                 className="w-full sm:w-auto px-4 py-2 border border-signal bg-signal/10 hover:bg-signal text-signal hover:text-void font-mono text-xs font-bold transition-all flex items-center justify-center gap-1.5 text-center shrink-0 uppercase tracking-wider group cursor-pointer"
               >
                 <span>Visit Website</span>
                 <span className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform">↗</span>
-              </a>
+              </OutboundLink>
 
               {d.githubUrl && (
                 <a
@@ -795,7 +795,7 @@ export default function ProductClientView({
                   Open Original ↗
                 </a>
               </div>
-              <div className="overflow-hidden rounded-xs border border-hairline bg-black">
+              <div className="overflow-hidden rounded-lg border border-hairline bg-black">
                 {renderVideoEmbed(activeVideoUrl)}
               </div>
             </div>
@@ -1213,7 +1213,7 @@ export default function ProductClientView({
               {/* Founder Avatar with Proper Profile Picture */}
               <Link
                 href={`/founder/${product.makerUsername || slugify(product.makerName || product.maker)}`}
-                className="w-12 h-12 sm:w-14 sm:h-14 bg-surface border border-hairline rounded-sm flex items-center justify-center font-mono font-bold text-ink shrink-0 overflow-hidden relative group hover:border-signal transition-colors"
+                className="w-12 h-12 sm:w-14 sm:h-14 bg-surface border border-hairline rounded-lg flex items-center justify-center font-mono font-bold text-ink shrink-0 overflow-hidden relative group hover:border-signal transition-colors"
               >
                 {product.makerImage ? (
                   <img width="64" height="64"
@@ -1351,7 +1351,7 @@ export default function ProductClientView({
                 <img width="64" height="64"
                   src={selectedImage}
                   alt="High Resolution Screenshot Preview"
-                  className="max-h-[70vh] w-auto max-w-full object-contain rounded-xs shadow-lg"
+                  className="max-h-[70vh] w-auto max-w-full object-contain rounded-lg shadow-lg"
                 />
               ) : (
                 <div className="text-ink-dim text-xs p-8 text-center">

@@ -1,3 +1,4 @@
+import { publicDetails } from "@/lib/free-launch";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getProductBySlug, getSimilarProducts } from "@/lib/queries/products";
@@ -156,7 +157,8 @@ export default async function ProductPage({
     monthlyRank: p.monthlyRank,
     rawAwards,
     accolades,
-    details: (p.details as any) ?? null,
+    // Never ship secrets or internal bookkeeping to the browser.
+    details: publicDetails(p.details) as any,
     revenue: revenueFormatted,
     mrrCents,
     totalRevenueCents,

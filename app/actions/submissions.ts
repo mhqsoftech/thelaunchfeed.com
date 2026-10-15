@@ -259,7 +259,12 @@ export type SubmissionConflict = {
 
 export type CreateSubmissionResult =
   | { success: true; submission: Submission }
-  | { success: false; error: string; conflict?: SubmissionConflict };
+  | {
+      success: false;
+      error: string;
+      conflict?: SubmissionConflict;
+      freeGate?: import("@/lib/free-launch").FreeLaunchGate;
+    };
 
 export async function createSubmission(input: CreateSubmissionInput): Promise<CreateSubmissionResult> {
   try {
@@ -382,13 +387,29 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
     ]);
     const screenshots: string[] = uploadedScreenshots.filter((s): s is string => !!s);
 
-    const detailsData = parsed.details
-      ? {
-          ...(parsed.details as Record<string, unknown>),
-          videoUrl: parsed.videoUrl || null,
-          tags: parsed.tags ?? [],
-        }
-      : undefined;
+    // Free launches ($0) must show our badge and upvote other launches first.
+    // Paid tiers are created now and go to checkout; publishing re-checks
+    // that they either paid or met the free requirements.
+    const freeLaunch = await import("@/lib/free-launch");
+    const clientDetails = freeLaunch.stripProtectedDetails(parsed.details as Record<string, unknown> | null);
+    let freeStamp: Record<string, unknown> | undefined;
+    if (!isDraft && freeLaunch.requestedTier(clientDetails) === 0) {
+      const gate = await freeLaunch.requireFreeGate(user.id, parsed.websiteUrl || "");
+      if (!gate.qualified) {
+        return { success: false, error: gate.message || "Free launch requirements not met.", freeGate: gate };
+      }
+      freeStamp = freeLaunch.freeLaunchStamp(gate);
+    }
+
+    const detailsData = {
+      ...(clientDetails ?? {}),
+      videoUrl: parsed.videoUrl || null,
+      tags: parsed.tags ?? [],
+      freeGateVersion: freeLaunch.FREE_GATE_VERSION,
+      // Site keys the "Featured on" badge link resolves by (lib/free-launch).
+      badgeKeys: freeLaunch.withBadgeKeys([], parsed.websiteUrl),
+      ...(freeStamp ? { freeLaunch: freeStamp } : {}),
+    };
 
     const sub = await prisma.submission.create({
       data: {
@@ -402,7 +423,7 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
         videoUrl: parsed.videoUrl || null,
         tags: parsed.tags ?? [],
         categoryId: category?.id,
-        details: detailsData ? (detailsData as any) : undefined,
+        details: detailsData as any,
         makerName: parsed.makerName,
         makerHandle: parsed.makerHandle,
         makerEmail: user.email,
@@ -415,37 +436,9 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
       return { success: true, submission: sub };
     }
 
-    // Fire the "submission.created" event AS A BACKGROUND job. If Inngest is
-    // not running (e.g. local dev without `npx inngest-cli dev` or missing INNGEST_EVENT_KEY),
-    // safely fall back to in-process sendAndLog so emails/logs work seamlessly without crashing.
-    (async () => {
-      try {
-        const { inngest } = await import("@/lib/inngest");
-        await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
-      } catch (inngestErr) {
-        try {
-          const { isAutomationEnabled } = await import("@/app/actions/automation");
-          const enabled = await isAutomationEnabled("product-submitted").catch(() => true);
-          if (enabled) {
-            const { sendAndLog } = await import("@/lib/inngest/functions");
-            await sendAndLog({
-              templateId: "product-submitted",
-              to: sub.makerEmail,
-              toUserId: sub.ownerId,
-              trigger: "on-submit",
-              vars: {
-                productName: sub.name,
-                productSlug: slugify(sub.name),
-                userName: user.name || user.email,
-                slotExpiresOn: new Date(sub.scheduledFor).toISOString().slice(0, 10),
-              },
-            });
-          }
-        } catch (fallbackErr) {
-          console.warn("[submission:fallback-email] notice:", fallbackErr);
-        }
-      }
-    })().catch((e) => console.error("[submission:background] failed:", e));
+    // Founder confirmation email runs as a durable background job.
+    const { emit } = await import("@/lib/jobs");
+    await emit("submission.created", { submissionId: sub.id });
 
     try {
       revalidatePath("/admin");
@@ -490,162 +483,30 @@ export async function publishSubmissionNow(id: string): Promise<void> {
   if (!sub) throw new Error("SUBMISSION_NOT_FOUND");
   if (sub.status === "REJECTED") throw new Error("SUBMISSION_REJECTED");
 
-  const now = new Date();
-
-  // If already published, just make sure the timestamp/link exist and no-op.
-  if (sub.status === "PUBLISHED" && sub.publishedProductId) {
+  // Same publisher the scheduler uses — claims the row atomically, creates
+  // the Product, and links any purchased spotlight slot.
+  const { publishSubmission } = await import("@/lib/publish");
+  const res = await publishSubmission(sub.id, { allowStatuses: ["SCHEDULED", "DRAFT"], enforceFreeGate: false });
+  if (res.status !== "published") {
     revalidatePath("/admin");
     revalidatePath("/");
+    if (res.status === "skipped") throw new Error(`PUBLISH_SKIPPED_${res.reason.toUpperCase()}`);
     return;
   }
 
-  // Do the publish in-process instead of waiting for the Inngest cron —
-  // creates the Product row, flips the submission to PUBLISHED, links
-  // them via publishedProductId (satisfying the schema's @unique),
-  // and fires the launch email inline.
-  const subDetails = (sub.details as Record<string, unknown>) || {};
-  const subVideoUrl = sub.videoUrl || (subDetails.videoUrl as string) || null;
-  const subTags = sub.tags && sub.tags.length > 0 ? sub.tags : ((subDetails.tags as string[]) || []);
-
-  const slug = await ensureUniqueSlug(slugify(sub.name));
-  const fallbackCat = sub.categoryId ? null : await resolveCategory((sub.details as any)?.category || subTags[0] || sub.name);
-  const product = await prisma.$transaction(async (tx) => {
-    const p = await tx.product.create({
-      data: {
-        slug,
-        name: sub.name,
-        tagline: sub.tagline,
-        description: sub.description,
-        websiteUrl: sub.websiteUrl,
-        logoUrl: sub.logoUrl,
-        screenshots: sub.screenshots,
-        videoUrl: subVideoUrl,
-        tags: subTags,
-        categoryId: sub.categoryId || fallbackCat?.id,
-        details: sub.details ?? undefined,
-        ownerId: sub.ownerId,
-        status: "LIVE",
-        launchedAt: now,
-        voteCount: 1,
-      },
-    });
-    await tx.vote.create({
-      data: {
-        productId: p.id,
-        userId: sub.ownerId,
-      },
-    });
-    await tx.submission.update({
-      where: { id: sub.id },
-      data: {
-        status: "PUBLISHED",
-        publishedAt: now,
-        publishedProductId: p.id,
-        scheduledFor: now,
-      },
-    });
-    return p;
-  });
-
-  // If a featured/spotlight slot was purchased for this submission, connect it to the published product and start 30-day window
-  try {
-    const subPurchaseId = (sub.details as Record<string, unknown>)?.purchaseId as string | undefined;
-    const matchingSlot = await prisma.featuredSlot.findFirst({
-      where: {
-        OR: [
-          ...(subPurchaseId ? [{ purchaseId: subPurchaseId }] : []),
-          { customUrl: `/product/${slug}` },
-          { customName: sub.name },
-        ],
-      },
-    });
-
-    if (matchingSlot) {
-      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-      await prisma.featuredSlot.update({
-        where: { id: matchingSlot.id },
-        data: {
-          productId: product.id,
-          startsAt: now,
-          endsAt: new Date(now.getTime() + thirtyDaysMs),
-        },
-      });
-      const { invalidateSlotsCache } = await import("@/lib/queries/slots");
-      invalidateSlotsCache();
-    }
-  } catch (e) {
-    console.warn("[publishSubmissionNow] Failed to link FeaturedSlot:", e);
-  }
-
-  // Send the "product-launched" email to the owner right now so they hear
-  // about it even without Inngest. The wider broadcast to all subscribers
-  // still fans out through the Inngest handler when it's running.
-  try {
-    const { sendAndLog } = await import("@/lib/inngest/functions");
-    await sendAndLog({
-      templateId: "product-launched",
-      to: sub.owner.email,
-      toUserId: sub.owner.id,
-      trigger: "on-launch",
-      vars: {
-        productName: product.name,
-        productSlug: product.slug,
-        userName: sub.owner.name || sub.owner.username,
-      },
-    });
-  } catch (e) {
-    console.error("[launch-email] failed:", e);
-  }
-  try {
-    const { broadcastProductLaunch } = await import("@/lib/broadcast");
-    await broadcastProductLaunch({
-      id: product.id,
-      name: product.name,
-      slug: product.slug,
-      tagline: product.tagline,
-      makerName: sub.owner.name || sub.owner.username,
-      makerUsername: sub.owner.username || undefined,
-      category: sub.category?.name || undefined,
-      tags: sub.tags,
-      websiteUrl: sub.websiteUrl,
-    });
-  } catch (e) {
-    console.error("[social-broadcast] inline failed:", e);
-  }
-
-  try {
-    const { inngest } = await import("@/lib/inngest");
-    await inngest.send({ name: "product.launched", data: { productId: product.id } });
-  } catch {
-    // Inngest not wired — owner email and broadcast already handled inline.
-  }
-
-  // Automated Web Search Indexing (Google Indexing API & IndexNow)
-  try {
-    const { submitBatch } = await import("@/lib/indexing");
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
-    const urlsToIndex = [
-      `${appUrl}/product/${encodeURIComponent(product.slug)}`,
-      `${appUrl}/`,
-    ];
-    if (sub.category?.slug) {
-      urlsToIndex.push(`${appUrl}/category/${encodeURIComponent(sub.category.slug)}`);
-    }
-    if (sub.owner?.username && sub.owner.isProfilePublic) {
-      urlsToIndex.push(`${appUrl}/founder/${encodeURIComponent(sub.owner.username.replace(/^@/, "").trim())}`);
-    }
-    await submitBatch(urlsToIndex, { type: "URL_UPDATED" });
-  } catch (e) {
-    console.error("[web-indexing] inline publish failed:", e);
-  }
+  // Social broadcast + founder email + search indexing run as background
+  // jobs (deduplicated per product, so nothing is ever sent twice).
+  const { emit } = await import("@/lib/jobs");
+  await emit("broadcast.launches", { productIds: [res.productId] }, { dedupeKey: `broadcast.launches:now:${res.productId}` });
+  await emit("product.launched", { productId: res.productId }, { dedupeKey: `product.launched:${res.productId}` });
 
   revalidatePath("/admin");
   revalidatePath("/");
   revalidatePath("/founders");
   revalidatePath("/category");
   revalidatePath("/profile");
-  revalidatePath(`/product/${product.slug}`);
-  revalidatePath(`/badges/${product.slug}`);
+  revalidatePath(`/product/${res.slug}`);
+  revalidatePath(`/badges/${res.slug}`);
 }
 
 export async function publishAllScheduledSubmissions(): Promise<{ count: number }> {
@@ -679,23 +540,6 @@ export async function publishAllScheduledSubmissions(): Promise<{ count: number 
   return { count: successCount };
 }
 
-/**
- * Reserve a unique slug — appends `-2`, `-3`, … if the base is taken.
- * Kept local to this action so the same helper Inngest uses is duplicated
- * in only one place per publish path.
- */
-async function ensureUniqueSlug(base: string): Promise<string> {
-  let candidate = base || `product-${Date.now().toString(36)}`;
-  for (let i = 2; i < 200; i++) {
-    const clash = await prisma.product.findUnique({
-      where: { slug: candidate },
-      select: { id: true },
-    });
-    if (!clash) return candidate;
-    candidate = `${base}-${i}`;
-  }
-  return `${base}-${Date.now().toString(36)}`;
-}
 
 export async function rejectSubmission(id: string, reason: string): Promise<void> {
   await requireAdmin();
@@ -711,30 +555,8 @@ export async function rejectSubmission(id: string, reason: string): Promise<void
     include: { owner: true },
   });
 
-  try {
-    const { sendAndLog } = await import("@/lib/inngest/functions");
-    await sendAndLog({
-      templateId: "product-rejected",
-      to: sub.owner.email,
-      toUserId: sub.owner.id,
-      trigger: "on-reject",
-      vars: {
-        productName: sub.name,
-        productSlug: slugify(sub.name),
-        userName: sub.owner.name || sub.owner.username,
-        rejectionReason: trimmed,
-      },
-    });
-  } catch (e) {
-    console.error("[reject-email] failed:", e);
-  }
-  try {
-    const { inngest } = await import("@/lib/inngest");
-    await inngest.send({
-      name: "submission.rejected",
-      data: { submissionId: id, reason: trimmed },
-    });
-  } catch {}
+  const { emit } = await import("@/lib/jobs");
+  await emit("submission.rejected", { submissionId: sub.id, reason: trimmed });
 
   revalidatePath("/admin");
   revalidatePath("/profile");
@@ -921,18 +743,34 @@ export async function updateMySubmission(
   const finalTags = parsed.tags !== undefined ? parsed.tags : existing.tags;
 
   const existingDetails = (existing.details as Record<string, unknown>) || {};
-  const updatedDetails = parsed.details !== undefined
-    ? {
-        ...existingDetails,
-        ...(parsed.details as Record<string, unknown>),
-        videoUrl: finalVideoUrl,
-        tags: finalTags,
-      }
-    : {
-        ...existingDetails,
-        videoUrl: finalVideoUrl,
-        tags: finalTags,
-      };
+  const freeLaunch = await import("@/lib/free-launch");
+  const updatedDetails: Record<string, unknown> = {
+    ...existingDetails,
+    ...(freeLaunch.stripProtectedDetails(parsed.details as Record<string, unknown> | null) ?? {}),
+    // Server-owned keys (payment, free-launch stamp) always come from the DB row.
+    ...freeLaunch.pickProtectedDetails(existingDetails),
+    videoUrl: finalVideoUrl,
+    tags: finalTags,
+    // Keep old + new site keys so an already-embedded badge keeps resolving.
+    badgeKeys: freeLaunch.withBadgeKeys(existingDetails.badgeKeys, existing.websiteUrl, parsed.websiteUrl || existing.websiteUrl),
+  };
+  freeLaunch.dropSecrets(updatedDetails); // purge any legacy plaintext key
+
+  // Entering the launch queue as a free launch → enforce the requirements.
+  const enteringQueue = !keepAsDraft && (wasDraft || wasRejected);
+  if (
+    enteringQueue &&
+    !freeLaunch.isPaidLaunch(existingDetails) &&
+    freeLaunch.requestedTier(updatedDetails) === 0 &&
+    !(existingDetails.freeLaunch as { qualified?: boolean } | undefined)?.qualified
+  ) {
+    const gate = await freeLaunch.requireFreeGate(user.id, parsed.websiteUrl || existing.websiteUrl, existing.id);
+    if (!gate.qualified) throw new Error(gate.message || "FREE_LAUNCH_REQUIREMENTS_NOT_MET");
+    updatedDetails.freeLaunch = freeLaunch.freeLaunchStamp(gate);
+  }
+  if (updatedDetails.freeGateVersion === undefined && (wasDraft || wasRejected)) {
+    updatedDetails.freeGateVersion = freeLaunch.FREE_GATE_VERSION;
+  }
 
   const sub = await prisma.submission.update({
     where: { id: existing.id },
@@ -955,23 +793,8 @@ export async function updateMySubmission(
   });
 
   if (wasRejected) {
-    try {
-      const { sendAndLog } = await import("@/lib/inngest/functions");
-      await sendAndLog({
-        templateId: "product-submitted",
-        to: user.email,
-        toUserId: user.id,
-        trigger: "on-submit",
-        vars: {
-          productName: sub.name,
-          productSlug: slugify(sub.name),
-          userName: user.name || user.username,
-          slotExpiresOn: sub.scheduledFor.toISOString().slice(0, 10),
-        },
-      });
-    } catch (e) {
-      console.error("[resubmit-email] failed:", e);
-    }
+    const { emit } = await import("@/lib/jobs");
+    await emit("submission.created", { submissionId: sub.id });
   }
 
   revalidatePath("/admin");
@@ -1010,18 +833,18 @@ export async function updateMyProduct(
   const finalTags = parsed.tags !== undefined ? parsed.tags : existing.tags;
 
   const existingDetails = (existing.details as Record<string, unknown>) || {};
-  const updatedDetails = parsed.details !== undefined
-    ? {
-        ...existingDetails,
-        ...(parsed.details as Record<string, unknown>),
-        videoUrl: finalVideoUrl,
-        tags: finalTags,
-      }
-    : {
-        ...existingDetails,
-        videoUrl: finalVideoUrl,
-        tags: finalTags,
-      };
+  const freeLaunch = await import("@/lib/free-launch");
+  const updatedDetails: Record<string, unknown> = {
+    ...existingDetails,
+    ...(freeLaunch.stripProtectedDetails(parsed.details as Record<string, unknown> | null) ?? {}),
+    // Server-owned keys (payment, free-launch stamp) always come from the DB row.
+    ...freeLaunch.pickProtectedDetails(existingDetails),
+    videoUrl: finalVideoUrl,
+    tags: finalTags,
+    // Keep old + new site keys so an already-embedded badge keeps resolving.
+    badgeKeys: freeLaunch.withBadgeKeys(existingDetails.badgeKeys, existing.websiteUrl, parsed.websiteUrl || existing.websiteUrl),
+  };
+  freeLaunch.dropSecrets(updatedDetails); // purge any legacy plaintext key
 
   const updated = await prisma.product.update({
     where: { id: productId },
@@ -1094,6 +917,14 @@ export async function resubmitSubmission(input: ResubmitInput): Promise<Submissi
       description: parsed.description ?? existing.description,
       websiteUrl: parsed.websiteUrl || existing.websiteUrl,
       categoryId: category?.id ?? existing.categoryId,
+      details: {
+        ...((existing.details as Record<string, unknown>) || {}),
+        badgeKeys: (await import("@/lib/free-launch")).withBadgeKeys(
+          (existing.details as Record<string, unknown> | null)?.badgeKeys,
+          existing.websiteUrl,
+          parsed.websiteUrl || existing.websiteUrl
+        ),
+      } as any,
       status: "SCHEDULED",
       scheduledFor,
       rejectedAt: null,
@@ -1101,12 +932,8 @@ export async function resubmitSubmission(input: ResubmitInput): Promise<Submissi
     },
   });
 
-  try {
-    const { inngest } = await import("@/lib/inngest");
-    await inngest.send({ name: "submission.created", data: { submissionId: sub.id } });
-  } catch (e) {
-    console.error("[resubmit:inngest] failed:", e);
-  }
+  const { emit } = await import("@/lib/jobs");
+  await emit("submission.created", { submissionId: sub.id });
 
   revalidatePath("/admin");
   revalidatePath("/profile");

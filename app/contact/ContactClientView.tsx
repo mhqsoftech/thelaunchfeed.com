@@ -224,7 +224,7 @@ export default function ContactClientView() {
       </div>
 
       {/* Header */}
-      <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 rounded-xs">
+      <div className="border border-hairline p-4 sm:p-7 bg-surface/30 space-y-3 rounded-lg">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="hover:opacity-90 transition-opacity">
             <LaunchFeedBrandLogo height={28} />
@@ -237,7 +237,7 @@ export default function ContactClientView() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
         {/* Left 2 Cols: Interactive Contact Form */}
-        <div className="lg:col-span-2 border border-hairline p-4 sm:p-6 bg-void space-y-5 sm:space-y-6 rounded-xs">
+        <div className="lg:col-span-2 border border-hairline p-4 sm:p-6 bg-void space-y-5 sm:space-y-6 rounded-lg">
           <div className="border-b border-hairline pb-3">
             <h2 className="text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-signal" />
@@ -484,7 +484,7 @@ export default function ContactClientView() {
       <div className="border-t border-hairline pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-xs w-full sm:w-auto justify-center"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold text-ink transition-colors cursor-pointer group rounded-lg w-full sm:w-auto justify-center"
         >
           <span className="text-signal group-hover:-translate-x-0.5 transition-transform">←</span>
           <span>Back to Leaderboard</span>

@@ -68,6 +68,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "hourly",
       priority: 1.0,
     },
+    ...(["weekly", "monthly", "yearly", "all-time"] as const).map((period) => ({
+      url: `${APP_URL}/leaderboard/${period}`,
+      lastModified: new Date(latestProductTimestamp),
+      changeFrequency: (period === "weekly" ? "daily" : period === "monthly" ? "daily" : "weekly") as "daily" | "weekly",
+      priority: period === "weekly" ? 0.9 : 0.8,
+    })),
+    {
+      url: `${APP_URL}/categories`,
+      lastModified: new Date(latestProductTimestamp),
+      changeFrequency: "daily",
+      priority: 0.8,
+    },
     {
       url: `${APP_URL}/founders`,
       lastModified: new Date(latestFounderTimestamp),

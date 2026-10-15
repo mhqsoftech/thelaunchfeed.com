@@ -59,7 +59,7 @@ export default function FeaturedOnFooterBar({
           {loopList.map((item, idx) => (
             <div
               key={`${item.id}-${idx}`}
-              className="shrink-0 flex items-center justify-center h-8 px-2.5 py-1 border border-hairline/80 bg-surface/30 hover:border-signal/50 hover:bg-surface transition-all rounded-xs select-none"
+              className="shrink-0 flex items-center justify-center h-8 px-2.5 py-1 border border-hairline/80 bg-surface/30 hover:border-signal/50 hover:bg-surface transition-all rounded-lg select-none"
             >
               <div
                 className="directory-badge-wrapper flex items-center justify-center max-h-7 overflow-hidden"
