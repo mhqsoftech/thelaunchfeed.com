@@ -15,7 +15,7 @@ export type FreeLaunchProduct = {
   category: string | null;
   /** The current user has an upvote on it. */
   voted: boolean;
-  /** That upvote counts toward this free launch (cast since the last one). */
+  /** That upvote counts toward this free launch (no earlier free launch used this product). */
   counts: boolean;
 };
 

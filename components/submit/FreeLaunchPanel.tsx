@@ -7,7 +7,8 @@ import { getFreeLaunchStatus, verifyFreeLaunchBadge, type FreeLaunchStatus } fro
 /**
  * Free ($0) launch requirements shown on the submit page:
  *   1. Embed The Launch Feed badge on your site → Verify
- *   2. Upvote any 3 launched products (newest first)
+ *   2. Upvote any 3 launched products (newest first) — 3 new ones per free launch;
+ *      fewer (or none) when the maker has no unused launches left to upvote
  * Reports `qualified` upward so the submit button can unlock.
  */
 export function FreeLaunchPanel({
@@ -186,66 +187,78 @@ export function FreeLaunchPanel({
         <div className="flex items-center justify-between gap-3">
           <h3 className="font-semibold text-ink flex items-center gap-2">
             <StepDot done={upvoteOk} n={2} />
-            Upvote any {status.required} launched products
+            {status.required === 0
+              ? "Upvote new launched products"
+              : `Upvote any ${status.required} new launched product${status.required === 1 ? "" : "s"}`}
           </h3>
           <span className={`text-xs font-semibold tabular-nums ${upvoteOk ? "text-verified" : "text-ink-dim"}`}>
             {status.upvotesDone} / {status.required}
           </span>
         </div>
         <div className="h-1.5 rounded-full bg-surface overflow-hidden" aria-hidden>
-          <div className="h-full bg-signal transition-all" style={{ width: `${(status.upvotesDone / status.required) * 100}%` }} />
+          <div className="h-full bg-signal transition-all" style={{ width: `${status.required ? (status.upvotesDone / status.required) * 100 : 100}%` }} />
         </div>
-        <p className="text-sm text-ink-dim">
-          Open a launch, check it out, and upvote it on its product page. Newest launches first — votes cast since your
-          last free launch count, and your progress updates when you come back to this tab.
-        </p>
-        <ul className="divide-y divide-hairline">
-          {visible.map((p) => (
-            <li key={p.id} className="flex items-center gap-3 py-2.5">
-              <span className="w-10 h-10 shrink-0 overflow-hidden rounded-lg border border-hairline bg-surface flex items-center justify-center text-[10px] font-mono font-bold text-ink-dim">
-                {p.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.logoUrl} alt="" width={40} height={40} loading="lazy" className="w-full h-full object-cover" />
-                ) : (
-                  p.name.slice(0, 2).toUpperCase()
-                )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <a href={`/product/${p.slug}`} target="_blank" rel="noopener" className="text-sm font-semibold text-ink hover:text-signal truncate block">
-                  {p.name}
-                </a>
-                <p className="text-xs text-ink-dim truncate">
-                  {p.tagline}
-                  <span className="text-ink-faint"> · {new Date(p.launchedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
-                </p>
-              </div>
-              {p.voted ? (
-                <span
-                  className={`shrink-0 inline-flex items-center gap-1 h-9 px-3 rounded-full text-xs font-semibold ${
-                    p.counts ? "bg-verified/10 text-verified" : "bg-surface text-ink-faint"
-                  }`}
-                  title={p.counts ? "Counts toward your free launch" : "Upvoted before your last free launch — doesn't count again"}
-                >
-                  ✓ Upvoted
-                </span>
-              ) : (
-                <a
-                  href={`/product/${p.slug}`}
-                  target="_blank"
-                  rel="noopener"
-                  className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-hairline text-xs font-semibold text-ink hover:border-signal hover:text-signal transition-colors"
-                  aria-label={`Open ${p.name} to upvote it`}
-                >
-                  Open &amp; upvote <span aria-hidden>↗</span>
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
-        {status.products.length > 8 && (
-          <button type="button" onClick={() => setShowAll((v) => !v)} className="text-sm font-semibold text-signal hover:underline">
-            {showAll ? "Show fewer" : `Show ${status.products.length - 8} more launches`}
-          </button>
+        {status.required === 0 ? (
+          <p className="text-sm text-ink-dim">
+            Nothing left to upvote — you&apos;ve already used every live launch for earlier free launches, so your verified
+            badge is all this launch needs.
+          </p>
+        ) : (
+          <>
+            <p className="text-sm text-ink-dim">
+              Open a launch, check it out, and upvote it on its product page. Every free launch needs {status.required} new
+              upvote{status.required === 1 ? "" : "s"} — products you upvoted for an earlier free launch don&apos;t count again.
+              Progress updates when you come back to this tab.
+            </p>
+            <ul className="divide-y divide-hairline">
+              {visible.map((p) => (
+                <li key={p.id} className="flex items-center gap-3 py-2.5">
+                  <span className="w-10 h-10 shrink-0 overflow-hidden rounded-lg border border-hairline bg-surface flex items-center justify-center text-[10px] font-mono font-bold text-ink-dim">
+                    {p.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.logoUrl} alt="" width={40} height={40} loading="lazy" className="w-full h-full object-cover" />
+                    ) : (
+                      p.name.slice(0, 2).toUpperCase()
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <a href={`/product/${p.slug}`} target="_blank" rel="noopener" className="text-sm font-semibold text-ink hover:text-signal truncate block">
+                      {p.name}
+                    </a>
+                    <p className="text-xs text-ink-dim truncate">
+                      {p.tagline}
+                      <span className="text-ink-faint"> · {new Date(p.launchedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                    </p>
+                  </div>
+                  {p.voted ? (
+                    <span
+                      className={`shrink-0 inline-flex items-center gap-1 h-9 px-3 rounded-full text-xs font-semibold ${
+                        p.counts ? "bg-verified/10 text-verified" : "bg-surface text-ink-faint"
+                      }`}
+                      title={p.counts ? "Counts toward your free launch" : "Already used for an earlier free launch — upvote a different product"}
+                    >
+                      ✓ Upvoted
+                    </span>
+                  ) : (
+                    <a
+                      href={`/product/${p.slug}`}
+                      target="_blank"
+                      rel="noopener"
+                      className="shrink-0 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full border border-hairline text-xs font-semibold text-ink hover:border-signal hover:text-signal transition-colors"
+                      aria-label={`Open ${p.name} to upvote it`}
+                    >
+                      Open &amp; upvote <span aria-hidden>↗</span>
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {status.products.length > 8 && (
+              <button type="button" onClick={() => setShowAll((v) => !v)} className="text-sm font-semibold text-signal hover:underline">
+                {showAll ? "Show fewer" : `Show ${status.products.length - 8} more launches`}
+              </button>
+            )}
+          </>
         )}
       </div>
 

@@ -4,8 +4,11 @@
  * A $0 launch is free in money, not in effort. Before it can go live the
  * maker must:
  *   1. show our badge on their website (a link back to thelaunchfeed.com), and
- *   2. upvote REQUIRED_UPVOTES other launched products since their last free
- *      launch (so each free launch gives something back to the community).
+ *   2. upvote REQUIRED_UPVOTES *new* launched products for every free launch —
+ *      products used for an earlier free launch never count again (so each
+ *      free launch gives something back to the community). When fewer than
+ *      that are left to use, only those are needed; with none left, the badge
+ *      alone qualifies.
  *
  * The badge is verified two ways so client-rendered (SPA) sites work too:
  *   - "html":    we fetch the page and find an <a href> / <img src> pointing at us
@@ -234,8 +237,14 @@ export async function storedBadgeVerified(websiteUrl: string): Promise<boolean> 
 /* ─────────── upvote requirement ─────────── */
 
 /**
- * Upvotes count when cast on someone else's LIVE, real (non-seed) product after the maker's
- * previous free launch qualified — each free launch needs fresh upvotes.
+ * Each free launch needs upvotes on REQUIRED_UPVOTES products that no earlier
+ * free launch of this maker already used (someone else's LIVE, real non-seed
+ * products). Tracking used products — not vote timestamps — is what stops
+ * un-upvoting and re-upvoting the same products from counting twice.
+ *
+ * If fewer than REQUIRED_UPVOTES such products exist, `required` drops to
+ * what is left; when the maker has used up every launch, it is 0 and the
+ * badge alone qualifies.
  */
 export async function upvoteProgress(userId: string, opts: { excludeSubmissionId?: string } = {}) {
   const previous = await prisma.submission.findMany({
@@ -246,25 +255,33 @@ export async function upvoteProgress(userId: string, opts: { excludeSubmissionId
     },
     select: { details: true },
   });
-  const since = previous
-    .map((s) => Date.parse(((s.details as any)?.freeLaunch?.qualifiedAt as string) || ""))
-    .filter((n) => Number.isFinite(n))
-    .sort((a, b) => b - a)[0];
+  const usedProductIds = [
+    ...new Set(
+      previous
+        .flatMap((s) => (s.details as any)?.freeLaunch?.upvotedProductIds ?? [])
+        .filter((x: unknown): x is string => typeof x === "string")
+    ),
+  ];
 
-  const votes = await prisma.vote.findMany({
-    where: {
-      userId,
-      ...(since ? { createdAt: { gt: new Date(since) } } : {}),
-      product: { status: "LIVE", ownerId: { not: userId }, owner: { isSeed: false } },
-    },
-    select: { productId: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const eligible = {
+    status: "LIVE" as const,
+    ownerId: { not: userId },
+    owner: { isSeed: false },
+    ...(usedProductIds.length ? { id: { notIn: usedProductIds } } : {}),
+  };
+  const [votes, available] = await Promise.all([
+    prisma.vote.findMany({
+      where: { userId, product: eligible },
+      select: { productId: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.product.count({ where: eligible }),
+  ]);
+  const required = Math.min(REQUIRED_UPVOTES, available);
   return {
-    required: REQUIRED_UPVOTES,
-    done: Math.min(votes.length, REQUIRED_UPVOTES),
+    required,
+    done: Math.min(votes.length, required),
     votedProductIds: votes.map((v) => v.productId),
-    since: since ? new Date(since).toISOString() : null,
   };
 }
 
@@ -288,13 +305,14 @@ export async function evaluateFreeGate(
       ? verifyBadge(websiteUrl).then((b) => ({ domain: b.domain, verified: b.verified, reason: b.reason }))
       : storedBadgeVerified(websiteUrl).then((v) => ({ domain: normalizeDomain(websiteUrl), verified: v, reason: undefined as string | undefined })),
   ]);
-  const upvotesOk = votes.done >= REQUIRED_UPVOTES;
+  const upvotesOk = votes.done >= votes.required;
+  const left = votes.required - votes.done;
   const missing: string[] = [];
   if (!badge.verified) missing.push("embed The Launch Feed badge on your website");
-  if (!upvotesOk) missing.push(`upvote ${REQUIRED_UPVOTES - votes.done} more launched product${REQUIRED_UPVOTES - votes.done === 1 ? "" : "s"}`);
+  if (!upvotesOk) missing.push(`upvote ${left} more new launched product${left === 1 ? "" : "s"}`);
   return {
     qualified: badge.verified && upvotesOk,
-    upvotes: { required: REQUIRED_UPVOTES, done: votes.done },
+    upvotes: { required: votes.required, done: votes.done },
     badge: { domain: badge.domain, verified: badge.verified },
     votedProductIds: votes.votedProductIds,
     message: missing.length ? `To launch for free, ${missing.join(" and ")} — or pick a paid launch.` : undefined,
@@ -302,12 +320,12 @@ export async function evaluateFreeGate(
 }
 
 /** Details stamp written onto a submission that passed the gate. */
-export function freeLaunchStamp(gate: { badge: { domain: string | null }; votedProductIds: string[] }) {
+export function freeLaunchStamp(gate: { badge: { domain: string | null }; upvotes: { required: number }; votedProductIds: string[] }) {
   return {
     qualified: true,
     qualifiedAt: new Date().toISOString(),
     badgeDomain: gate.badge.domain,
-    upvotedProductIds: gate.votedProductIds.slice(0, REQUIRED_UPVOTES),
+    upvotedProductIds: gate.votedProductIds.slice(0, gate.upvotes.required),
   };
 }
 
