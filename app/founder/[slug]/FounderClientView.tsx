@@ -166,7 +166,11 @@ export function FounderProfileContent({
   );
 
   return (
-    <div className="space-y-5 sm:space-y-6 pb-12 w-full max-w-full overflow-hidden">
+    // overflow-x-clip, not overflow-hidden: "hidden" makes this div a scroll
+    // container, so the sticky breadcrumb below would stick inside it and its
+    // top offset (globals.css, .tlf-main .sticky.-top-4) would push it down
+    // over the profile card instead of pinning it under the header.
+    <div className="space-y-5 sm:space-y-6 pb-12 w-full max-w-full overflow-x-clip">
       {/* Navigation Breadcrumb Bar — Sticky & Aligned with Sidebars */}
       {!onExitPreview && (
         <div className="sticky -top-4 z-20 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
