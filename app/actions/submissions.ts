@@ -457,10 +457,16 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
 
 /* ─────────── admin ─────────── */
 
-export async function listSubmissions(): Promise<Submission[]> {
+export async function listSubmissions() {
   await requireAdmin();
+  // Category + owner ride along so the admin preview can show the full
+  // submission without a second round-trip.
   return prisma.submission.findMany({
     orderBy: [{ status: "asc" }, { scheduledFor: "asc" }],
+    include: {
+      category: { select: { name: true, slug: true } },
+      owner: { select: { username: true, image: true, emailVerified: true, createdAt: true } },
+    },
   });
 }
 

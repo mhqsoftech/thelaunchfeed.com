@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState, useTransition } from "reac
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LaunchFeedLogo, LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
+import { LaunchFeedLogo } from "@/components/ui/LaunchFeedLogo";
 import { LaunchFeedLoader } from "@/components/ui/LaunchFeedLoader";
 import {
   getStoredSession,
@@ -48,6 +48,7 @@ const DEMO_USERS: (AdminUser & { subscriptions: never[]; upvotedProductIds: stri
 import { listMyProducts, type MyProduct } from "@/app/actions/profile";
 import { TEMPLATES, getTemplate, EmailTemplateId, TemplateVars } from "./emailTemplates";
 import SubmissionTimer from "@/app/components/SubmissionTimer";
+import SubmissionPreview, { imageSrc, launchTierInfo, type AdminSubmission } from "./SubmissionPreview";
 import ThemedSelect from "./ThemedSelect";
 import {
   listSubmissions,
@@ -271,23 +272,24 @@ const TABS: {
   id: Tab;
   label: string;
   group: "monitor" | "manage" | "comms" | "founder" | "system";
+  desc: string;
 }[] = [
-  { id: "overview", label: "Overview", group: "monitor" },
-  { id: "revenue", label: "Revenue", group: "monitor" },
-  { id: "products", label: "Products", group: "manage" },
-  { id: "submissions", label: "Submissions", group: "manage" },
-  { id: "users", label: "Users", group: "manage" },
-  { id: "moderation", label: "Moderation", group: "manage" },
-  { id: "featured", label: "Featured & Rotating", group: "manage" },
-  { id: "categories", label: "Categories", group: "manage" },
-  { id: "embeds", label: "Directory Embeds", group: "manage" },
-  { id: "indexing", label: "Web Indexing", group: "manage" },
-  { id: "outreach", label: "Directory Outreach", group: "manage" },
-  { id: "founder", label: "Founder mode", group: "founder" },
-  { id: "broadcast", label: "Social Broadcast", group: "comms" },
-  { id: "emails", label: "Compose email", group: "comms" },
-  { id: "automation", label: "Automation", group: "comms" },
-  { id: "seed", label: "Seed Data", group: "system" },
+  { id: "overview", label: "Overview", group: "monitor", desc: "Platform health at a glance and anything waiting on you." },
+  { id: "revenue", label: "Revenue", group: "monitor", desc: "Payments, placements and verified maker revenue." },
+  { id: "products", label: "Products", group: "manage", desc: "Every live product in the catalog." },
+  { id: "submissions", label: "Submissions", group: "manage", desc: "Review new launches before they go live. Open a preview to see everything the maker submitted." },
+  { id: "users", label: "Users", group: "manage", desc: "Accounts, roles and maker profiles." },
+  { id: "moderation", label: "Moderation", group: "manage", desc: "Flagged comments awaiting a decision." },
+  { id: "featured", label: "Featured & Rotating", group: "manage", desc: "Paid and custom spotlight placements." },
+  { id: "categories", label: "Categories", group: "manage", desc: "The taxonomy products are filed under." },
+  { id: "embeds", label: "Directory Embeds", group: "manage", desc: "Badge embeds found on maker sites." },
+  { id: "indexing", label: "Web Indexing", group: "manage", desc: "Search-engine submission status and history." },
+  { id: "outreach", label: "Directory Outreach", group: "manage", desc: "Founder leads crawled from other directories." },
+  { id: "founder", label: "Founder mode", group: "founder", desc: "Your own products, as a maker sees them." },
+  { id: "broadcast", label: "Social Broadcast", group: "comms", desc: "Automatic launch posts to social channels." },
+  { id: "emails", label: "Compose email", group: "comms", desc: "Preview templates and send one-off or broadcast emails." },
+  { id: "automation", label: "Automation", group: "comms", desc: "Turn automatic emails on or off per template." },
+  { id: "seed", label: "Seed Data", group: "system", desc: "Demo data and bulk visibility switches." },
 ];
 
 const GROUP_LABEL: Record<string, string> = {
@@ -319,6 +321,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   const changeTab = (newTab: Tab) => {
     setTab(newTab);
@@ -364,6 +367,19 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
     if (!session || !adminEmail) return false;
     return session.email.trim().toLowerCase() === adminEmail;
   }, [session, adminEmail]);
+
+  // Badge on the Submissions nav item; re-read whenever the tab changes so
+  // it reflects publishes/rejects made in the queue.
+  useEffect(() => {
+    if (!isAdmin) return;
+    let cancelled = false;
+    listSubmissions()
+      .then((rows) => !cancelled && setPendingCount(rows.filter((r) => r.status === "SCHEDULED").length))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, tab]);
 
   const cycleTheme = () => {
     const order: ThemeMode[] = ["light", "void", "thermal"];
@@ -437,6 +453,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
     );
   }
 
+  const activeTab = TABS.find((t) => t.id === tab) ?? TABS[0];
   const groups: Array<"monitor" | "manage" | "comms" | "founder" | "system"> = [
     "monitor",
     "manage",
@@ -457,16 +474,13 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
           ].join(" ")}
         >
           <Link href="/admin" className="flex items-center gap-2 overflow-hidden hover:opacity-85 transition-opacity" title="The Launch Feed - Admin Console">
-            {sidebarCollapsed ? (
-              <LaunchFeedLogo size={22} className="shrink-0" />
-            ) : (
+            <LaunchFeedLogo size={20} className="shrink-0" />
+            {!sidebarCollapsed && (
               <>
-                <div className="hidden md:flex items-center">
-                  <LaunchFeedBrandLogo height={22} />
-                </div>
-                <div className="flex md:hidden items-center">
-                  <LaunchFeedLogo size={22} className="shrink-0" />
-                </div>
+                <span className="hidden sm:inline font-display font-black text-[13px] tracking-wide text-ink uppercase leading-none whitespace-nowrap">
+                  The Launch <span className="text-signal">Feed</span>
+                </span>
+                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-ink text-void leading-none">Admin</span>
               </>
             )}
           </Link>
@@ -505,7 +519,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
               href="/submit"
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 px-3 border border-signal bg-signal text-surface hover:opacity-90 transition-opacity text-xs uppercase font-bold font-mono flex items-center gap-1 rounded-xs shrink-0"
+              className="h-8 px-3 border border-signal bg-signal text-surface hover:opacity-90 transition-opacity text-xs uppercase font-bold font-mono flex items-center gap-1 rounded-md shrink-0"
             >
               + Submit
             </Link>
@@ -513,7 +527,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs uppercase font-bold font-mono flex items-center gap-1 transition-colors rounded-xs shrink-0"
+              className="h-8 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs uppercase font-bold font-mono flex items-center gap-1 transition-colors rounded-md shrink-0"
             >
               ↗ Public site
             </Link>
@@ -566,7 +580,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
               logoutSession();
               window.location.href = "/";
             }}
-            className="hidden sm:inline-flex h-8 px-3 border border-hairline bg-surface hover:bg-signal hover:text-surface hover:border-signal text-xs uppercase font-bold font-mono transition-colors cursor-pointer items-center justify-center rounded-xs shrink-0"
+            className="hidden sm:inline-flex h-8 px-3 border border-hairline bg-surface hover:bg-signal hover:text-surface hover:border-signal text-xs uppercase font-bold font-mono transition-colors cursor-pointer items-center justify-center rounded-md shrink-0"
           >
             Sign out
           </button>
@@ -631,30 +645,40 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
             {groups.map((g) => (
               <div key={g} className="mb-4">
                 {!sidebarCollapsed ? (
-                  <div className="px-3 pb-1 text-xs uppercase text-ink-dim font-bold tracking-wider">
+                  <div className="px-4 pb-1.5 text-[10px] uppercase text-ink-faint font-bold tracking-[0.12em]">
                     {GROUP_LABEL[g]}
                   </div>
                 ) : (
                   <div className="my-2 border-t border-hairline/60" />
                 )}
-                <ul>
+                <ul className="px-2 space-y-0.5">
                   {TABS.filter((t) => t.group === g).map((t) => {
                     const active = tab === t.id;
+                    const badge = t.id === "submissions" && pendingCount > 0 ? pendingCount : 0;
                     return (
                       <li key={t.id}>
                         <button
                           onClick={() => changeTab(t.id)}
                           title={t.label}
+                          aria-current={active ? "page" : undefined}
                           className={[
-                            "w-full flex items-center gap-3 py-2 text-xs uppercase font-bold border-l-2 transition-colors cursor-pointer",
-                            sidebarCollapsed ? "px-0 justify-center" : "px-3",
+                            "relative w-full h-9 flex items-center gap-2.5 rounded-md text-[12px] font-semibold transition-colors cursor-pointer",
+                            sidebarCollapsed ? "px-0 justify-center" : "px-2.5",
                             active
-                              ? "border-signal bg-[color:var(--surface-alt,rgba(0,0,0,0.03))] text-ink"
-                              : "border-transparent text-ink-dim hover:text-ink hover:border-hairline",
+                              ? "bg-void text-ink shadow-card ring-1 ring-hairline"
+                              : "text-ink-dim hover:text-ink hover:bg-raised/60",
                           ].join(" ")}
                         >
-                          <TabIcon id={t.id} className="w-4 h-4 shrink-0 text-current" />
-                          {!sidebarCollapsed && <span className="truncate">{t.label}</span>}
+                          <TabIcon id={t.id} className={`w-4 h-4 shrink-0 ${active ? "text-signal" : "text-current"}`} />
+                          {!sidebarCollapsed && <span className="truncate flex-1 text-left">{t.label}</span>}
+                          {badge > 0 &&
+                            (sidebarCollapsed ? (
+                              <span className="absolute top-1.5 right-2.5 w-2 h-2 rounded-full bg-signal" aria-label={`${badge} pending`} />
+                            ) : (
+                              <span className="min-w-5 h-5 px-1.5 rounded-full bg-signal text-white text-[10px] font-bold tabular-nums flex items-center justify-center">
+                                {badge}
+                              </span>
+                            ))}
                         </button>
                       </li>
                     );
@@ -692,18 +716,17 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0 p-3 sm:p-6 flex flex-col overflow-y-auto md:overflow-hidden">
-          <div className="mb-4 flex items-baseline justify-between gap-4 flex-wrap shrink-0">
-            <div>
-              <div className="text-xs uppercase text-ink-dim font-bold">
-                {GROUP_LABEL[TABS.find((t) => t.id === tab)!.group]}
+        <main className="flex-1 min-w-0 p-3 sm:p-6 lg:px-8 flex flex-col overflow-y-auto md:overflow-hidden bg-void">
+          <div className="mb-5 pb-4 border-b border-hairline flex items-end justify-between gap-4 flex-wrap shrink-0">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase text-ink-faint font-bold tracking-[0.12em]">
+                Admin / {GROUP_LABEL[activeTab.group]}
               </div>
-              <h1 className="text-xl font-bold tracking-tight mt-0.5">
-                {TABS.find((t) => t.id === tab)!.label}
-              </h1>
+              <h1 className="font-sans text-2xl font-bold tracking-tight mt-1 text-ink">{activeTab.label}</h1>
+              <p className="font-sans text-sm text-ink-dim mt-1 max-w-2xl">{activeTab.desc}</p>
             </div>
-            <div className="text-xs text-ink-dim uppercase">
-              {new Date().toISOString().replace("T", " ").slice(0, 19)} UTC
+            <div className="text-[11px] text-ink-faint tabular-nums">
+              {new Date().toISOString().replace("T", " ").slice(0, 16)} UTC
             </div>
           </div>
 
@@ -714,7 +737,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
                 : "flex-1 min-h-0 overflow-y-auto"
             }
           >
-            {tab === "overview" && <OverviewTab />}
+            {tab === "overview" && <OverviewTab onNavigate={changeTab} />}
             {tab === "products" && <ProductsTab query={query} setQuery={setQuery} />}
             {tab === "submissions" && <SubmissionsTab />}
             {tab === "users" && <UsersTab query={query} setQuery={setQuery} />}
@@ -757,7 +780,7 @@ function GateCard({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="border border-hairline p-6 max-w-xl w-full">
+    <div className="border border-hairline rounded-xl bg-card shadow-card p-6 max-w-xl w-full">
       <div className="flex items-center gap-2 text-xs uppercase font-bold text-signal mb-3">
         <span className="w-1.5 h-1.5 rounded-full bg-signal" />
         {title}
@@ -772,24 +795,27 @@ function Stat({
   label,
   value,
   hint,
+  accent,
 }: {
   label: string;
   value: string | number;
   hint?: string;
+  accent?: boolean;
 }) {
   return (
-    <div className="border border-hairline p-3.5">
-      <div className="text-xs uppercase text-ink-dim font-bold">{label}</div>
-      <div className="text-2xl font-bold mt-1 tabular-nums">{value}</div>
-      {hint ? <div className="text-xs text-ink-dim mt-0.5">{hint}</div> : null}
+    <div className={`rounded-xl border p-4 bg-card shadow-card ${accent ? "border-signal/40" : "border-hairline"}`}>
+      <div className="text-[10px] uppercase tracking-wider text-ink-faint font-bold">{label}</div>
+      <div className={`font-sans text-[28px] leading-none font-bold mt-2 tabular-nums ${accent ? "text-signal" : "text-ink"}`}>{value}</div>
+      {hint ? <div className="font-sans text-xs text-ink-dim mt-1.5 truncate">{hint}</div> : null}
     </div>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="px-3 py-2 border-b border-hairline text-xs uppercase text-ink-dim font-bold">
-      {children}
+    <div className="px-4 py-3 border-b border-hairline flex items-center justify-between gap-2">
+      <span className="text-[11px] uppercase tracking-wider text-ink-dim font-bold">{children}</span>
+      {action}
     </div>
   );
 }
@@ -832,7 +858,7 @@ function TabLoader({ label = "Loading data..." }: { label?: string }) {
 
 /* ─────────────────────────── OverviewTab ─────────────────────────── */
 
-function OverviewTab() {
+function OverviewTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
   const featured = useAsync(() => listSlots("FEATURED"), []);
   const rotating = useAsync(() => listSlots("ROTATING"), []);
   const cats = useAsync(() => listCategories(), []);
@@ -840,6 +866,7 @@ function OverviewTab() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [summaryLoading, setSummaryLoading] = useState(true);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/summary", { cache: "no-store" })
@@ -857,66 +884,103 @@ function OverviewTab() {
     return <TabLoader label="Loading dashboard metrics..." />;
   }
 
-  const pending = (subs.data || []).filter((s) => s.status === "SCHEDULED").length;
+  const queue = (subs.data || []).filter((s) => s.status === "SCHEDULED");
   const totalVotes = products.reduce((a, p) => a + p.votes, 0);
-  const topProduct = [...products].sort((a, b) => b.votes - a.votes)[0];
+  const top = [...products].sort((a, b) => b.votes - a.votes).slice(0, 5);
+  const maxVotes = top[0]?.votes || 1;
+  const previewSub = previewId ? queue.find((s) => s.id === previewId) ?? null : null;
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Products" value={products.length} hint="live in catalog" />
+    <div className="space-y-5 pb-6">
+      {queue.length > 0 && (
+        <div className="rounded-xl border border-signal/40 bg-signal-dim px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-signal shrink-0 animate-pulse" />
+            <span className="font-sans text-sm text-ink">
+              <b>{queue.length} submission{queue.length === 1 ? "" : "s"}</b> waiting for review. The next one goes live{" "}
+              {new Date(queue[0].scheduledFor).toLocaleString()} unless rejected.
+            </span>
+          </div>
+          <button
+            onClick={() => onNavigate("submissions")}
+            className="h-8 px-3 text-xs uppercase font-bold rounded-md bg-signal text-white hover:opacity-90 cursor-pointer shrink-0"
+          >
+            Review queue →
+          </button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <Stat label="Pending review" value={queue.length} hint="scheduled submissions" accent={queue.length > 0} />
+        <Stat label="Live products" value={products.length} hint="in the catalog" />
         <Stat label="Users" value={users.length} hint="registered accounts" />
-        <Stat label="Total Votes" value={totalVotes.toLocaleString()} hint="all-time" />
+        <Stat label="Total votes" value={totalVotes.toLocaleString()} hint="all-time" />
+        <Stat label="Featured slots" value={featured.data?.length ?? "—"} hint="paid + custom" />
+        <Stat label="Rotating slots" value={rotating.data?.length ?? "—"} hint="paid + custom" />
         <Stat label="Categories" value={cats.data?.length ?? "—"} hint="taxonomy nodes" />
-        <Stat label="Featured" value={featured.data?.length ?? "—"} hint="paid + custom" />
-        <Stat label="Rotating" value={rotating.data?.length ?? "—"} hint="paid + custom" />
-        <Stat label="Top votes" value={topProduct?.votes ?? 0} hint={topProduct?.name} />
-        <Stat label="Pending" value={pending} hint="submissions in queue" />
+        <Stat label="Top product" value={top[0]?.votes ?? 0} hint={top[0] ? `${top[0].name} · votes` : "no products yet"} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="border border-hairline">
-          <SectionTitle>Top 5 by votes</SectionTitle>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[340px]">
-              <tbody>
-                {[...products]
-                  .sort((a, b) => b.votes - a.votes)
-                  .slice(0, 5)
-                  .map((p, i) => (
-                    <tr key={p.id} className="border-t border-hairline first:border-t-0">
-                      <td className="px-3 py-2.5 w-8 text-ink-dim tabular-nums text-xs">{i + 1}</td>
-                      <td className="px-3 py-2.5 font-bold">{p.name}</td>
-                      <td className="px-3 py-2.5 text-xs text-ink-dim truncate max-w-[240px]">{p.tagline}</td>
-                      <td className="px-3 py-2.5 tabular-nums text-right font-bold text-xs">{p.votes}</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+        <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
+          <SectionTitle
+            action={
+              <button onClick={() => onNavigate("submissions")} className="text-[11px] font-bold text-signal hover:underline cursor-pointer">
+                Open queue →
+              </button>
+            }
+          >
+            Review queue
+          </SectionTitle>
+          {queue.length === 0 ? (
+            <div className="px-4 py-10 text-center font-sans text-sm text-ink-dim">Nothing waiting. New submissions appear here.</div>
+          ) : (
+            <ul>
+              {queue.slice(0, 5).map((s) => (
+                <li key={s.id} className="px-4 py-3 border-t border-hairline first:border-t-0 flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-sans text-sm font-semibold text-ink truncate">{s.name}</div>
+                    <div className="font-sans text-xs text-ink-dim truncate">{s.tagline}</div>
+                  </div>
+                  <SubmissionTimer target={s.scheduledFor.toString()} compact />
+                  <button
+                    onClick={() => setPreviewId(s.id)}
+                    className="h-7 px-2.5 text-[11px] uppercase font-bold rounded-md border border-hairline hover:border-ink text-ink cursor-pointer shrink-0"
+                  >
+                    Preview
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-        <div className="border border-hairline">
-          <SectionTitle>Recent activity</SectionTitle>
-          <ul className="text-sm">
-            {[
-              { t: "queue", msg: `${pending} submission(s) scheduled`, when: "now" },
-              { t: "slots", msg: `${(featured.data?.length ?? 0) + (rotating.data?.length ?? 0)} placements live`, when: "now" },
-              { t: "cats", msg: `${cats.data?.length ?? 0} categories available`, when: "now" },
-            ].map((e, i) => (
-              <li
-                key={i}
-                className="px-3 py-2.5 border-t border-hairline first:border-t-0 flex items-center justify-between"
-              >
-                <span>
-                  <span className="inline-block w-16 text-xs uppercase text-ink-dim font-bold">{e.t}</span>
-                  {e.msg}
-                </span>
-                <span className="text-xs text-ink-dim">{e.when}</span>
-              </li>
-            ))}
-          </ul>
+
+        <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
+          <SectionTitle>Top 5 by votes</SectionTitle>
+          {top.length === 0 ? (
+            <div className="px-4 py-10 text-center font-sans text-sm text-ink-dim">No live products yet.</div>
+          ) : (
+            <ul>
+              {top.map((p, i) => (
+                <li key={p.id} className="px-4 py-3 border-t border-hairline first:border-t-0">
+                  <div className="flex items-center gap-3">
+                    <span className="w-5 text-xs text-ink-faint tabular-nums">{i + 1}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-sans text-sm font-semibold text-ink truncate">{p.name}</div>
+                    </div>
+                    <span className="text-xs font-bold tabular-nums text-ink">▲ {p.votes}</span>
+                  </div>
+                  <div className="ml-8 mt-1.5 h-1 rounded-full bg-raised overflow-hidden">
+                    <div className="h-full rounded-full bg-signal/70" style={{ width: `${Math.max(4, (p.votes / maxVotes) * 100)}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
+
+      {previewSub && <SubmissionPreview sub={previewSub} onClose={() => setPreviewId(null)} />}
     </div>
   );
 }
@@ -1980,15 +2044,42 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
 
 /* ─────────────────────────── SubmissionsTab (DB-backed) ─────────────────────────── */
 
-type SubRow = Awaited<ReturnType<typeof listSubmissions>>[number];
+type SubRow = AdminSubmission;
+type SubFilter = "SCHEDULED" | "PUBLISHED" | "REJECTED";
+
+function SubLogo({ sub, size = "w-11 h-11" }: { sub: SubRow; size?: string }) {
+  const src = imageSrc(sub.logoUrl);
+  return (
+    <div className={`${size} shrink-0 rounded-lg border border-hairline bg-surface overflow-hidden flex items-center justify-center text-xs font-bold text-ink-dim`}>
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="w-full h-full object-cover" />
+      ) : (
+        sub.name.slice(0, 2).toUpperCase()
+      )}
+    </div>
+  );
+}
+
+function TierPill({ sub }: { sub: SubRow }) {
+  const tier = launchTierInfo(sub.details as Record<string, unknown> | null);
+  const cls =
+    tier.tone === "paid"
+      ? "border-verified/40 text-verified bg-verified/10"
+      : tier.tone === "pending"
+        ? "border-signal/40 text-signal bg-signal-dim"
+        : "border-hairline text-ink-dim";
+  return <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 border rounded-sm whitespace-nowrap ${cls}`}>{tier.label}</span>;
+}
 
 function SubmissionsTab() {
   const [items, setItems] = useState<SubRow[]>([]);
   const [leadHours, setLeadHoursState] = useState(24);
   const [loading, setLoading] = useState(true);
-  const [flash, setFlash] = useState<string | null>(null);
-  const [rejectId, setRejectId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState("");
+  const [flash, setFlash] = useState<{ tone: "ok" | "err"; msg: string } | null>(null);
+  const [filter, setFilter] = useState<SubFilter>("SCHEDULED");
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const refresh = React.useCallback(async () => {
@@ -2005,6 +2096,11 @@ function SubmissionsTab() {
     void refresh();
   }, [refresh]);
 
+  const notify = (tone: "ok" | "err", msg: string) => {
+    setFlash({ tone, msg });
+    setTimeout(() => setFlash(null), 4500);
+  };
+
   if (loading) {
     return <TabLoader label="Loading submissions queue..." />;
   }
@@ -2012,125 +2108,195 @@ function SubmissionsTab() {
   const scheduled = items.filter((s) => s.status === "SCHEDULED");
   const published = items.filter((s) => s.status === "PUBLISHED");
   const rejected = items.filter((s) => s.status === "REJECTED");
+  const lists: Record<SubFilter, SubRow[]> = { SCHEDULED: scheduled, PUBLISHED: published, REJECTED: rejected };
+  const visible = lists[filter];
+  const previewSub = previewId ? items.find((s) => s.id === previewId) ?? null : null;
 
-  const doReject = (sub: SubRow) => {
-    if (!rejectReason.trim()) return;
+  const doPublish = (sub: SubRow) => {
     startTransition(async () => {
       try {
-        await rejectSubmission(sub.id, rejectReason.trim());
-        setFlash(`Rejected "${sub.name}" — rejection email queued to ${sub.makerEmail}.`);
-        setRejectId(null);
-        setRejectReason("");
+        await publishSubmissionNow(sub.id);
+        notify("ok", `Published "${sub.name}". Launch email and broadcast are queued.`);
+        setPreviewId(null);
         await refresh();
       } catch (e) {
-        setFlash(String((e as Error).message));
+        notify("err", `Publish failed: ${(e as Error).message}`);
       }
-      setTimeout(() => setFlash(null), 4500);
     });
   };
 
+  const doReject = (sub: SubRow, reason: string) => {
+    startTransition(async () => {
+      try {
+        await rejectSubmission(sub.id, reason);
+        notify("ok", `Rejected "${sub.name}". Rejection email queued to ${sub.makerEmail}.`);
+        setPreviewId(null);
+        await refresh();
+      } catch (e) {
+        notify("err", String((e as Error).message));
+      }
+    });
+  };
+
+  const doDelete = (sub: SubRow) => {
+    if (!confirm(`Permanently remove the submission "${sub.name}"? The maker is not notified.`)) return;
+    startTransition(async () => {
+      await deleteSubmission(sub.id);
+      notify("ok", `Removed "${sub.name}".`);
+      await refresh();
+    });
+  };
+
+  const filters: { id: SubFilter; label: string; count: number }[] = [
+    { id: "SCHEDULED", label: "Queue", count: scheduled.length },
+    { id: "PUBLISHED", label: "Published", count: published.length },
+    { id: "REJECTED", label: "Rejected", count: rejected.length },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="border border-hairline p-3.5 flex flex-wrap items-center gap-3">
-        <div className="text-xs uppercase text-ink-dim font-bold">Default lead time</div>
-        <input
-          type="number"
-          min={0}
-          value={leadHours}
-          onChange={(e) => setLeadHoursState(Number(e.target.value) || 0)}
-          className="w-20 px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono"
-        />
-        <span className="text-xs text-ink-dim font-bold">hours after submission</span>
-        <button
-          onClick={() => {
-            startTransition(async () => {
-              await setDefaultLeadHours(leadHours);
-              setFlash("Default schedule updated.");
-              setTimeout(() => setFlash(null), 2500);
-            });
-          }}
-          disabled={pending}
-          className="text-xs uppercase font-bold px-3 py-1.5 border border-ink bg-ink text-surface disabled:opacity-40"
-        >
-          Save default
-        </button>
-        {flash && <span className="text-xs text-signal font-bold">{flash}</span>}
-      </div>
-
-      <div className="border border-hairline">
-        <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-hairline bg-surface/30 flex-wrap gap-2">
-          <div className="flex items-center gap-3">
-            <div className="text-xs uppercase text-ink-dim font-bold">
-              Scheduled ({scheduled.length})
-            </div>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex w-full sm:w-auto p-0.5 border border-hairline rounded-lg bg-surface">
+          {filters.map((f) => (
             <button
-              onClick={() => refresh()}
-              className="text-[11px] font-mono font-bold px-2 py-0.5 border border-hairline bg-surface hover:bg-raised text-ink hover:text-signal transition-colors cursor-pointer"
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={[
+                "h-8 px-2.5 sm:px-3 flex-1 sm:flex-none justify-center whitespace-nowrap rounded-md text-xs uppercase font-bold flex items-center gap-2 transition-colors cursor-pointer",
+                filter === f.id ? "bg-void text-ink shadow-card border border-hairline" : "text-ink-dim hover:text-ink border border-transparent",
+              ].join(" ")}
             >
-              ↻ Refresh
+              {f.label}
+              <span
+                className={[
+                  "min-w-5 h-5 px-1 rounded-full text-[10px] tabular-nums flex items-center justify-center",
+                  filter === f.id && f.id === "SCHEDULED" && f.count > 0 ? "bg-signal text-white" : "bg-raised text-ink-dim",
+                ].join(" ")}
+              >
+                {f.count}
+              </span>
             </button>
-          </div>
-          {scheduled.length > 0 && (
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowSettings((v) => !v)}
+            title="Schedule settings"
+            className={`h-8 px-3 whitespace-nowrap text-xs uppercase font-bold border rounded-md transition-colors cursor-pointer ${showSettings ? "border-ink text-ink" : "border-hairline text-ink-dim hover:text-ink"}`}
+          >
+            ⚙<span className="hidden sm:inline"> Schedule settings</span>
+          </button>
+          <button
+            onClick={() => refresh()}
+            className="h-8 px-3 whitespace-nowrap text-xs uppercase font-bold border border-hairline rounded-md text-ink-dim hover:text-ink hover:bg-raised transition-colors cursor-pointer"
+          >
+            ↻ Refresh
+          </button>
+          {filter === "SCHEDULED" && scheduled.length > 0 && (
             <button
               onClick={() => {
-                if (
-                  scheduled.length > 1 &&
-                  !confirm(
-                    `Are you sure you want to publish all ${scheduled.length} scheduled products live right now?`
-                  )
-                ) {
-                  return;
-                }
+                if (!confirm(`Publish all ${scheduled.length} scheduled product(s) live right now?`)) return;
                 startTransition(async () => {
                   try {
                     const res = await publishAllScheduledSubmissions();
-                    setFlash(
-                      `✓ Successfully published ${res.count} product${
-                        res.count === 1 ? "" : "s"
-                      } live to The Launch Feed!`
-                    );
+                    notify("ok", `Published ${res.count} product${res.count === 1 ? "" : "s"}.`);
                     await refresh();
                   } catch (e) {
-                    setFlash(`Publish failed: ${(e as Error).message}`);
+                    notify("err", `Publish failed: ${(e as Error).message}`);
                   }
-                  setTimeout(() => setFlash(null), 5000);
                 });
               }}
               disabled={pending}
-              className="text-xs uppercase font-bold px-3 py-1.5 bg-signal text-void hover:bg-signal/80 transition-colors disabled:opacity-40 cursor-pointer flex items-center gap-1.5 shrink-0"
+              className="h-8 px-3 whitespace-nowrap text-xs uppercase font-bold rounded-md bg-signal text-white hover:opacity-90 disabled:opacity-40 cursor-pointer"
               title="Publish all scheduled products live at once"
             >
-              <span>⚡</span>
-              <span>Publish All at Once ({scheduled.length})</span>
+              ⚡ Publish all ({scheduled.length})
             </button>
           )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[760px]">
-            <thead>
-              <tr className="text-xs uppercase text-ink-dim font-bold">
-                <th className="text-left px-3 py-2 border-b border-hairline">Product</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Maker</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Scheduled for (UTC)</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Countdown</th>
-                <th className="text-right px-3 py-2 border-b border-hairline">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scheduled.map((s) => (
-                <React.Fragment key={s.id}>
-                  <tr className="border-t border-hairline align-top">
-                    <td className="px-3 py-2.5">
-                      <div className="font-bold">{s.name}</div>
-                      <div className="text-xs text-ink-dim truncate max-w-[240px]">
-                        {s.tagline}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="font-medium">{s.makerName}</div>
-                      <div className="text-xs text-ink-dim">{s.makerEmail}</div>
-                    </td>
-                    <td className="px-3 py-2.5">
+      </div>
+
+      {showSettings && (
+        <div className="border border-hairline rounded-lg bg-card p-4 flex flex-wrap items-center gap-3">
+          <div className="text-xs uppercase text-ink-dim font-bold">Default lead time</div>
+          <input
+            type="number"
+            min={0}
+            value={leadHours}
+            onChange={(e) => setLeadHoursState(Number(e.target.value) || 0)}
+            className="w-20 h-8 px-2.5 text-sm bg-void border border-hairline rounded-md focus:outline-none focus:border-ink"
+          />
+          <span className="text-xs text-ink-dim">hours between submission and launch</span>
+          <button
+            onClick={() => {
+              startTransition(async () => {
+                await setDefaultLeadHours(leadHours);
+                notify("ok", "Default schedule updated.");
+              });
+            }}
+            disabled={pending}
+            className="h-8 px-3 text-xs uppercase font-bold rounded-md bg-ink text-void disabled:opacity-40 cursor-pointer"
+          >
+            Save
+          </button>
+        </div>
+      )}
+
+      {flash && (
+        <div
+          role="status"
+          className={`rounded-lg border px-4 py-2.5 text-xs font-bold ${
+            flash.tone === "ok" ? "border-verified/40 bg-verified/10 text-verified" : "border-signal/40 bg-signal-dim text-signal"
+          }`}
+        >
+          {flash.msg}
+        </div>
+      )}
+
+      {/* List */}
+      {visible.length === 0 ? (
+        <div className="border border-dashed border-hairline rounded-xl py-14 text-center">
+          <div className="text-sm font-bold text-ink">
+            {filter === "SCHEDULED" ? "Queue is clear" : filter === "PUBLISHED" ? "Nothing published yet" : "No rejected submissions"}
+          </div>
+          <div className="text-xs text-ink-dim mt-1">
+            {filter === "SCHEDULED" ? "New submissions show up here for review." : "Submissions will appear here once processed."}
+          </div>
+        </div>
+      ) : (
+        <ul className="space-y-2.5">
+          {visible.map((s) => (
+            <li
+              key={s.id}
+              className="group border border-hairline rounded-xl bg-card hover:border-ink-faint transition-colors"
+            >
+              <div className="p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-5">
+                {/* Identity — click to preview */}
+                <button
+                  type="button"
+                  onClick={() => setPreviewId(s.id)}
+                  className="flex items-start gap-3 min-w-0 flex-1 text-left cursor-pointer"
+                >
+                  <SubLogo sub={s} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-sans text-[15px] font-bold text-ink group-hover:text-signal transition-colors truncate">{s.name}</span>
+                      <TierPill sub={s} />
+                      {s.category?.name && <span className="text-[10px] uppercase font-bold text-ink-faint">{s.category.name}</span>}
+                    </div>
+                    <div className="font-sans text-sm text-ink-dim truncate mt-0.5">{s.tagline || "No tagline"}</div>
+                    <div className="text-[11px] text-ink-faint mt-1 truncate">
+                      {s.makerName} · {s.makerEmail} · submitted {new Date(s.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Status column */}
+                {s.status === "SCHEDULED" && (
+                  <div className="flex items-center gap-3 lg:w-[300px] shrink-0">
+                    <div className="min-w-0">
+                      <div className="text-[10px] uppercase font-bold text-ink-faint mb-1">Goes live (local time)</div>
                       <input
                         type="datetime-local"
                         value={toLocalInput(s.scheduledFor.toString())}
@@ -2142,172 +2308,81 @@ function SubmissionsTab() {
                             await refresh();
                           });
                         }}
-                        className="px-2 py-1 text-xs bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono"
+                        className="h-8 px-2 text-xs bg-void border border-hairline rounded-md focus:outline-none focus:border-ink"
                       />
-                    </td>
-                    <td className="px-3 py-2.5">
+                    </div>
+                    <div className="pt-4">
                       <SubmissionTimer target={s.scheduledFor.toString()} compact />
-                    </td>
-                    <td className="px-3 py-2.5 text-right whitespace-nowrap">
-                      <button
-                        onClick={() => {
-                          startTransition(async () => {
-                            await publishSubmissionNow(s.id);
-                            await refresh();
-                          });
-                        }}
-                        disabled={pending}
-                        className="text-xs uppercase font-bold px-2.5 py-1 border border-signal bg-signal text-surface mr-1 disabled:opacity-40"
-                      >
-                        Publish now
-                      </button>
-                      <button
-                        onClick={() => {
-                          setRejectId(rejectId === s.id ? null : s.id);
-                          setRejectReason("");
-                        }}
-                        className="text-xs uppercase font-bold px-2.5 py-1 border border-hairline hover:bg-signal hover:text-surface hover:border-signal mr-1"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => {
-                          startTransition(async () => {
-                            await deleteSubmission(s.id);
-                            await refresh();
-                          });
-                        }}
-                        className="text-xs uppercase font-bold px-2.5 py-1 border border-hairline hover:bg-ink hover:text-surface"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
-                  {rejectId === s.id && (
-                    <tr className="border-t border-hairline bg-[color:var(--surface-alt,rgba(0,0,0,0.02))]">
-                      <td colSpan={5} className="px-3 py-3">
-                        <div className="text-xs uppercase text-ink-dim font-bold mb-1">
-                          Reason for rejection · sent to {s.makerEmail}
-                        </div>
-                        <textarea
-                          value={rejectReason}
-                          onChange={(e) => setRejectReason(e.target.value)}
-                          rows={3}
-                          placeholder="Explain why this submission was rejected. Be specific — the founder gets this verbatim."
-                          className="w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink"
-                        />
-                        <div className="mt-2 flex gap-2 justify-end">
-                          <button
-                            onClick={() => {
-                              setRejectId(null);
-                              setRejectReason("");
-                            }}
-                            className="text-xs uppercase font-bold px-3 py-1.5 border border-hairline"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={() => doReject(s)}
-                            disabled={!rejectReason.trim() || pending}
-                            className="text-xs uppercase font-bold px-3 py-1.5 border border-signal bg-signal text-surface disabled:opacity-40"
-                          >
-                            Reject & send email
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-              {scheduled.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-3 py-4 text-center text-ink-dim text-sm">
-                    No scheduled submissions in the queue.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                    </div>
+                  </div>
+                )}
+                {s.status === "PUBLISHED" && (
+                  <div className="text-xs text-ink-dim lg:w-[300px] shrink-0">
+                    Published {s.publishedAt ? new Date(s.publishedAt).toLocaleString() : ""}
+                  </div>
+                )}
+                {s.status === "REJECTED" && (
+                  <div className="text-xs text-ink-dim lg:w-[300px] shrink-0 min-w-0">
+                    <span className="text-signal font-bold uppercase text-[10px]">Reason · </span>
+                    <span className="line-clamp-2">{s.rejectionReason || "—"}</span>
+                  </div>
+                )}
 
-      <div className="border border-hairline">
-        <SectionTitle>Published ({published.length})</SectionTitle>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[520px]">
-            <tbody>
-              {published.slice(0, 20).map((s) => (
-                <tr key={s.id} className="border-t border-hairline first:border-t-0">
-                  <td className="px-3 py-2.5 font-bold">{s.name}</td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim truncate max-w-[280px]">{s.tagline}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-xs text-ink-dim">
-                    {s.publishedAt ? s.publishedAt.toString().replace("T", " ").slice(0, 19) : ""}
-                  </td>
-                  <td className="px-3 py-2.5 text-right">
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                  <button
+                    onClick={() => setPreviewId(s.id)}
+                    className="h-8 px-3 text-xs uppercase font-bold rounded-md border border-ink text-ink hover:bg-ink hover:text-void transition-colors cursor-pointer"
+                  >
+                    Preview
+                  </button>
+                  {s.status === "SCHEDULED" && (
+                    <button
+                      onClick={() => doPublish(s)}
+                      disabled={pending}
+                      className="h-8 px-3 text-xs uppercase font-bold rounded-md bg-signal text-white hover:opacity-90 disabled:opacity-40 cursor-pointer"
+                    >
+                      Publish now
+                    </button>
+                  )}
+                  {s.status === "PUBLISHED" && (
                     <Link
                       href={`/product/${slugify(s.name)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       prefetch={false}
-                      className="text-xs uppercase font-bold underline underline-offset-2 hover:text-signal"
+                      className="h-8 px-3 text-xs uppercase font-bold rounded-md border border-hairline text-ink-dim hover:text-ink flex items-center"
                     >
-                      view ↗
+                      View ↗
                     </Link>
-                  </td>
-                </tr>
-              ))}
-              {published.length === 0 && (
-                <tr>
-                  <td className="px-3 py-4 text-center text-ink-dim text-sm">Nothing published yet.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="border border-hairline">
-        <SectionTitle>Rejected ({rejected.length})</SectionTitle>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[560px]">
-            <tbody>
-              {rejected.slice(0, 20).map((s) => (
-                <tr key={s.id} className="border-t border-hairline first:border-t-0 align-top">
-                  <td className="px-3 py-2.5 w-1/4">
-                    <div className="font-bold">{s.name}</div>
-                    <div className="text-xs text-ink-dim">{s.makerEmail}</div>
-                  </td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim">
-                    <div className="text-xs uppercase text-signal font-bold mb-0.5">Reason</div>
-                    {s.rejectionReason || "—"}
-                  </td>
-                  <td className="px-3 py-2.5 tabular-nums text-xs text-ink-dim whitespace-nowrap">
-                    {s.rejectedAt ? s.rejectedAt.toString().replace("T", " ").slice(0, 19) : ""}
-                  </td>
-                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                  )}
+                  {s.status !== "PUBLISHED" && (
                     <button
-                      onClick={() => {
-                        startTransition(async () => {
-                          await deleteSubmission(s.id);
-                          await refresh();
-                        });
-                      }}
-                      className="text-xs uppercase font-bold px-2.5 py-1 border border-hairline hover:bg-ink hover:text-surface"
+                      onClick={() => doDelete(s)}
+                      disabled={pending}
+                      title="Remove submission"
+                      aria-label={`Remove ${s.name}`}
+                      className="h-8 w-8 text-sm rounded-md border border-hairline text-ink-faint hover:text-signal hover:border-signal transition-colors cursor-pointer disabled:opacity-40"
                     >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {rejected.length === 0 && (
-              <tr>
-                <td className="px-3 py-4 text-center text-ink-dim text-sm">No rejected submissions.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {previewSub && (
+        <SubmissionPreview
+          sub={previewSub}
+          busy={pending}
+          onClose={() => setPreviewId(null)}
+          onPublish={() => doPublish(previewSub)}
+          onReject={(reason) => doReject(previewSub, reason)}
+        />
+      )}
     </div>
   );
 }
