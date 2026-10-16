@@ -339,6 +339,7 @@ async function _sendOutreachCampaignInternal(
 
     const subject = options?.overrideSubject || template.subject(vars);
     const html = template.render(vars);
+    const text = template.text(vars);
 
     try {
       if (resend) {
@@ -347,6 +348,7 @@ async function _sendOutreachCampaignInternal(
           to: targetEmail,
           subject,
           html,
+          text,
         });
 
         // Log in EmailLog
@@ -461,6 +463,7 @@ export async function sendTestOutreachEmailAction(recipientEmail: string, sample
 
   const subject = `[TEST PREVIEW] ${template.subject(vars)}`;
   const html = template.render(vars);
+  const text = template.text(vars);
 
   if (!resend) {
     throw new Error("RESEND_API_KEY is not configured in the environment.");
@@ -471,6 +474,7 @@ export async function sendTestOutreachEmailAction(recipientEmail: string, sample
     to: recipientEmail,
     subject,
     html,
+    text,
   });
 
   return { success: true, id: res.data?.id };

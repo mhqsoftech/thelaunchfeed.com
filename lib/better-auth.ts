@@ -5,6 +5,7 @@ import { nextCookies } from "better-auth/next-js";
 import { emailOTP } from "better-auth/plugins";
 import { Resend } from "resend";
 import { prisma } from "./db";
+import { renderEmail, type RenderedEmail } from "./email/layout";
 
 /**
  * Local Better Auth instance backed by Prisma/Postgres (Neon).
@@ -18,16 +19,16 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 const EMAIL_FROM = process.env.EMAIL_FROM || "The Launch Feed <hi@thelaunchfeed.com>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-async function sendMail(to: string, subject: string, html: string) {
+async function sendMail(to: string, subject: string, mail: RenderedEmail) {
   if (!resend) {
-    console.warn(`[mail:dev] to=${to} subject=${subject}\n${html}`);
+    console.warn(`[mail:dev] to=${to} subject=${subject}\n${mail.text}`);
     return;
   }
-  const { error } = await resend.emails.send({ from: EMAIL_FROM, to, subject, html });
+  const { error } = await resend.emails.send({ from: EMAIL_FROM, to, subject, html: mail.html, text: mail.text });
   if (error) console.error("[mail] resend error:", error);
 }
 
-function otpEmail(otp: string, kind: string) {
+function otpEmail(otp: string, kind: string): RenderedEmail {
   const heading =
     kind === "sign-in"
       ? "Your sign-in code"
@@ -37,84 +38,16 @@ function otpEmail(otp: string, kind: string) {
           ? "Confirm your new email"
           : "Verify your email";
 
-  return `<!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>The Launch Feed</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f2;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#0a0a0a;">
-  <span style="display:none;max-height:0;overflow:hidden;opacity:0;">${otp} is your verification code for The Launch Feed</span>
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f2;padding:36px 12px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border:1px solid #e5e5e2;text-align:left;">
-          <!-- Header -->
-          <tr>
-            <td style="padding:18px 24px;border-bottom:1px solid #e5e5e2;">
-              <table role="presentation" width="100%">
-                <tr>
-                  <td style="font-size:12px;font-weight:700;letter-spacing:.04em;color:#0a0a0a;">
-                    <span style="display:inline-block;width:8px;height:8px;background:#D6002A;border-radius:50%;vertical-align:middle;margin-right:8px;"></span>
-                    THE LAUNCH FEED
-                  </td>
-                  <td align="right" style="font-size:10px;text-transform:uppercase;color:#5f5f5c;font-weight:700;letter-spacing:.05em;">
-                    AUTH CODE
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:28px 24px;">
-              <div style="font-size:18px;font-weight:700;color:#0a0a0a;margin-bottom:8px;">
-                ${heading}
-              </div>
-              <p style="font-size:13px;line-height:1.6;color:#4a4a46;margin:0 0 20px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,sans-serif;">
-                Enter this 6-digit one-time code to authenticate your session on <strong>The Launch Feed</strong>:
-              </p>
-
-              <!-- Code Box -->
-              <div style="background:#fafaf8;border:1px solid #e5e5e2;padding:20px;text-align:center;margin-bottom:20px;">
-                <div style="font-size:32px;font-weight:800;letter-spacing:.32em;color:#0a0a0a;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;padding-left:.32em;">
-                  ${otp}
-                </div>
-                <div style="font-size:11px;color:#5f5f5c;margin-top:10px;font-weight:600;letter-spacing:.02em;">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px;margin-right:4px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Valid for 5 minutes only
-                </div>
-              </div>
-
-              <p style="font-size:12px;line-height:1.55;color:#7a7a75;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,sans-serif;">
-                If you did not request this verification code, you can safely ignore this email. No action is required.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding:16px 24px;border-top:1px solid #e5e5e2;font-size:10px;color:#7a7a75;text-transform:uppercase;line-height:1.6;background:#fafaf8;">
-              <table role="presentation" width="100%">
-                <tr>
-                  <td>
-                    <a href="${APP_URL}" style="color:#0a0a0a;font-weight:700;text-decoration:none;">thelaunchfeed.com</a> ·
-                    <a href="mailto:hi@thelaunchfeed.com" style="color:#0a0a0a;text-decoration:none;">hi@thelaunchfeed.com</a>
-                  </td>
-                  <td align="right" style="color:#8a8a85;">
-                    SECURE SIGN-IN
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
+  return renderEmail({
+    preheader: `${otp} is your verification code for The Launch Feed`,
+    eyebrow: "Security code",
+    eyebrowTone: "neutral",
+    heading,
+    intro: ["Enter this 6-digit code on The Launch Feed to continue:"],
+    code: { value: otp, caption: "Valid for 5 minutes. Never share it with anyone." },
+    outro: ["If you didn't request this code, you can safely ignore this email. Your account stays as it is."],
+    reason: "You're receiving this because someone entered this address on The Launch Feed's sign-in page.",
+  });
 }
 
 const isAdmin = (email: string) => {
@@ -168,7 +101,16 @@ export const auth = betterAuth({
       await sendMail(
         user.email,
         "Reset your Launch Feed password",
-        `<p>Click below to reset your password. This link expires in 1 hour.</p><p><a href="${url}">${url}</a></p>`,
+        renderEmail({
+          preheader: "Reset your Launch Feed password. The link expires in 1 hour.",
+          eyebrow: "Password reset",
+          eyebrowTone: "neutral",
+          heading: "Reset your password",
+          intro: ["We got a request to reset the password for your Launch Feed account. The link below expires in 1 hour."],
+          cta: { label: "Reset password", url },
+          outro: ["If you didn't ask for this, ignore this email. Your password won't change."],
+          reason: "You're receiving this because a password reset was requested for this address on The Launch Feed.",
+        }),
       );
     },
   },

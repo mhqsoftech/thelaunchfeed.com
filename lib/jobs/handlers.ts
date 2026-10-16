@@ -59,6 +59,7 @@ export async function sendAndLog(input: {
   const tpl = getTemplate(input.templateId as any);
   const subject = tpl.subject(input.vars || {});
   const html = tpl.render(input.vars || {});
+  const text = tpl.text(input.vars || {});
 
   const log = await prisma.emailLog.create({
     data: {
@@ -87,10 +88,10 @@ export async function sendAndLog(input: {
     // within a 24-hour window on this header.
     // Resend's free tier allows ~2 req/s; back off briefly on 429 instead of
     // failing a broadcast halfway through.
-    let res = await resend.emails.send({ from: FROM, to: input.to, subject, html }, { idempotencyKey: log.id });
+    let res = await resend.emails.send({ from: FROM, to: input.to, subject, html, text }, { idempotencyKey: log.id });
     for (let i = 0; i < 3 && res.error && /rate.?limit/i.test(`${res.error.name} ${res.error.message}`); i++) {
       await new Promise((r) => setTimeout(r, 1_100 * (i + 1)));
-      res = await resend.emails.send({ from: FROM, to: input.to, subject, html }, { idempotencyKey: log.id });
+      res = await resend.emails.send({ from: FROM, to: input.to, subject, html, text }, { idempotencyKey: log.id });
     }
     if (res.error) throw new Error(res.error.message);
     await prisma.emailLog.update({
