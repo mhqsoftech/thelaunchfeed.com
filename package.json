@@ -37,6 +37,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "resend": "^6.4.0",
+    "sharp": "^0.35.5",
     "simple-icons": "^16.28.0",
     "tailwindcss-mcp-server": "^0.1.1",
     "turndown": "^7.2.4",

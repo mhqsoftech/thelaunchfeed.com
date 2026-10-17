@@ -15,7 +15,6 @@ export const metadata: Metadata = {
     title: "Browse Product Categories | The Launch Feed",
     description: "Every category on The Launch Feed with its top-voted launches.",
     url: `${SITE_URL}/categories`,
-    images: [{ url: "/thelaunchfeed-og.avif", width: 1200, height: 630 }],
   },
 };
 

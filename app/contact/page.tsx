@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import MainLayoutShell from "@/app/MainLayoutShell";
 import ContactClientView from "./ContactClientView";
-import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
+import { breadcrumb, webPageNode } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Contact - The Launch Feed",
@@ -17,14 +17,12 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://thelaunchfeed.com/contact",
     siteName: "The Launch Feed",
-    images: [{ url: "/icon.svg", width: 1200, height: 630, alt: "Contact The Launch Feed" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Contact - The Launch Feed",
     description:
       "Contact The Launch Feed team for product launch inquiries, featured sponsorships, or developer support.",
-    images: ["/icon.svg"],
     creator: "@thelaunchfeed",
   },
 };
@@ -34,8 +32,7 @@ export default function ContactPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
+      webPageNode({ path: "/contact", name: "Contact The Launch Feed", description: metadata.description ?? undefined, type: "ContactPage" }),
       {
         ...breadcrumb([
           { name: "Home", url: siteUrl },

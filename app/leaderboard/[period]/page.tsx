@@ -57,7 +57,6 @@ export async function generateMetadata({ params }: { params: Promise<{ period: s
       description: board.description(),
       url: `${SITE_URL}/leaderboard/${period}`,
       type: "website",
-      images: [{ url: "/thelaunchfeed-og.avif", width: 1200, height: 630 }],
     },
     twitter: { card: "summary_large_image", title, description: board.description() },
   };

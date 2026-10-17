@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import MainLayoutShell from "@/app/MainLayoutShell";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
-import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
+import { breadcrumb, webPageNode } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Terms of Service - The Launch Feed",
@@ -18,14 +18,12 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://thelaunchfeed.com/terms",
     siteName: "The Launch Feed",
-    images: [{ url: "/thelaunchfeed-logo.png", width: 1477, height: 272, alt: "Terms of Service - The Launch Feed" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Terms of Service - The Launch Feed",
     description:
       "The Launch Feed Terms of Service: Guidelines, product submission rules, voting integrity standards, and platform conditions.",
-    images: ["/thelaunchfeed-logo.png"],
     creator: "@thelaunchfeed",
   },
 };
@@ -36,8 +34,7 @@ export default function TermsOfServicePage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
+      webPageNode({ path: "/terms", name: "Terms of Service", description: metadata.description ?? undefined, type: "WebPage" }),
       {
         ...breadcrumb([
           { name: "Home", url: siteUrl },

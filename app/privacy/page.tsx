@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import MainLayoutShell from "@/app/MainLayoutShell";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
-import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
+import { breadcrumb, webPageNode } from "@/lib/seo/schema";
 import ManageCookieButton from "@/app/components/ManageCookieButton";
 
 export const metadata: Metadata = {
@@ -19,14 +19,12 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://thelaunchfeed.com/privacy",
     siteName: "The Launch Feed",
-    images: [{ url: "/thelaunchfeed-logo.png", width: 1477, height: 272, alt: "Privacy Policy - The Launch Feed" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Privacy Policy - The Launch Feed",
     description:
       "The Launch Feed Privacy Policy: Learn how we collect, protect, and handle account information, telemetry keys, and product specifications.",
-    images: ["/thelaunchfeed-logo.png"],
     creator: "@thelaunchfeed",
   },
 };
@@ -37,8 +35,7 @@ export default function PrivacyPolicyPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
+      webPageNode({ path: "/privacy", name: "Privacy Policy", description: metadata.description ?? undefined, type: "WebPage" }),
       {
         ...breadcrumb([
           { name: "Home", url: siteUrl },

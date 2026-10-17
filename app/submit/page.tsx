@@ -30,21 +30,12 @@ export const metadata: Metadata = {
     description:
       "Launch your software product, SaaS, or developer tool on The Launch Feed. Complete 360° architecture blueprints and instant AI autofill.",
     siteName: "The Launch Feed",
-    images: [
-      {
-        url: `${siteUrl}/thelaunchfeed-logo.png`,
-        width: 1477,
-        height: 272,
-        alt: "Submit a Product - The Launch Feed",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Submit a Product - The Launch Feed",
     description:
       "Launch your software product, SaaS, or developer tool on The Launch Feed with 360° architecture intelligence.",
-    images: [`${siteUrl}/thelaunchfeed-logo.png`],
     creator: "@thelaunchfeed",
   },
   robots: {

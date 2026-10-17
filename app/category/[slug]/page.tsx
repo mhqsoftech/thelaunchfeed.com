@@ -6,7 +6,7 @@ import {
   getCategoriesWithCounts,
 } from "@/lib/queries/categories";
 import CategoryClientView from "./CategoryClientView";
-import { organizationNode, websiteNode, breadcrumb, ORG_ID, WEBSITE_ID, SITE_NAME } from "@/lib/seo/schema";
+import { breadcrumb, ORG_ID, WEBSITE_ID, SITE_NAME } from "@/lib/seo/schema";
 
 export const revalidate = 300;
 
@@ -104,8 +104,6 @@ export default async function CategoryPage({
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
       {
         "@type": "CollectionPage",
         "@id": `${categoryUrl}#page`,

@@ -4,7 +4,7 @@ import { getPublicProfile } from "@/lib/queries/user";
 import { buildFounderViewWithSuggested } from "@/lib/queries/founderView";
 import { prisma } from "@/lib/db";
 import FounderClientView from "./FounderClientView";
-import { organizationNode, websiteNode, breadcrumb, ORG_ID, WEBSITE_ID, SITE_NAME } from "@/lib/seo/schema";
+import { breadcrumb, WEBSITE_ID } from "@/lib/seo/schema";
 
 /**
  * Every historical handle a founder has used is kept in UsernameRedirect.
@@ -61,11 +61,7 @@ export async function generateMetadata({
 
   const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
   const canonicalUrl = `${siteUrl}/founder/${founder.username}`;
-  // Use the founder's profile picture so every share card carries their face.
-  const shareImage = founder.image || `${siteUrl}/og-default.png`;
-  const absoluteShareImage = shareImage.startsWith("http")
-    ? shareImage
-    : `${siteUrl}${shareImage.startsWith("/") ? "" : "/"}${shareImage}`;
+  // Social card comes from ./opengraph-image.tsx (avatars are often AVIF).
   const pageTitle = `${name} (${handle}) - Founder Profile | The Launch Feed`;
   return {
     title: pageTitle,
@@ -94,12 +90,6 @@ export async function generateMetadata({
       title: pageTitle,
       description,
       siteName: "The Launch Feed",
-      images: [
-        {
-          url: absoluteShareImage,
-          alt: `${name} (${handle}) on The Launch Feed`,
-        },
-      ],
     },
     twitter: {
       // Founder cards read best as a square avatar next to text.
@@ -107,7 +97,6 @@ export async function generateMetadata({
       title: pageTitle,
       description,
       creator: founder.twitterHandle ? `@${founder.twitterHandle.replace(/^@/, "")}` : undefined,
-      images: [absoluteShareImage],
     },
     robots: {
       index: true,
@@ -130,7 +119,7 @@ export default async function FounderPage({
   const { slug } = await params;
   const cleanSlug = decodeURIComponent(slug).trim();
   const slugKey = cleanSlug.replace(/^@/, "").trim().toLowerCase();
-  let built = await buildFounderViewWithSuggested(cleanSlug);
+  const built = await buildFounderViewWithSuggested(cleanSlug);
   if (!built) {
     const currentUsername = await resolveHistoricalUsername(cleanSlug);
     if (currentUsername) permanentRedirect(`/founder/${currentUsername}`);
@@ -148,8 +137,12 @@ export default async function FounderPage({
   const f = await getPublicProfile(cleanSlug);
   if (!f) notFound();
 
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com";
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
   const canonicalUrl = `${siteUrl}/founder/${f.username}`;
+  const ogImage = `${canonicalUrl}/opengraph-image`;
+  const topics = Array.from(
+    new Set(f.products.map((p: any) => p.category?.name).filter((x: unknown): x is string => typeof x === "string" && !!x))
+  );
 
   const sameAsUrls = [
     f.websiteUrl,
@@ -161,17 +154,38 @@ export default async function FounderPage({
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
       {
         "@type": "ProfilePage",
         "@id": `${canonicalUrl}#profile`,
         name: `${f.name || f.username} (@${f.username}) - Founder Profile | The Launch Feed`,
         url: canonicalUrl,
+        inLanguage: "en",
         isPartOf: { "@id": WEBSITE_ID },
         about: { "@id": personId },
         mainEntity: { "@id": personId },
+        primaryImageOfPage: { "@type": "ImageObject", url: ogImage, width: 1200, height: 630 },
         breadcrumb: { "@id": `${canonicalUrl}#breadcrumb` },
+        ...(f.products.length
+          ? {
+              hasPart: {
+                "@type": "ItemList",
+                name: `Products launched by ${f.name || f.username}`,
+                numberOfItems: f.products.length,
+                itemListElement: f.products.map((p: any, i: number) => ({
+                  "@type": "ListItem",
+                  position: i + 1,
+                  item: {
+                    "@type": "SoftwareApplication",
+                    "@id": `${siteUrl}/product/${p.slug}#software`,
+                    name: p.name,
+                    url: `${siteUrl}/product/${p.slug}`,
+                    applicationCategory: p.category?.name || "BusinessApplication",
+                    author: { "@id": personId },
+                  },
+                })),
+              },
+            }
+          : {}),
       },
       {
         "@type": "Person",
@@ -180,21 +194,11 @@ export default async function FounderPage({
         alternateName: `@${f.username}`,
         identifier: f.username,
         url: canonicalUrl,
-        image: f.image || `${siteUrl}/icon.svg`,
+        image: f.image || ogImage,
         jobTitle: f.title || "Founder & Software Maker",
         description: f.bio || undefined,
-        sameAs: sameAsUrls,
-        knowsAbout: f.products.map((p: any) => p.name),
-        worksFor: { "@id": ORG_ID },
-        makesOffer: f.products.map((p: any) => ({
-          "@type": "Offer",
-          itemOffered: {
-            "@type": "SoftwareApplication",
-            name: p.name,
-            url: `${siteUrl}/product/${p.slug}`,
-            applicationCategory: p.category?.name || "DeveloperApplication",
-          },
-        })),
+        ...(sameAsUrls.length ? { sameAs: sameAsUrls } : {}),
+        ...(topics.length ? { knowsAbout: topics } : {}),
       },
       {
         ...breadcrumb([

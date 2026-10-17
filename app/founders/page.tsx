@@ -21,21 +21,12 @@ export const metadata: Metadata = {
     type: "website",
     url: `${siteUrl}/founders`,
     siteName: "The Launch Feed",
-    images: [
-      {
-        url: `${siteUrl}/icon.svg`,
-        width: 1200,
-        height: 630,
-        alt: "Top 100 Founders - The Launch Feed",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Top 100 Founders - The Launch Feed",
     description:
       "Explore the top 100 software founders, creators, and indie builders ranked dynamically by products launched, cumulative votes, and craft prestige.",
-    images: [`${siteUrl}/icon.svg`],
     creator: "@thelaunchfeed",
   },
   robots: {

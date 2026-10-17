@@ -3,7 +3,7 @@ import MainLayoutShell from "@/app/MainLayoutShell";
 import { LaunchTime } from "@/components/ui/LaunchTime";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
-import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
+import { breadcrumb, webPageNode } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "About - The Launch Feed",
@@ -19,14 +19,12 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://thelaunchfeed.com/about",
     siteName: "The Launch Feed",
-    images: [{ url: "/thelaunchfeed-logo.png", width: 1477, height: 272, alt: "About The Launch Feed" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "About - The Launch Feed",
     description:
       "The 360° product intelligence platform and daily software leaderboard built for authentic indie makers and SaaS builders.",
-    images: ["/thelaunchfeed-logo.png"],
     creator: "@thelaunchfeed",
   },
 };
@@ -36,8 +34,7 @@ export default function AboutPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
+      webPageNode({ path: "/about", name: "About The Launch Feed", description: metadata.description ?? undefined, type: "AboutPage" }),
       {
         ...breadcrumb([
           { name: "Home", url: siteUrl },

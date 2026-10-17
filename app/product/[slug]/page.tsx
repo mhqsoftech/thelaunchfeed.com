@@ -6,7 +6,7 @@ import { listCommentsForSlug } from "@/app/actions/comments";
 import { getAccoladeDetails } from "@/lib/awards";
 import { computeAwardsForProductTimegated } from "@/lib/queries/awards";
 import ProductClientView, { type ViewProduct } from "./ProductClientView";
-import { organizationNode, websiteNode, breadcrumb, ORG_ID, WEBSITE_ID, SITE_URL, SITE_NAME } from "@/lib/seo/schema";
+import { breadcrumb, ORG_ID, WEBSITE_ID, SITE_URL, SITE_NAME } from "@/lib/seo/schema";
 
 export const revalidate = 300;
 
@@ -28,13 +28,8 @@ export async function generateMetadata({
   const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
   const canonicalUrl = `${siteUrl}/product/${product.slug}`;
   const description = product.description || product.tagline || `${product.name} on The Launch Feed. Discover technical architecture, 360° product specs, and community upvotes.`;
-  // Prefer the first screenshot for a large social card, fall back to the
-  // product logo so at minimum the product's mark shows up in every share.
-  const shareImage =
-    (Array.isArray(product.screenshots) && product.screenshots[0]) ||
-    product.logoUrl ||
-    `${siteUrl}/og-default.png`;
-  const absoluteShareImage = shareImage.startsWith("http") ? shareImage : `${siteUrl}${shareImage.startsWith("/") ? "" : "/"}${shareImage}`;
+  // Social cards come from ./opengraph-image.tsx (a PNG with the logo,
+  // tagline and votes); maker uploads are AVIF, which most crawlers ignore.
   const pageTitle = `${product.name} - Product | The Launch Feed`;
   return {
     title: pageTitle,
@@ -59,19 +54,12 @@ export async function generateMetadata({
       title: pageTitle,
       description,
       siteName: "The Launch Feed",
-      images: [
-        {
-          url: absoluteShareImage,
-          alt: `${product.name} — ${product.tagline || "on The Launch Feed"}`,
-        },
-      ],
     },
     twitter: {
       card: "summary_large_image",
       title: pageTitle,
       description,
       creator: product.owner.twitterHandle ? `@${product.owner.twitterHandle.replace(/^@/, "")}` : "@thelaunchfeed",
-      images: [absoluteShareImage],
     },
     robots: {
       index: true,
@@ -190,22 +178,57 @@ export default async function ProductPage({
   const launchedIso = new Date(p.launchedAt).toISOString();
   const updatedIso = new Date((p as any).updatedAt || p.launchedAt).toISOString();
 
-  // Structured Data (JSON-LD) for Search Engines & AI Bots
+  // Structured Data (JSON-LD) for search engines and AI answer engines.
+  // Only facts the maker actually entered — no invented ratings or prices.
+  const d = (view.details || {}) as Record<string, any>;
+  const ogImage = `${productUrl}/opengraph-image`;
+  const features: string[] = Array.isArray(d.features) ? d.features.filter((f: unknown) => typeof f === "string" && f.trim()) : [];
+  const faqs: Array<{ q: string; a: string }> = Array.isArray(d.faqs)
+    ? d.faqs.filter((f: any) => f && typeof f.q === "string" && typeof f.a === "string" && f.q.trim() && f.a.trim())
+    : [];
+  const offers = (Array.isArray(d.pricingTiers) ? d.pricingTiers : [])
+    .map((t: any) => {
+      const raw = String(t?.price ?? "").trim();
+      const free = /^(free|\$?0(\.0+)?)(\b|\/|$)/i.test(raw);
+      const num = free ? 0 : Number((raw.match(/\d+(?:\.\d+)?/) || [])[0]);
+      if (!raw || !Number.isFinite(num)) return null;
+      return {
+        "@type": "Offer",
+        name: String(t?.name || (free ? "Free" : "Paid")).slice(0, 60),
+        price: num.toFixed(2),
+        priceCurrency: "USD",
+        ...(t?.specs ? { description: String(t.specs).slice(0, 200) } : {}),
+      };
+    })
+    .filter(Boolean);
+  // Bare URLs (no ?ref= tracking) so search engines can match the entity.
+  const bareUrl = (u: unknown) => {
+    if (typeof u !== "string" || !/^https?:\/\//i.test(u)) return null;
+    try {
+      const x = new URL(u);
+      x.search = "";
+      x.hash = "";
+      return x.toString();
+    } catch {
+      return null;
+    }
+  };
+  const absUrl = (u: string | null | undefined) => (!u ? null : /^https?:\/\//i.test(u) ? u : `${siteUrl}${u.startsWith("/") ? "" : "/"}${u}`);
+  const productSameAs = [bareUrl(p.websiteUrl), bareUrl(d.githubUrl)].filter(Boolean);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
       {
-        "@type": "WebPage",
+        "@type": "ItemPage",
         "@id": `${productUrl}#webpage`,
         url: productUrl,
         name: `${p.name} - Product | ${SITE_NAME}`,
+        description: p.tagline,
+        inLanguage: "en",
         isPartOf: { "@id": WEBSITE_ID },
-        primaryImageOfPage: {
-          "@type": "ImageObject",
-          url: p.logoUrl || `${siteUrl}/icon.svg`,
-        },
+        mainEntity: { "@id": `${productUrl}#software` },
+        primaryImageOfPage: { "@type": "ImageObject", url: ogImage, width: 1200, height: 630 },
         datePublished: launchedIso,
         dateModified: updatedIso,
         breadcrumb: { "@id": `${productUrl}#breadcrumb` },
@@ -217,9 +240,14 @@ export default async function ProductPage({
         headline: p.tagline,
         description: p.description || p.tagline,
         url: productUrl,
-        applicationCategory: p.category?.name || "DeveloperApplication",
-        operatingSystem: "All",
-        image: p.logoUrl || `${siteUrl}/icon.svg`,
+        ...(productSameAs.length ? { sameAs: productSameAs } : {}),
+        applicationCategory: p.category?.name || "BusinessApplication",
+        operatingSystem: "Web",
+        image: [ogImage, ...(p.logoUrl ? [absUrl(p.logoUrl)] : [])],
+        ...((p.screenshots ?? []).length ? { screenshot: (p.screenshots ?? []).slice(0, 4).map(absUrl) } : {}),
+        ...(features.length ? { featureList: features.slice(0, 12).join(", ") } : {}),
+        ...(typeof d.latestVersion === "string" && d.latestVersion.trim() ? { softwareVersion: d.latestVersion.trim() } : {}),
+        ...((p.tags ?? []).length ? { keywords: (p.tags ?? []).join(", ") } : {}),
         datePublished: launchedIso,
         dateModified: updatedIso,
         publisher: { "@id": ORG_ID },
@@ -230,20 +258,26 @@ export default async function ProductPage({
           url: founderUrl,
           ...(founderSameAs.length ? { sameAs: founderSameAs } : {}),
         },
-        aggregateRating: {
-          "@type": "AggregateRating",
-          ratingValue: "5.0",
-          reviewCount: Math.max(1, p.voteCount),
-          bestRating: "5",
-          worstRating: "1",
-        },
-        offers: {
-          "@type": "Offer",
-          price: "0",
-          priceCurrency: "USD",
-          availability: "https://schema.org/InStock",
-        },
+        interactionStatistic: [
+          { "@type": "InteractionCounter", interactionType: "https://schema.org/LikeAction", userInteractionCount: p.voteCount },
+          { "@type": "InteractionCounter", interactionType: "https://schema.org/CommentAction", userInteractionCount: initialComments.length },
+        ],
+        ...(offers.length ? { offers } : {}),
       },
+      ...(faqs.length
+        ? [
+            {
+              "@type": "FAQPage",
+              "@id": `${productUrl}#faq`,
+              isPartOf: { "@id": `${productUrl}#webpage` },
+              mainEntity: faqs.slice(0, 10).map((f) => ({
+                "@type": "Question",
+                name: f.q.trim(),
+                acceptedAnswer: { "@type": "Answer", text: f.a.trim() },
+              })),
+            },
+          ]
+        : []),
       {
         ...breadcrumb([
           { name: "Home", url: siteUrl },

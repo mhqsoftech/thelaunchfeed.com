@@ -35,22 +35,12 @@ export const metadata: Metadata = {
     title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
     description:
       "Discover the best new tech products, SaaS apps, and AI tools launched today. Real-time voting, verified MRR badges, and permanent maker backlinks.",
-    images: [
-      {
-        url: "/thelaunchfeed-og.avif",
-        width: 1200,
-        height: 630,
-        alt: "The Launch Feed - Ship. Vote. Rise.",
-        type: "image/avif",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
     description:
       "Discover the best new tech products, SaaS apps, and AI tools launched today with verified revenue badges.",
-    images: ["/thelaunchfeed-og.avif"],
     creator: "@thelaunchfeed",
   },
   robots: {
@@ -69,8 +59,9 @@ export const metadata: Metadata = {
     shortcut: "/icon.svg",
     apple: "/icon.svg",
   },
+  // Google Search Console is verified by the HTML file
+  // public/googled2d6cb4f814366f3.html (a meta tag needs a different token).
   verification: {
-    google: "googled2d6cb4f814366f3",
     other: {
       "msvalidate.01": "CEA1513666614736E084DBC2073583AE",
     },

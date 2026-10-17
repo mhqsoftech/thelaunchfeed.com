@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getProductBySlug } from "@/lib/queries/products";
 import { computeAwardsForProductTimegated } from "@/lib/queries/awards";
 import BadgesClientView from "../BadgesClientView";
-import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
+import { breadcrumb, webPageNode } from "@/lib/seo/schema";
 
 export async function generateMetadata({
   params,
@@ -82,8 +82,14 @@ export default async function ProductBadgesPage({
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
+      {
+        ...webPageNode({
+          path: `/badges/${encodeURIComponent(cleanSlug)}`,
+          name: `${product.name} badges & trophies`,
+          description: `Official embeddable launch badges and award trophies for ${product.name} on The Launch Feed.`,
+        }),
+        about: { "@id": `${productUrl}#software` },
+      },
       {
         ...breadcrumb([
           { name: "Home", url: siteUrl },

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import MainLayoutShell from "@/app/MainLayoutShell";
 import BadgesClientView from "./BadgesClientView";
-import { organizationNode, websiteNode, breadcrumb } from "@/lib/seo/schema";
+import { breadcrumb, webPageNode } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
   title: "Official Embed Badges & Trophies - The Launch Feed",
@@ -15,8 +15,7 @@ export default async function BadgesPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
-      organizationNode(),
-      websiteNode(),
+      webPageNode({ path: "/badges", name: "Launch badges & trophies", description: metadata.description ?? undefined, type: "CollectionPage" }),
       {
         ...breadcrumb([
           { name: "Home", url: siteUrl },
