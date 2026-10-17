@@ -10,6 +10,7 @@ import {
   reorderDirectoryEmbeds,
   type DirectoryEmbedItem,
 } from "@/app/actions/directoryEmbeds";
+import * as ui from "./ui";
 
 const PRESETS = [
   {
@@ -176,13 +177,13 @@ export default function DirectoryEmbedsTab() {
   };
 
   return (
-    <div className="space-y-6 font-mono text-ink">
+    <div className="space-y-6 text-ink">
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-hairline pb-4">
         <div>
           <h2 className="text-base font-bold uppercase tracking-wider flex items-center gap-2">
             <span>Online Directory Embed Codes</span>
-            <span className="text-[10px] font-bold px-2 py-0.5 border border-signal text-signal bg-signal/10">
+            <span className={ui.pill("signal")}>
               Footer Marquee
             </span>
           </h2>
@@ -194,7 +195,7 @@ export default function DirectoryEmbedsTab() {
         <button
           type="button"
           onClick={openAddModal}
-          className="px-4 py-2 bg-ink text-void hover:bg-signal font-bold text-xs uppercase flex items-center gap-2 transition-colors cursor-pointer shrink-0 shadow-sm"
+          className={ui.cx(ui.btn, ui.primary, "shrink-0")}
         >
           <span>+ Add Directory Embed</span>
         </button>
@@ -202,7 +203,7 @@ export default function DirectoryEmbedsTab() {
 
       {/* Alerts */}
       {error && (
-        <div className="p-3 border border-signal/50 bg-signal/10 text-signal text-xs flex items-center justify-between">
+        <div className="rounded-xl border p-3 border-signal/50 bg-signal/10 text-signal text-xs flex items-center justify-between">
           <span>{error}</span>
           <button onClick={() => setError(null)} className="font-bold ml-2 cursor-pointer">
             &times;
@@ -211,7 +212,7 @@ export default function DirectoryEmbedsTab() {
       )}
 
       {successMsg && (
-        <div className="p-3 border border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs flex items-center justify-between">
+        <div className="rounded-xl border p-3 border-emerald-500/50 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs flex items-center justify-between">
           <span>✓ {successMsg}</span>
           <button onClick={() => setSuccessMsg(null)} className="font-bold ml-2 cursor-pointer">
             &times;
@@ -221,11 +222,11 @@ export default function DirectoryEmbedsTab() {
 
       {/* Embeds List / Table */}
       {loading ? (
-        <div className="p-8 border border-hairline text-center text-xs text-ink-dim">
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-8 text-center text-xs text-ink-dim">
           Loading directory embeds...
         </div>
       ) : embeds.length === 0 ? (
-        <div className="p-8 border border-dashed border-hairline text-center space-y-3">
+        <div className="rounded-xl border border-dashed border-hairline p-8 text-center space-y-3">
           <div className="text-sm font-bold text-ink">No Directory Embed Codes Added Yet</div>
           <p className="text-xs text-ink-dim max-w-md mx-auto">
             Add your first directory badge from Product Hunt, Peerlist, Uneed, or another software directory to showcase social proof in the site footer.
@@ -233,35 +234,35 @@ export default function DirectoryEmbedsTab() {
           <button
             type="button"
             onClick={openAddModal}
-            className="px-4 py-2 border border-signal text-signal hover:bg-signal hover:text-void font-bold text-xs uppercase transition-colors cursor-pointer"
+            className={ui.cx(ui.btn, ui.secondary)}
           >
             + Add First Directory Badge
           </button>
         </div>
       ) : (
-        <div className="border border-hairline bg-surface/20 divide-y divide-hairline overflow-x-auto">
-          <table className="w-full text-xs text-left min-w-[650px]">
-            <thead className="bg-surface/60 text-[10px] uppercase font-bold text-ink-dim tracking-wider border-b border-hairline">
+        <div className="rounded-xl border border-hairline bg-card shadow-card divide-y divide-hairline overflow-x-auto">
+          <table className={ui.cx(ui.table, "min-w-[650px]")}>
+            <thead className={ui.thead}>
               <tr>
-                <th className="py-2.5 px-4 w-12 text-center">Order</th>
-                <th className="py-2.5 px-4">Directory / Name</th>
-                <th className="py-2.5 px-4">Live Preview</th>
-                <th className="py-2.5 px-4 text-center w-28">Status</th>
-                <th className="py-2.5 px-4 text-right w-40">Actions</th>
+                <th className={ui.cx(ui.th, "w-12 text-center")}>Order</th>
+                <th className={ui.th}>Directory / Name</th>
+                <th className={ui.th}>Live Preview</th>
+                <th className={ui.cx(ui.th, "text-center w-28")}>Status</th>
+                <th className={ui.cx(ui.th, "text-right w-40")}>Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-hairline">
               {embeds.map((item, idx) => (
                 <tr key={item.id} className="hover:bg-surface/40 transition-colors">
                   {/* Order Controls */}
-                  <td className="py-3 px-4 text-center">
+                  <td className={ui.cx(ui.td, "text-center")}>
                     <div className="flex items-center justify-center gap-1">
                       <button
                         type="button"
                         disabled={idx === 0 || isPending}
                         onClick={() => handleMove(idx, "up")}
                         title="Move Up"
-                        className="p-1 border border-hairline hover:border-ink disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-[10px]"
+                        className={ui.cx(ui.btnSm, ui.secondary)}
                       >
                         ▲
                       </button>
@@ -270,7 +271,7 @@ export default function DirectoryEmbedsTab() {
                         disabled={idx === embeds.length - 1 || isPending}
                         onClick={() => handleMove(idx, "down")}
                         title="Move Down"
-                        className="p-1 border border-hairline hover:border-ink disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed text-[10px]"
+                        className={ui.cx(ui.btnSm, ui.secondary)}
                       >
                         ▼
                       </button>
@@ -278,7 +279,7 @@ export default function DirectoryEmbedsTab() {
                   </td>
 
                   {/* Directory Name & Details */}
-                  <td className="py-3 px-4">
+                  <td className={ui.td}>
                     <div className="font-bold text-ink flex items-center gap-2">
                       <span>{item.name}</span>
                       {item.targetUrl && (
@@ -292,14 +293,14 @@ export default function DirectoryEmbedsTab() {
                         </a>
                       )}
                     </div>
-                    <div className="text-[10px] text-ink-faint mt-0.5 truncate max-w-xs font-mono">
+                    <div className="text-[10px] text-ink-faint mt-0.5 truncate max-w-xs">
                       ID: {item.id}
                     </div>
                   </td>
 
                   {/* Live Rendered Preview */}
-                  <td className="py-3 px-4">
-                    <div className="p-2 border border-hairline bg-void inline-flex items-center justify-center max-h-12 overflow-hidden max-w-[200px]">
+                  <td className={ui.td}>
+                    <div className="rounded-xl border border-hairline bg-card shadow-card p-2 inline-flex items-center justify-center max-h-12 overflow-hidden max-w-[200px]">
                       <div
                         className="scale-90 origin-left"
                         dangerouslySetInnerHTML={{ __html: item.embedHtml }}
@@ -308,7 +309,7 @@ export default function DirectoryEmbedsTab() {
                   </td>
 
                   {/* Status Toggle */}
-                  <td className="py-3 px-4 text-center">
+                  <td className={ui.cx(ui.td, "text-center")}>
                     <button
                       type="button"
                       disabled={isPending}
@@ -324,12 +325,12 @@ export default function DirectoryEmbedsTab() {
                   </td>
 
                   {/* Actions */}
-                  <td className="py-3 px-4 text-right">
+                  <td className={ui.cx(ui.td, "text-right")}>
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         type="button"
                         onClick={() => openEditModal(item)}
-                        className="px-2.5 py-1 border border-hairline hover:border-ink text-ink text-[10px] uppercase font-bold transition-colors cursor-pointer"
+                        className={ui.cx(ui.btnSm, ui.secondary)}
                       >
                         Edit
                       </button>
@@ -337,7 +338,7 @@ export default function DirectoryEmbedsTab() {
                         type="button"
                         disabled={isPending}
                         onClick={() => setDeletingEmbed({ id: item.id, name: item.name })}
-                        className="px-2.5 py-1 border border-signal/40 text-signal hover:bg-signal hover:text-void text-[10px] uppercase font-bold transition-colors cursor-pointer"
+                        className={ui.cx(ui.btnSm, ui.secondary)}
                       >
                         Delete
                       </button>
@@ -351,7 +352,7 @@ export default function DirectoryEmbedsTab() {
       )}
 
       {/* Footer Preview Callout */}
-      <div className="p-4 border border-hairline bg-surface/30 space-y-2">
+      <div className="rounded-xl border border-hairline bg-card shadow-card p-4 space-y-2">
         <div className="text-xs font-bold uppercase text-ink flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
           <span>Footer Display Behavior</span>
@@ -364,7 +365,7 @@ export default function DirectoryEmbedsTab() {
       {/* Add / Edit Modal */}
       {showModal && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-void border border-hairline w-full max-w-xl p-5 sm:p-6 space-y-5 shadow-2xl font-mono text-ink relative rounded-xs">
+          <div className="rounded-xl border border-hairline bg-card shadow-card shadow-[var(--shadow-lift)] w-full max-w-xl p-5 sm:p-6 space-y-5 text-ink relative">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <h3 className="text-sm font-bold text-ink uppercase tracking-wider">
                 {editingId ? "Edit Directory Embed" : "Add Directory Embed Code"}
@@ -391,7 +392,7 @@ export default function DirectoryEmbedsTab() {
                       key={p.name}
                       type="button"
                       onClick={() => applyPreset(p)}
-                      className="px-2.5 py-1 text-[10px] font-bold border border-hairline bg-surface hover:bg-raised text-ink hover:text-signal hover:border-signal/50 transition-colors cursor-pointer rounded-xs"
+                      className={ui.cx(ui.btnSm, ui.secondary)}
                     >
                       {p.name}
                     </button>
@@ -402,7 +403,7 @@ export default function DirectoryEmbedsTab() {
 
             <form onSubmit={handleSave} className="space-y-4">
               <div className="space-y-1">
-                <label className="block text-xs font-bold uppercase text-ink">
+                <label className={ui.cx(ui.label, "mb-1.5")}>
                   Directory Name:
                 </label>
                 <input
@@ -411,12 +412,12 @@ export default function DirectoryEmbedsTab() {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Product Hunt, Uneed, Peerlist, Toolify"
-                  className="w-full px-3 py-2 border border-hairline bg-surface/30 text-ink text-xs focus:border-signal outline-none font-mono placeholder:text-ink-faint rounded-xs"
+                  className={ui.cx(ui.input, "w-full")}
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-bold uppercase text-ink">
+                <label className={ui.cx(ui.label, "mb-1.5")}>
                   Embed HTML Snippet:
                 </label>
                 <textarea
@@ -425,7 +426,7 @@ export default function DirectoryEmbedsTab() {
                   value={formEmbedHtml}
                   onChange={(e) => setFormEmbedHtml(e.target.value)}
                   placeholder='<a href="https://..." target="_blank"><img src="https://..." alt="..." /></a>'
-                  className="w-full px-3 py-2 border border-hairline bg-surface/30 text-signal font-mono text-xs focus:border-signal outline-none resize-none leading-relaxed placeholder:text-ink-faint rounded-xs"
+                  className="w-full px-3 py-2 border border-hairline bg-surface/30 text-signal text-xs focus:border-signal outline-none resize-none leading-relaxed placeholder:text-ink-faint rounded-md"
                 />
                 <p className="text-[10px] text-ink-dim">
                   Paste the exact HTML embed snippet provided by the directory.
@@ -433,7 +434,7 @@ export default function DirectoryEmbedsTab() {
               </div>
 
               <div className="space-y-1">
-                <label className="block text-xs font-bold uppercase text-ink">
+                <label className={ui.cx(ui.label, "mb-1.5")}>
                   Target Website URL (Optional override):
                 </label>
                 <input
@@ -441,7 +442,7 @@ export default function DirectoryEmbedsTab() {
                   value={formTargetUrl}
                   onChange={(e) => setFormTargetUrl(e.target.value)}
                   placeholder="https://directory.com/products/the-launch-feed"
-                  className="w-full px-3 py-2 border border-hairline bg-surface/30 text-ink text-xs focus:border-signal outline-none font-mono placeholder:text-ink-faint rounded-xs"
+                  className={ui.cx(ui.input, "w-full")}
                 />
               </div>
 
@@ -451,7 +452,7 @@ export default function DirectoryEmbedsTab() {
                   <div className="text-[10px] font-bold uppercase text-ink-dim">
                     Live Preview in Modal:
                   </div>
-                  <div className="p-4 border border-hairline bg-surface/20 flex items-center justify-center min-h-[50px] overflow-hidden rounded-xs">
+                  <div className="rounded-xl border border-hairline bg-card shadow-card p-4 flex items-center justify-center min-h-[50px] overflow-hidden">
                     <div dangerouslySetInnerHTML={{ __html: formEmbedHtml }} />
                   </div>
                 </div>
@@ -463,7 +464,7 @@ export default function DirectoryEmbedsTab() {
                     type="checkbox"
                     checked={formEnabled}
                     onChange={(e) => setFormEnabled(e.target.checked)}
-                    className="accent-signal cursor-pointer"
+                    className={ui.checkbox}
                   />
                   <span>Enable immediately in footer</span>
                 </label>
@@ -474,14 +475,14 @@ export default function DirectoryEmbedsTab() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-xs uppercase font-bold cursor-pointer transition-colors rounded-xs"
+                  className={ui.cx(ui.btn, ui.secondary)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-5 py-2 bg-signal text-void hover:bg-signal/90 disabled:opacity-50 text-xs uppercase font-bold cursor-pointer shadow-xs transition-colors rounded-xs"
+                  className={ui.cx(ui.btn, ui.primary)}
                 >
                   {isPending ? "Saving..." : editingId ? "Update Embed" : "Save Embed"}
                 </button>
@@ -495,7 +496,7 @@ export default function DirectoryEmbedsTab() {
       {/* Delete Confirmation Modal */}
       {deletingEmbed && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="w-full max-w-md border border-rose-500/40 bg-void p-5 sm:p-6 space-y-4 font-mono text-ink shadow-2xl relative rounded-xs">
+          <div className="rounded-xl border shadow-[var(--shadow-lift)] w-full max-w-md border-rose-500/40 p-5 sm:p-6 space-y-4 text-ink relative">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
@@ -503,13 +504,13 @@ export default function DirectoryEmbedsTab() {
                   Delete Directory Embed
                 </h3>
               </div>
-              <span className="text-[9px] font-mono px-2 py-0.5 border border-rose-500/40 text-rose-400 bg-rose-500/10 uppercase font-bold">
+              <span className={ui.pill("bad")}>
                 Permanent
               </span>
             </div>
 
             <div className="space-y-2.5 text-xs text-ink-dim leading-relaxed">
-              <div className="p-3 border border-hairline bg-surface/30 rounded-xs space-y-1">
+              <div className="rounded-xl border border-hairline bg-card shadow-card p-3 space-y-1">
                 <div className="text-[10px] uppercase font-bold text-ink-faint">Directory Name</div>
                 <div className="text-sm font-bold text-ink truncate">
                   {deletingEmbed.name}
@@ -526,7 +527,7 @@ export default function DirectoryEmbedsTab() {
                 type="button"
                 disabled={isPending}
                 onClick={() => setDeletingEmbed(null)}
-                className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink-dim hover:text-ink text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 rounded-xs"
+                className={ui.cx(ui.btn, ui.secondary)}
               >
                 Cancel
               </button>
@@ -534,7 +535,7 @@ export default function DirectoryEmbedsTab() {
                 type="button"
                 disabled={isPending}
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5 rounded-xs shadow-xs"
+                className={ui.cx(ui.btn, "bg-rose-600 text-white hover:bg-rose-500")}
               >
                 {isPending ? (
                   <>

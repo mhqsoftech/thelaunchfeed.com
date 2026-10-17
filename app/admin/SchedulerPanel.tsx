@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useState, useTransition } from "react";
 import { getSchedulerStatusAction, runSchedulerNowAction, retryFailedJobAction } from "@/app/actions/automation";
+import * as ui from "./ui";
 
 type Status = Awaited<ReturnType<typeof getSchedulerStatusAction>>;
 
@@ -58,14 +59,14 @@ export default function SchedulerPanel() {
     });
 
   if (error) {
-    return <div className="border border-hairline p-4 text-xs text-red-500">Scheduler status unavailable: {error}</div>;
+    return <div className="rounded-xl border border-hairline bg-card shadow-card p-4 text-xs text-red-500">Scheduler status unavailable: {error}</div>;
   }
   if (!status) {
-    return <div className="border border-hairline p-4 text-xs text-ink-dim">Loading scheduler health…</div>;
+    return <div className="rounded-xl border border-hairline bg-card shadow-card p-4 text-xs text-ink-dim">Loading scheduler health…</div>;
   }
 
   return (
-    <section className="border border-hairline" aria-labelledby="scheduler-heading">
+    <section className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden" aria-labelledby="scheduler-heading">
       <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-hairline">
         <div className="flex items-center gap-2.5">
           <span
@@ -88,7 +89,7 @@ export default function SchedulerPanel() {
             type="button"
             onClick={runNow}
             disabled={pending}
-            className="px-3 py-1.5 text-xs font-bold border border-hairline hover:border-signal hover:text-signal disabled:opacity-50"
+            className={ui.cx(ui.btn, ui.secondary)}
           >
             {pending ? "Running…" : "Run now"}
           </button>
@@ -104,25 +105,25 @@ export default function SchedulerPanel() {
       {message && <p className="px-4 py-2 text-xs text-ink-dim border-b border-hairline">{message}</p>}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[640px]">
+        <table className={ui.cx(ui.table, "min-w-[640px]")}>
           <thead>
-            <tr className="text-xs uppercase text-ink-dim font-bold">
-              <th className="text-left px-3 py-2 border-b border-hairline">Task</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Schedule</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Last run</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Status</th>
+            <tr className="">
+              <th className={ui.th}>Task</th>
+              <th className={ui.th}>Schedule</th>
+              <th className={ui.th}>Last run</th>
+              <th className={ui.th}>Status</th>
             </tr>
           </thead>
           <tbody>
             {status.tasks.map((t) => (
-              <tr key={t.job} className="border-b border-hairline/60 last:border-0">
-                <td className="px-3 py-2">
+              <tr key={t.job} className={ui.tr}>
+                <td className={ui.td}>
                   <div className="font-bold text-ink">{t.job.replace("cron.", "")}</div>
                   <div className="text-xs text-ink-dim">{t.description}</div>
                 </td>
-                <td className="px-3 py-2 text-xs text-ink-dim whitespace-nowrap">{every(t.everyMinutes)}</td>
-                <td className="px-3 py-2 text-xs text-ink-dim whitespace-nowrap">{ago(t.lastFinishedAt)}</td>
-                <td className="px-3 py-2 text-xs">
+                <td className={ui.cx(ui.td, "text-xs text-ink-dim whitespace-nowrap")}>{every(t.everyMinutes)}</td>
+                <td className={ui.cx(ui.td, "text-xs text-ink-dim whitespace-nowrap")}>{ago(t.lastFinishedAt)}</td>
+                <td className={ui.cx(ui.td, "text-xs")}>
                   {t.lastStatus === "DONE" && <span className="text-emerald-600 font-bold">OK</span>}
                   {t.lastStatus === "FAILED" && (
                     <span className="text-red-500 font-bold" title={t.lastError ?? ""}>
@@ -153,7 +154,7 @@ export default function SchedulerPanel() {
                 type="button"
                 onClick={() => retry(f.id)}
                 disabled={pending}
-                className="shrink-0 px-2 py-1 border border-hairline hover:border-signal hover:text-signal"
+                className={ui.cx(ui.btnSm, ui.secondary, "shrink-0")}
               >
                 Retry
               </button>

@@ -9,6 +9,7 @@ import {
 } from "@/app/actions/broadcast";
 import { type BroadcastConfig, type BroadcastLogItem } from "@/lib/broadcast";
 import { LaunchFeedLoader } from "@/components/ui/LaunchFeedLoader";
+import * as ui from "./ui";
 
 /* ─────────────────────────── Official Brand SVG Logos ─────────────────────────── */
 
@@ -169,20 +170,17 @@ export default function BroadcastTab() {
   }
 
   return (
-    <div className="space-y-6 font-mono text-ink">
-      {/* Header Banner */}
-      <div className="border border-hairline bg-surface/40 p-4 sm:p-6 space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <h2 className="text-base sm:text-lg font-bold uppercase tracking-wider text-ink flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-signal animate-pulse" />
-            <span>Multi-Channel Social Broadcast Engine</span>
-          </h2>
-          <span className="text-[10px] px-2 py-0.5 border border-signal/60 bg-signal/10 text-signal font-bold uppercase shrink-0 self-start sm:self-auto">
-            AUTOMATED PRODUCT LAUNCH DISPATCHER
-          </span>
-        </div>
-        <p className="text-xs text-ink-dim leading-relaxed font-sans">
-          Configure API credentials and public channel endpoints for <strong>X (Twitter)</strong>, <strong>Telegram</strong>, and <strong>WhatsApp</strong>. When any product is published at the 6:00 AM IST (00:30 UTC) release slot or launched manually, it is automatically broadcasted with rich 360° product specs and direct backlinks.
+    <div className="space-y-6 text-ink">
+      {/* Intro (the page heading above already names the tab) */}
+      <div className={ui.cx(ui.cardPad, "space-y-2")}>
+        <span className={ui.pill("signal")}>
+          <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
+          Automated launch dispatcher
+        </span>
+        <p className="text-sm text-ink-dim leading-relaxed">
+          Configure API credentials and public channel endpoints for <strong className="text-ink">X (Twitter)</strong>,{" "}
+          <strong className="text-ink">Telegram</strong> and <strong className="text-ink">WhatsApp</strong>. When a product is published at the
+          6:00 AM IST (00:30 UTC) release slot or launched manually, it is broadcast automatically with its product specs and a direct link.
         </p>
       </div>
 
@@ -190,17 +188,17 @@ export default function BroadcastTab() {
       <form onSubmit={handleSave} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* 1. X (Twitter) — Native API v2 (free tier is minimal) + optional webhook fallback */}
-          <div className="border border-hairline bg-surface/30 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
+          <div className="rounded-xl border border-hairline bg-card shadow-card p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="flex items-center justify-between border-b border-hairline pb-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-ink text-void rounded-xs flex items-center justify-center p-1">
+                  <div className="w-6 h-6 bg-ink text-void rounded-md flex items-center justify-center p-1">
                     <XBrandLogo className="w-3.5 h-3.5" />
                   </div>
                   <span className="font-bold text-xs uppercase text-ink">X / Twitter API v2</span>
                 </div>
                 <span
-                  className={`text-[9px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
+                  className={`text-[10px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
                     config.x.enabled
                       ? "border-signal text-signal bg-void"
                       : "border-hairline text-ink-faint bg-surface"
@@ -217,7 +215,7 @@ export default function BroadcastTab() {
                   onChange={(e) =>
                     setConfig({ ...config, x: { ...config.x, enabled: e.target.checked } })
                   }
-                  className="rounded-xs accent-[#00D97E]"
+                  className={ui.checkbox}
                 />
                 <span>Enable Direct Auto-Post to X (paid API tier required for reliable cadence)</span>
               </label>
@@ -229,7 +227,7 @@ export default function BroadcastTab() {
                     type="password"
                     value={config.x.apiKey || ""}
                     onChange={(e) => setConfig({ ...config, x: { ...config.x, apiKey: e.target.value } })}
-                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div className="space-y-1">
@@ -238,7 +236,7 @@ export default function BroadcastTab() {
                     type="password"
                     value={config.x.apiSecret || ""}
                     onChange={(e) => setConfig({ ...config, x: { ...config.x, apiSecret: e.target.value } })}
-                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div className="space-y-1">
@@ -247,7 +245,7 @@ export default function BroadcastTab() {
                     type="password"
                     value={config.x.accessToken || ""}
                     onChange={(e) => setConfig({ ...config, x: { ...config.x, accessToken: e.target.value } })}
-                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div className="space-y-1">
@@ -256,12 +254,12 @@ export default function BroadcastTab() {
                     type="password"
                     value={config.x.accessTokenSecret || ""}
                     onChange={(e) => setConfig({ ...config, x: { ...config.x, accessTokenSecret: e.target.value } })}
-                    className="w-full px-2 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
               </div>
               <p className="text-[10px] text-ink-dim font-sans leading-tight">
-                Generate at <a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noreferrer" className="underline">developer.x.com</a> → Project → App → Keys and tokens. App permissions must be <strong>Read and Write</strong>. Since X removed most of the free-tier write allowance, use the <strong>Bluesky</strong> channel for zero-cost auto-broadcast, or fall back to the <strong>manual "Post to X" intent link</strong> shown in the launch log for one-tap posting.
+                Generate at <a href="https://developer.x.com/en/portal/dashboard" target="_blank" rel="noreferrer" className="underline">developer.x.com</a> → Project → App → Keys and tokens. App permissions must be <strong>Read and Write</strong>. Since X removed most of the free-tier write allowance, use the <strong>Bluesky</strong> channel for zero-cost auto-broadcast, or fall back to the <strong>manual &ldquo;Post to X&rdquo; intent link</strong> shown in the launch log for one-tap posting.
               </p>
 
               <div className="pt-2 border-t border-hairline">
@@ -269,7 +267,7 @@ export default function BroadcastTab() {
                   type="button"
                   onClick={() => handleTestChannel("x")}
                   disabled={testingX || !config.x.apiKey || !config.x.accessToken}
-                  className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+                  className={ui.cx(ui.btn, ui.secondary, "w-full")}
                 >
                   <SendIcon className="w-3.5 h-3.5 text-signal" />
                   <span>{testingX ? "Posting Test Tweet..." : "Test Post to X"}</span>
@@ -303,7 +301,7 @@ export default function BroadcastTab() {
                       },
                     })
                   }
-                  className="rounded-xs accent-[#00D97E]"
+                  className={ui.checkbox}
                 />
                 <span>Enable webhook path (mirror every launch + winner event)</span>
               </label>
@@ -323,7 +321,7 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="https://hook.eu2.make.com/... or Buffer inbound / n8n / Zapier endpoint"
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
                 <p className="text-[10px] text-ink-dim font-sans leading-tight pt-0.5">
                   POSTs the full JSON launch payload. RSS feed at <code>/feed.xml</code> is also available for any polling automation as a zero-auth fallback.
@@ -337,7 +335,7 @@ export default function BroadcastTab() {
                 type="button"
                 onClick={() => handleTestChannel("webhook")}
                 disabled={testingWebhook || !config.webhook?.webhookUrl}
-                className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+                className={ui.cx(ui.btn, ui.secondary, "w-full")}
               >
                 <SendIcon className="w-3.5 h-3.5 text-signal" />
                 <span>{testingWebhook ? "Sending Test Ping..." : "Test Webhook (Make.com / Buffer)"}</span>
@@ -357,17 +355,17 @@ export default function BroadcastTab() {
           </div>
 
           {/* 2. Telegram Channel */}
-          <div className="border border-hairline bg-surface/20 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
+          <div className="rounded-xl border border-hairline bg-card shadow-card p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="flex items-center justify-between border-b border-hairline pb-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-[#229ED9] text-white rounded-xs flex items-center justify-center p-1">
+                  <div className="w-6 h-6 bg-[#229ED9] text-white rounded-md flex items-center justify-center p-1">
                     <TelegramBrandLogo className="w-3.5 h-3.5" />
                   </div>
                   <span className="font-bold text-xs uppercase text-ink">Telegram Channel</span>
                 </div>
                 <span
-                  className={`text-[9px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
+                  className={`text-[10px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
                     config.telegram.enabled
                       ? "border-signal text-signal bg-void"
                       : "border-hairline text-ink-faint bg-surface"
@@ -388,7 +386,7 @@ export default function BroadcastTab() {
                       telegram: { ...config.telegram, enabled: e.target.checked },
                     })
                   }
-                  className="rounded-xs accent-[#00D97E]"
+                  className={ui.checkbox}
                 />
                 <span>Enable Auto-Broadcast to Telegram</span>
               </label>
@@ -408,7 +406,7 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="https://t.me/thelaunchfeed"
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
               </div>
 
@@ -427,7 +425,7 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="e.g. 7123456789:AAHk..."
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
               </div>
 
@@ -446,9 +444,9 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="e.g. @thelaunchfeed or -100123456789"
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
-                <p className="text-[9px] text-ink-faint font-sans">
+                <p className="text-[10px] text-ink-faint font-sans">
                   Ensure the bot is added as an <strong>Administrator</strong> with &ldquo;Post Messages&rdquo; permissions.
                 </p>
               </div>
@@ -459,7 +457,7 @@ export default function BroadcastTab() {
                 type="button"
                 onClick={() => handleTestChannel("telegram")}
                 disabled={testingTg || !config.telegram.botToken || !config.telegram.chatId}
-                className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+                className={ui.cx(ui.btn, ui.secondary, "w-full")}
               >
                 <SendIcon className="w-3.5 h-3.5 text-signal" />
                 <span>{testingTg ? "Testing Telegram Connection..." : "Test Telegram Message"}</span>
@@ -479,17 +477,17 @@ export default function BroadcastTab() {
           </div>
 
           {/* 3. WhatsApp Channel — Green-API gateway */}
-          <div className="border border-hairline bg-surface/20 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
+          <div className="rounded-xl border border-hairline bg-card shadow-card p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="flex items-center justify-between border-b border-hairline pb-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-[#25D366] text-white rounded-xs flex items-center justify-center p-1">
+                  <div className="w-6 h-6 bg-[#25D366] text-white rounded-md flex items-center justify-center p-1">
                     <WhatsAppBrandLogo className="w-3.5 h-3.5" />
                   </div>
                   <span className="font-bold text-xs uppercase text-ink">WhatsApp (Green-API)</span>
                 </div>
                 <span
-                  className={`text-[9px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
+                  className={`text-[10px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
                     config.whatsapp.enabled && (config.whatsapp.instanceId || config.whatsapp.phoneNumberId) && (config.whatsapp.apiToken || config.whatsapp.accessToken)
                       ? "border-signal text-signal bg-void"
                       : "border-hairline text-ink-faint bg-surface"
@@ -510,7 +508,7 @@ export default function BroadcastTab() {
                       whatsapp: { ...config.whatsapp, enabled: e.target.checked },
                     })
                   }
-                  className="rounded-xs accent-[#00D97E]"
+                  className={ui.checkbox}
                 />
                 <span>Enable Auto-Broadcast to WhatsApp</span>
               </label>
@@ -535,7 +533,7 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="e.g. 1203630XXXXXXXXX@g.us"
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
               </div>
 
@@ -554,19 +552,19 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="https://chat.whatsapp.com/HxTenCRhtHa9PIviuQNl9U"
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
               </div>
 
               {/* Green-API Production Gateway */}
-              <div className="p-3 border border-hairline bg-surface/40 space-y-2.5 rounded-xs">
+              <div className="rounded-xl border border-hairline bg-card shadow-card p-3 space-y-2.5">
                 <div className="text-[10px] uppercase font-bold text-ink flex items-center justify-between">
                   <span>Production Gateway: Green-API</span>
                   <a
                     href="https://green-api.com/en/pricing/"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[9px] text-signal font-mono font-normal underline"
+                    className="text-[10px] text-signal font-normal underline"
                   >
                     Free tier: 3-day trial then $0 dev plan
                   </a>
@@ -587,7 +585,7 @@ export default function BroadcastTab() {
                         })
                       }
                       placeholder="e.g. 7105123456"
-                      className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                      className={ui.cx(ui.input, "w-full")}
                     />
                   </div>
                   <div className="space-y-1">
@@ -602,7 +600,7 @@ export default function BroadcastTab() {
                         })
                       }
                       placeholder="e.g. f2391a5565e3..."
-                      className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                      className={ui.cx(ui.input, "w-full")}
                     />
                   </div>
                 </div>
@@ -614,7 +612,7 @@ export default function BroadcastTab() {
                 type="button"
                 onClick={() => handleTestChannel("whatsapp")}
                 disabled={testingWa || !config.whatsapp.chatId}
-                className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+                className={ui.cx(ui.btn, ui.secondary, "w-full")}
               >
                 <SendIcon className="w-3.5 h-3.5 text-signal" />
                 <span>{testingWa ? "Sending Test WhatsApp Alert..." : "Test WhatsApp Message"}</span>
@@ -634,17 +632,17 @@ export default function BroadcastTab() {
           </div>
 
           {/* 4. Bluesky (AT Protocol) — genuinely free X alternative */}
-          <div className="border border-hairline bg-surface/20 p-4 sm:p-5 space-y-4 flex flex-col justify-between">
+          <div className="rounded-xl border border-hairline bg-card shadow-card p-4 sm:p-5 space-y-4 flex flex-col justify-between">
             <div className="space-y-3.5">
               <div className="flex items-center justify-between border-b border-hairline pb-2.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-[#0085FF] text-white rounded-xs flex items-center justify-center p-1 font-bold text-[11px] font-mono">
+                  <div className="w-6 h-6 bg-[#0085FF] text-white rounded-md flex items-center justify-center p-1 font-bold text-[11px]">
                     B
                   </div>
                   <span className="font-bold text-xs uppercase text-ink">Bluesky (AT Proto)</span>
                 </div>
                 <span
-                  className={`text-[9px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
+                  className={`text-[10px] px-2 py-0.5 border font-bold uppercase tracking-wider ${
                     config.bluesky?.enabled
                       ? "border-signal text-signal bg-void"
                       : "border-hairline text-ink-faint bg-surface"
@@ -669,7 +667,7 @@ export default function BroadcastTab() {
                       },
                     })
                   }
-                  className="rounded-xs accent-[#00D97E]"
+                  className={ui.checkbox}
                 />
                 <span>Enable Auto-Broadcast to Bluesky (100% free · no rate tier)</span>
               </label>
@@ -691,7 +689,7 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="thelaunchfeed.bsky.social"
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
               </div>
 
@@ -712,7 +710,7 @@ export default function BroadcastTab() {
                     })
                   }
                   placeholder="xxxx-xxxx-xxxx-xxxx"
-                  className="w-full px-2.5 py-1.5 border border-hairline bg-void text-xs text-ink focus:outline-none focus:border-ink font-mono"
+                  className={ui.cx(ui.input, "w-full")}
                 />
                 <p className="text-[10px] text-ink-dim font-sans leading-tight pt-0.5">
                   Generate at <a href="https://bsky.app/settings/app-passwords" target="_blank" rel="noreferrer" className="underline">bsky.app/settings/app-passwords</a>. This is NOT your main password — App Passwords can be revoked without affecting your account. No API tier gating; posts land within seconds.
@@ -725,7 +723,7 @@ export default function BroadcastTab() {
                 type="button"
                 onClick={() => handleTestChannel("bluesky")}
                 disabled={testingBsky || !config.bluesky?.handle || !config.bluesky?.appPassword}
-                className="w-full py-2 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center gap-2"
+                className={ui.cx(ui.btn, ui.secondary, "w-full")}
               >
                 <SendIcon className="w-3.5 h-3.5 text-signal" />
                 <span>{testingBsky ? "Posting to Bluesky..." : "Test Bluesky Post"}</span>
@@ -748,13 +746,13 @@ export default function BroadcastTab() {
         {/* Action Save Bar */}
         <div className="border-t border-hairline pt-4 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="text-[11px] text-ink-dim font-mono">
+            <div className="text-[11px] text-ink-dim">
               Credentials and channel links are stored in the database.
             </div>
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 bg-signal text-void font-mono text-xs font-bold hover:bg-signal/90 transition-colors cursor-pointer disabled:opacity-40 shadow-sm flex items-center gap-2"
+              className={ui.cx(ui.btn, ui.primary)}
             >
               <SaveIcon className="w-3.5 h-3.5" />
               <span>{saving ? "Saving Configuration..." : "Save Broadcast Configuration"}</span>
@@ -788,7 +786,7 @@ export default function BroadcastTab() {
       </form>
 
       {/* Broadcast Delivery History */}
-      <div className="border border-hairline bg-void p-4 sm:p-6 space-y-4">
+      <div className="rounded-xl border border-hairline bg-card shadow-card p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-hairline pb-3">
           <div>
             <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-ink">
@@ -800,7 +798,7 @@ export default function BroadcastTab() {
           </div>
           <button
             onClick={loadData}
-            className="text-[10px] px-2.5 py-1 border border-hairline bg-surface hover:bg-raised text-ink transition-colors cursor-pointer font-bold flex items-center gap-1.5"
+            className={ui.cx(ui.btnSm, ui.secondary)}
           >
             <RefreshIcon className="w-3 h-3" />
             <span>Refresh Logs</span>
@@ -808,13 +806,13 @@ export default function BroadcastTab() {
         </div>
 
         {logs.length === 0 ? (
-          <div className="py-8 text-center text-xs text-ink-faint border border-dashed border-hairline">
+          <div className="rounded-xl border border-dashed border-hairline py-8 text-center text-sm text-ink-dim">
             No broadcast events recorded yet. Configure credentials above and test a broadcast or publish a product.
           </div>
         ) : (
-          <div className="divide-y divide-hairline border border-hairline overflow-y-auto overflow-x-auto max-h-[420px]">
+          <div className="rounded-xl border border-hairline bg-card shadow-card divide-y divide-hairline overflow-y-auto overflow-x-auto max-h-[420px]">
             {logs.map((log) => (
-              <div key={log.id} className="p-3 sm:p-4 text-xs font-mono flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface/20">
+              <div key={log.id} className="p-3 sm:p-4 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-surface/20">
                 <div className="space-y-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-ink truncate">{log.productName}</span>
@@ -828,7 +826,7 @@ export default function BroadcastTab() {
                 <div className="flex items-center gap-2 flex-wrap shrink-0">
                   {/* X Status */}
                   <span
-                    className={`text-[9px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
+                    className={`text-[10px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
                       log.results.x?.success
                         ? "border-signal text-signal bg-void"
                         : log.results.x === undefined
@@ -843,7 +841,7 @@ export default function BroadcastTab() {
 
                   {/* Telegram Status */}
                   <span
-                    className={`text-[9px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
+                    className={`text-[10px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
                       log.results.telegram?.success
                         ? "border-signal text-signal bg-void"
                         : log.results.telegram === undefined
@@ -858,7 +856,7 @@ export default function BroadcastTab() {
 
                   {/* WhatsApp Status */}
                   <span
-                    className={`text-[9px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
+                    className={`text-[10px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
                       log.results.whatsapp?.success
                         ? "border-signal text-signal bg-void"
                         : log.results.whatsapp === undefined
@@ -873,7 +871,7 @@ export default function BroadcastTab() {
 
                   {/* Bluesky Status */}
                   <span
-                    className={`text-[9px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
+                    className={`text-[10px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
                       log.results.bluesky?.success
                         ? "border-signal text-signal bg-void"
                         : log.results.bluesky === undefined
@@ -888,7 +886,7 @@ export default function BroadcastTab() {
 
                   {/* Free Webhook Status */}
                   <span
-                    className={`text-[9px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
+                    className={`text-[10px] px-2 py-0.5 border font-bold uppercase flex items-center gap-1 ${
                       log.results.webhook?.success
                         ? "border-signal text-signal bg-void"
                         : log.results.webhook === undefined

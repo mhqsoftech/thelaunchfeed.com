@@ -15,6 +15,7 @@ import {
   type PlatformUrlsData,
 } from "@/app/actions/indexing";
 import { LaunchFeedLoader } from "@/components/ui/LaunchFeedLoader";
+import * as ui from "./ui";
 
 // Professional Vector SVG Icons
 function IconGlobe({ className = "w-4 h-4" }: { className?: string }) {
@@ -485,35 +486,29 @@ export default function IndexingTab() {
   const unsubmittedCount = urlsData?.unsubmittedCount ?? 0;
 
   return (
-    <div className="p-3.5 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
-      {/* Top Console Banner - Fully Mobile Adaptive */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 pb-4 border-b border-hairline">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xs bg-signal/10 border border-signal/30 text-signal flex items-center justify-center shrink-0 mt-0.5">
-            <IconGlobe className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-signal" />
+    <div className="space-y-5 pb-6">
+      {/* Toolbar: status + actions (the page heading above already names the tab) */}
+      <div className={ui.cx(ui.cardPad, "flex flex-col xl:flex-row xl:items-center justify-between gap-3")}>
+        <div className="flex items-start gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-signal-dim text-signal flex items-center justify-center shrink-0">
+            <IconGlobe className="w-4.5 h-4.5 text-signal" />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-base sm:text-xl font-bold font-mono uppercase tracking-tight text-ink">
-                Web Search Indexing Console
-              </h1>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-xs text-[10px] font-mono font-bold uppercase bg-signal/15 text-signal border border-signal/30 shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
-                Live Sync
-              </span>
-            </div>
-            <p className="text-[11px] sm:text-xs text-ink-dim font-mono mt-0.5 leading-relaxed">
-              Automated link dispatch to Google Indexing API & IndexNow (Max 200 latest/day).
+            <span className={ui.pill("signal")}>
+              <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
+              Live sync
+            </span>
+            <p className="text-sm text-ink-dim mt-1 leading-relaxed">
+              Automated link dispatch to Google Indexing API &amp; IndexNow (max 200 latest/day).
             </p>
           </div>
         </div>
 
-        {/* Action Buttons Grid on Mobile */}
-        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full lg:w-auto shrink-0 pt-1 lg:pt-0">
+        <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto shrink-0">
           <button
             onClick={loadData}
             disabled={loading || isPending || autoDiscovering}
-            className="h-9 sm:h-8 px-3 border border-hairline bg-surface hover:bg-raised text-xs font-mono font-bold uppercase transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 text-ink shadow-xs rounded-xs"
+            className={ui.cx(ui.btn, ui.secondary)}
             title="Refresh Status"
           >
             <IconRefresh className="w-3.5 h-3.5 text-ink-dim" spinning={loading} />
@@ -522,7 +517,7 @@ export default function IndexingTab() {
           <button
             onClick={handleAutoDiscoverAndIndexProducts}
             disabled={autoDiscovering || isPending || loading}
-            className="h-9 sm:h-8 px-3 sm:px-4 bg-ink text-surface border border-ink hover:bg-signal hover:border-signal text-xs font-mono font-bold uppercase transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs disabled:opacity-50 rounded-xs"
+            className={ui.cx(ui.btn, ui.primary)}
             title="Auto-discover all live products and push any unindexed pages to Google & IndexNow"
           >
             {autoDiscovering ? (
@@ -532,7 +527,7 @@ export default function IndexingTab() {
               </>
             ) : (
               <>
-                <IconZap className="w-3.5 h-3.5 text-signal shrink-0" />
+                <IconZap className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">Auto-Index Products</span>
               </>
             )}
@@ -540,7 +535,7 @@ export default function IndexingTab() {
           <button
             onClick={handleSyncDeploy}
             disabled={isPending || autoDiscovering || quota.remaining <= 0}
-            className="h-9 sm:h-8 px-3 sm:px-4 bg-signal text-surface border border-signal hover:opacity-90 text-xs font-mono font-bold uppercase transition-opacity flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs disabled:opacity-50 rounded-xs"
+            className={ui.cx(ui.btn, ui.primary)}
           >
             {isPending ? (
               <>
@@ -558,40 +553,23 @@ export default function IndexingTab() {
       </div>
 
       {/* View Switcher Tabs */}
-      <div className="flex items-center gap-2 border-b border-hairline pb-2 overflow-x-auto">
-        <button
-          onClick={() => setActiveSubView("overview")}
-          className={`px-3 py-1.5 text-xs font-mono font-bold uppercase transition-colors flex items-center gap-2 rounded-xs cursor-pointer ${
-            activeSubView === "overview"
-              ? "bg-ink text-surface shadow-xs"
-              : "bg-surface hover:bg-raised text-ink-dim hover:text-ink border border-hairline"
-          }`}
-        >
-          <IconGauge className="w-3.5 h-3.5" />
-          <span>Overview & Live Logs</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubView("directory")}
-          className={`px-3 py-1.5 text-xs font-mono font-bold uppercase transition-colors flex items-center gap-2 rounded-xs cursor-pointer relative ${
-            activeSubView === "directory"
-              ? "bg-ink text-surface shadow-xs"
-              : "bg-surface hover:bg-raised text-ink-dim hover:text-ink border border-hairline"
-          }`}
-        >
-          <IconList className="w-3.5 h-3.5" />
-          <span>Platform URL Directory</span>
-          {unsubmittedCount > 0 && (
-            <span className="px-1.5 py-0.2 bg-amber-500 text-black text-[10px] font-extrabold rounded-full animate-pulse">
-              {unsubmittedCount} unindexed
-            </span>
-          )}
-        </button>
+      <div className="overflow-x-auto">
+        <div className={ui.segment}>
+          <button onClick={() => setActiveSubView("overview")} className={ui.cx(ui.segmentItem(activeSubView === "overview"), "inline-flex items-center gap-1.5")}>
+            <IconGauge className="w-3.5 h-3.5" />
+            <span>Overview &amp; live logs</span>
+          </button>
+          <button onClick={() => setActiveSubView("directory")} className={ui.cx(ui.segmentItem(activeSubView === "directory"), "inline-flex items-center gap-1.5")}>
+            <IconList className="w-3.5 h-3.5" />
+            <span>URL directory</span>
+            {unsubmittedCount > 0 && <span className={ui.pill("warn")}>{unsubmittedCount} unindexed</span>}
+          </button>
+        </div>
       </div>
 
       {/* In-app Alerts */}
       {error && (
-        <div className="p-3 sm:p-3.5 bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-mono flex items-start justify-between gap-2.5 rounded-xs">
+        <div className="rounded-xl border p-3 sm:p-3.5 bg-red-500/10 border-red-500/30 text-red-500 text-xs flex items-start justify-between gap-2.5">
           <div className="flex items-start gap-2 min-w-0">
             <IconAlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <span className="leading-relaxed break-words">{error}</span>
@@ -602,7 +580,7 @@ export default function IndexingTab() {
         </div>
       )}
       {successMsg && (
-        <div className="p-3 sm:p-3.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs font-mono flex items-start justify-between gap-2.5 rounded-xs">
+        <div className="rounded-xl border p-3 sm:p-3.5 bg-emerald-500/10 border-emerald-500/30 text-emerald-500 text-xs flex items-start justify-between gap-2.5">
           <div className="flex items-start gap-2 min-w-0">
             <IconCheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span className="leading-relaxed break-words">{successMsg}</span>
@@ -619,7 +597,7 @@ export default function IndexingTab() {
           {/* Hero 3-Column Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
             {/* 1. Google Daily Quota Card */}
-            <div className="p-3.5 sm:p-4 border border-hairline bg-surface rounded-xs relative overflow-hidden flex flex-col justify-between shadow-xs">
+            <div className="rounded-xl border border-hairline bg-card shadow-card p-3.5 sm:p-4 relative overflow-hidden flex flex-col justify-between shadow-xs">
               <div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -628,13 +606,13 @@ export default function IndexingTab() {
                       Google 24h Quota
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline bg-raised rounded-xs text-ink font-semibold">
+                  <span className={ui.pill()}>
                     Max 200/day
                   </span>
                 </div>
 
                 <div className="mt-3 sm:mt-4 flex items-baseline gap-2">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-ink">
+                  <span className="text-2xl sm:text-3xl font-bold font-mono text-ink">
                     {quota.usedToday}
                   </span>
                   <span className="text-xs font-mono text-ink-dim font-bold">
@@ -653,7 +631,7 @@ export default function IndexingTab() {
                 </div>
               </div>
 
-              <div className="mt-3.5 pt-2.5 sm:pt-3 border-t border-hairline flex items-center justify-between text-[11px] font-mono text-ink-dim">
+              <div className="mt-3.5 pt-2.5 sm:pt-3 border-t border-hairline flex items-center justify-between text-[11px] text-ink-dim">
                 <span>Remaining: <strong className="text-ink">{quota.remaining}</strong></span>
                 <span className="flex items-center gap-1">
                   <IconClock className="w-3 h-3 text-ink-dim" />
@@ -663,7 +641,7 @@ export default function IndexingTab() {
             </div>
 
             {/* 2. Engines & Auth Status Card */}
-            <div className="p-3.5 sm:p-4 border border-hairline bg-surface rounded-xs flex flex-col justify-between shadow-xs">
+            <div className="rounded-xl border border-hairline bg-card shadow-card p-3.5 sm:p-4 flex flex-col justify-between shadow-xs">
               <div>
                 <div className="flex items-center gap-1.5">
                   <IconGlobe className="w-4 h-4 text-signal shrink-0" />
@@ -674,13 +652,13 @@ export default function IndexingTab() {
 
                 <div className="mt-3 space-y-2">
                   {/* Google Indexing API */}
-                  <div className="flex items-center justify-between gap-2 text-xs font-mono p-2 sm:p-2.5 bg-raised/50 border border-hairline/60 rounded-xs">
+                  <div className="rounded-lg border border-hairline/60 bg-raised/50 flex items-center justify-between gap-2 text-xs p-2 sm:p-2.5">
                     <span className="font-bold flex items-center gap-2 text-ink truncate text-[11px] sm:text-xs">
                       <IconGoogle className="w-4 h-4 shrink-0" />
                       <span className="truncate">Google Search API</span>
                     </span>
                     <span
-                      className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-xs flex items-center gap-1 shrink-0 ${
+                      className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-md flex items-center gap-1 shrink-0 ${
                         auth.hasWebIndexingApiKey
                           ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30"
                           : "bg-red-500/10 text-red-500 border border-red-500/30"
@@ -701,12 +679,12 @@ export default function IndexingTab() {
                   </div>
 
                   {/* IndexNow */}
-                  <div className="flex items-center justify-between gap-2 text-xs font-mono p-2 sm:p-2.5 bg-raised/50 border border-hairline/60 rounded-xs">
+                  <div className="rounded-lg border border-hairline/60 bg-raised/50 flex items-center justify-between gap-2 text-xs p-2 sm:p-2.5">
                     <span className="font-bold flex items-center gap-2 text-ink truncate text-[11px] sm:text-xs">
                       <IconMicrosoft className="w-4 h-4 shrink-0" />
                       <span className="truncate">IndexNow (Bing/Yandex)</span>
                     </span>
-                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-xs bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 flex items-center gap-1 shrink-0">
+                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 flex items-center gap-1 shrink-0">
                       <IconCheckCircle className="w-3 h-3" />
                       Active
                     </span>
@@ -714,13 +692,13 @@ export default function IndexingTab() {
                 </div>
               </div>
 
-              <div className="mt-3 pt-2 border-t border-hairline text-[10px] font-mono text-ink-dim">
+              <div className="mt-3 pt-2 border-t border-hairline text-[10px] text-ink-dim">
                 Automated triggers on Product Launch & Profile Update.
               </div>
             </div>
 
             {/* 3. Overall Submissions Card */}
-            <div className="p-3.5 sm:p-4 border border-hairline bg-surface rounded-xs flex flex-col justify-between shadow-xs">
+            <div className="rounded-xl border border-hairline bg-card shadow-card p-3.5 sm:p-4 flex flex-col justify-between shadow-xs">
               <div>
                 <div className="flex items-center gap-1.5">
                   <IconLayers className="w-4 h-4 text-signal shrink-0" />
@@ -730,31 +708,31 @@ export default function IndexingTab() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
-                  <div className="p-2 border border-hairline/60 bg-raised/40 rounded-xs">
+                  <div className="rounded-lg border border-hairline/60 bg-raised/40 p-2">
                     <div className="flex items-center justify-center gap-1 text-emerald-500 font-bold">
                       <IconCheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                       <span className="text-base sm:text-lg font-mono">{stats.successSubmissions}</span>
                     </div>
-                    <div className="text-[9px] sm:text-[10px] font-mono text-ink-dim uppercase mt-0.5 truncate">Success</div>
+                    <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase mt-0.5 truncate">Success</div>
                   </div>
-                  <div className="p-2 border border-hairline/60 bg-raised/40 rounded-xs">
+                  <div className="rounded-lg border border-hairline/60 bg-raised/40 p-2">
                     <div className="flex items-center justify-center gap-1 text-red-500 font-bold">
                       <IconXCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                       <span className="text-base sm:text-lg font-mono">{stats.failedSubmissions}</span>
                     </div>
-                    <div className="text-[9px] sm:text-[10px] font-mono text-ink-dim uppercase mt-0.5 truncate">Failed</div>
+                    <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase mt-0.5 truncate">Failed</div>
                   </div>
-                  <div className="p-2 border border-hairline/60 bg-raised/40 rounded-xs">
+                  <div className="rounded-lg border border-hairline/60 bg-raised/40 p-2">
                     <div className="flex items-center justify-center gap-1 text-amber-500 font-bold">
                       <IconClock className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
                       <span className="text-base sm:text-lg font-mono">{stats.quotaSkippedSubmissions}</span>
                     </div>
-                    <div className="text-[9px] sm:text-[10px] font-mono text-ink-dim uppercase mt-0.5 truncate">Capped</div>
+                    <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase mt-0.5 truncate">Capped</div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-3.5 pt-2.5 sm:pt-3 border-t border-hairline text-[11px] font-mono text-ink-dim flex justify-between">
+              <div className="mt-3.5 pt-2.5 sm:pt-3 border-t border-hairline text-[11px] text-ink-dim flex justify-between">
                 <span>All-time Total</span>
                 <strong className="text-ink font-bold">{stats.totalSubmissions} logs</strong>
               </div>
@@ -763,7 +741,7 @@ export default function IndexingTab() {
 
           {/* Quick Notice to Unsubmitted Directory */}
           {unsubmittedCount > 0 && (
-            <div className="p-3.5 border border-amber-500/40 bg-amber-500/10 rounded-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
+            <div className="rounded-xl border p-3.5 border-amber-500/40 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2">
                 <IconClock className="w-4 h-4 text-amber-500 shrink-0" />
                 <span className="text-ink">
@@ -772,7 +750,7 @@ export default function IndexingTab() {
               </div>
               <button
                 onClick={() => setActiveSubView("directory")}
-                className="px-3 py-1.5 bg-amber-500 text-black font-bold uppercase text-[11px] rounded-xs hover:bg-amber-400 cursor-pointer shrink-0"
+                className="px-3 py-1.5 bg-amber-500 text-black font-bold uppercase text-[11px] rounded-md hover:bg-amber-400 cursor-pointer shrink-0"
               >
                 Review & Submit URLs →
               </button>
@@ -780,19 +758,19 @@ export default function IndexingTab() {
           )}
 
           {/* Manual Submission Form Card */}
-          <div className="p-3.5 sm:p-4 border border-hairline bg-surface rounded-xs shadow-xs space-y-3">
+          <div className="rounded-xl border border-hairline bg-card shadow-card p-3.5 sm:p-4 shadow-xs space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <div className="flex items-center gap-2">
                 <IconZap className="w-4 h-4 text-signal shrink-0" />
-                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-ink">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-ink">
                   Manual URL Submission for Web Indexing
                 </h2>
               </div>
               <span className="text-[10px] sm:text-[11px] font-mono text-ink-dim">Single or bulk (one per line)</span>
             </div>
 
-            <p className="text-[11px] sm:text-xs font-mono text-ink-dim leading-relaxed">
-              Submit any specific link (e.g. <code className="text-ink bg-raised px-1 py-0.5 rounded-xs">/product/cursor</code>, <code className="text-ink bg-raised px-1 py-0.5 rounded-xs">/founder/username</code>) or paste multiple URLs.
+            <p className="text-[11px] sm:text-xs text-ink-dim leading-relaxed">
+              Submit any specific link (e.g. <code className="text-ink bg-raised px-1 py-0.5 rounded-md">/product/cursor</code>, <code className="text-ink bg-raised px-1 py-0.5 rounded-md">/founder/username</code>) or paste multiple URLs.
             </p>
 
             <form onSubmit={handleCustomSubmit} className="space-y-3">
@@ -801,16 +779,16 @@ export default function IndexingTab() {
                 onChange={(e) => setCustomInput(e.target.value)}
                 rows={2}
                 placeholder="https://thelaunchfeed.com/product/xyz&#10;/founder/username"
-                className="w-full p-2.5 sm:p-3 bg-raised/50 border border-hairline text-xs font-mono text-ink placeholder:text-ink-dim/50 focus:outline-hidden focus:border-signal transition-colors rounded-xs"
+                className={ui.cx(ui.textarea, "w-full font-mono")}
               />
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 text-xs font-mono">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 text-xs">
                   <span className="text-ink-dim text-[11px] sm:text-xs">Target Engines:</span>
                   <select
                     value={customEngine}
                     onChange={(e) => setCustomEngine(e.target.value as any)}
-                    className="w-full sm:w-auto bg-raised border border-hairline px-2.5 py-1.5 text-xs font-mono text-ink cursor-pointer focus:outline-hidden rounded-xs"
+                    className={ui.cx(ui.input, "cursor-pointer w-full sm:w-auto")}
                   >
                     <option value="ALL">All Engines (Google & IndexNow)</option>
                     <option value="GOOGLE">Google Indexing API Only</option>
@@ -821,7 +799,7 @@ export default function IndexingTab() {
                 <button
                   type="submit"
                   disabled={submittingCustom || !customInput.trim()}
-                  className="w-full sm:w-auto h-9 sm:h-8 px-4 bg-ink text-surface hover:bg-signal text-xs font-mono font-bold uppercase transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5 rounded-xs shadow-xs shrink-0"
+                  className={ui.cx(ui.btn, ui.primary, "w-full sm:w-auto shrink-0")}
                 >
                   {submittingCustom ? (
                     <>
@@ -839,7 +817,7 @@ export default function IndexingTab() {
             </form>
 
             {customResult && (
-              <div className="mt-3 p-3 bg-raised/50 border border-hairline text-xs font-mono text-ink rounded-xs space-y-2">
+              <div className="rounded-xl border border-hairline bg-card shadow-card mt-3 p-3 bg-raised/50 text-xs text-ink space-y-2">
                 <div className="flex items-center justify-between text-ink-dim text-[11px] border-b border-hairline/60 pb-1.5">
                   <span className="font-bold uppercase flex items-center gap-1">
                     <IconCode className="w-3 h-3 text-signal" />
@@ -871,12 +849,12 @@ export default function IndexingTab() {
           </div>
 
           {/* Audit Logs Section */}
-          <div className="border border-hairline bg-surface rounded-xs overflow-hidden shadow-xs">
+          <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden shadow-xs">
             {/* Table & Filter Header */}
             <div className="p-3 sm:p-3.5 border-b border-hairline flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-surface">
               <div className="flex items-center gap-2">
                 <IconLayers className="w-4 h-4 text-signal shrink-0" />
-                <h3 className="text-xs font-mono font-bold uppercase text-ink">
+                <h3 className="text-xs font-bold uppercase text-ink">
                   Recent Indexing Logs ({filteredLogs.length})
                 </h3>
               </div>
@@ -889,7 +867,7 @@ export default function IndexingTab() {
                     placeholder="Search URL…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-8 pl-8 pr-2.5 bg-raised/50 border border-hairline text-xs font-mono text-ink placeholder:text-ink-dim/50 focus:outline-hidden focus:border-signal rounded-xs"
+                    className={ui.cx(ui.input, "w-full h-8 pl-8")}
                   />
                 </div>
 
@@ -898,7 +876,7 @@ export default function IndexingTab() {
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    className="w-full sm:w-auto h-8 pl-7 pr-3 bg-raised border border-hairline text-xs font-mono text-ink cursor-pointer focus:outline-hidden rounded-xs"
+                    className={ui.cx(ui.input, "cursor-pointer w-full sm:w-auto h-8 pl-7")}
                   >
                     <option value="ALL">All Statuses</option>
                     <option value="SUCCESS">SUCCESS</option>
@@ -912,16 +890,16 @@ export default function IndexingTab() {
             {/* Mobile Cards View */}
             <div className="block md:hidden divide-y divide-hairline">
               {filteredLogs.length === 0 ? (
-                <div className="py-8 text-center text-ink-dim font-mono text-xs">
+                <div className="py-8 text-center text-ink-dim text-xs">
                   <IconGlobe className="w-5 h-5 opacity-40 mx-auto mb-1.5" />
                   No indexing logs match current filters.
                 </div>
               ) : (
                 filteredLogs.map((log) => (
-                  <div key={log.id} className="p-3 hover:bg-raised/40 transition-colors space-y-2 font-mono text-xs">
+                  <div key={log.id} className="p-3 hover:bg-raised/40 transition-colors space-y-2 text-xs">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold border border-hairline rounded-xs bg-surface text-ink">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold border border-hairline rounded-md bg-surface text-ink">
                           {log.engine === "GOOGLE" ? (
                             <IconGoogle className="w-3 h-3 shrink-0" />
                           ) : (
@@ -936,7 +914,7 @@ export default function IndexingTab() {
 
                       <div className="flex items-center gap-1.5">
                         <span
-                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-xs ${
+                          className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
                             log.status === "SUCCESS"
                               ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30"
                               : log.status === "SKIPPED_QUOTA"
@@ -995,22 +973,22 @@ export default function IndexingTab() {
 
             {/* Desktop Table View */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-raised/70 border-b border-hairline text-[11px] text-ink-dim uppercase">
+              <table className={ui.table}>
+                <thead className={ui.thead}>
                   <tr>
-                    <th className="py-2.5 px-3">Submitted URL</th>
-                    <th className="py-2.5 px-3">Engine</th>
-                    <th className="py-2.5 px-3">Type</th>
-                    <th className="py-2.5 px-3">Status</th>
-                    <th className="py-2.5 px-3">HTTP</th>
-                    <th className="py-2.5 px-3">Time</th>
-                    <th className="py-2.5 px-3 text-right">Details</th>
+                    <th className={ui.th}>Submitted URL</th>
+                    <th className={ui.th}>Engine</th>
+                    <th className={ui.th}>Type</th>
+                    <th className={ui.th}>Status</th>
+                    <th className={ui.th}>HTTP</th>
+                    <th className={ui.th}>Time</th>
+                    <th className={ui.cx(ui.th, "text-right")}>Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {filteredLogs.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-10 text-center text-ink-dim font-mono text-xs">
+                      <td colSpan={7} className={ui.cx(ui.td, "text-center text-ink-dim text-xs")}>
                         <div className="flex flex-col items-center justify-center gap-1.5">
                           <IconGlobe className="w-5 h-5 opacity-40" />
                           <span>No indexing logs match current filters.</span>
@@ -1020,7 +998,7 @@ export default function IndexingTab() {
                   ) : (
                     filteredLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-raised/40 transition-colors">
-                    <td className="py-2.5 px-3 max-w-[320px] truncate font-medium text-ink">
+                    <td className={ui.cx(ui.td, "max-w-[320px] truncate font-medium text-ink")}>
                       <a
                         href={log.url}
                         target="_blank"
@@ -1032,8 +1010,8 @@ export default function IndexingTab() {
                         <IconExternalLink className="w-3 h-3 opacity-60 shrink-0" />
                       </a>
                     </td>
-                    <td className="py-2.5 px-3">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold border border-hairline rounded-xs bg-surface text-ink">
+                    <td className={ui.td}>
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold border border-hairline rounded-md bg-surface text-ink">
                         {log.engine === "GOOGLE" ? (
                           <IconGoogle className="w-3 h-3 shrink-0" />
                         ) : (
@@ -1042,12 +1020,12 @@ export default function IndexingTab() {
                         {log.engine}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-[11px] text-ink-dim">
+                    <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>
                       {log.type}
                     </td>
-                    <td className="py-2.5 px-3">
+                    <td className={ui.td}>
                       <span
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-xs ${
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md ${
                           log.status === "SUCCESS"
                             ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/30"
                             : log.status === "SKIPPED_QUOTA"
@@ -1065,7 +1043,7 @@ export default function IndexingTab() {
                         {log.status}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-ink-dim font-mono">
+                    <td className={ui.cx(ui.td, "text-ink-dim")}>
                       {log.httpStatus ? (
                         <span className={log.httpStatus >= 200 && log.httpStatus < 300 ? "text-emerald-500 font-bold" : "text-red-500 font-bold"}>
                           {log.httpStatus}
@@ -1074,13 +1052,13 @@ export default function IndexingTab() {
                         "-"
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-ink-dim text-[11px] whitespace-nowrap">
+                    <td className={ui.cx(ui.td, "text-ink-dim text-xs whitespace-nowrap")}>
                       {new Date(log.submittedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
                       <span className="text-[10px] opacity-70">
                         {new Date(log.submittedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td className={ui.cx(ui.td, "text-right")}>
                       <button
                         onClick={() => setSelectedLog(log)}
                         className="inline-flex items-center gap-1 text-[11px] font-bold text-ink-dim hover:text-ink hover:underline cursor-pointer"
@@ -1103,7 +1081,7 @@ export default function IndexingTab() {
       {activeSubView === "directory" && (
         <div className="space-y-4">
           {/* Top Control Bar for Platform URLs */}
-          <div className="p-3.5 sm:p-4 border border-hairline bg-surface rounded-xs shadow-xs space-y-3.5 font-mono">
+          <div className="rounded-xl border border-hairline bg-card shadow-card p-3.5 sm:p-4 shadow-xs space-y-3.5">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-hairline">
               <div>
                 <div className="flex items-center gap-2">
@@ -1124,7 +1102,7 @@ export default function IndexingTab() {
                   <select
                     value={batchEngine}
                     onChange={(e) => setBatchEngine(e.target.value as any)}
-                    className="bg-raised border border-hairline px-2 py-1 text-xs font-mono text-ink cursor-pointer focus:outline-hidden rounded-xs"
+                    className={ui.cx(ui.input, "cursor-pointer")}
                   >
                     <option value="ALL">All (Google + IndexNow)</option>
                     <option value="GOOGLE">Google Only</option>
@@ -1135,7 +1113,7 @@ export default function IndexingTab() {
                 <button
                   onClick={handleSubmitSelected}
                   disabled={selectedUrls.length === 0 || submittingBatch}
-                  className="h-8 px-3 bg-ink text-surface hover:bg-signal text-xs font-bold uppercase transition-colors flex items-center gap-1.5 rounded-xs cursor-pointer disabled:opacity-40"
+                  className={ui.cx(ui.btn, ui.primary)}
                 >
                   {submittingBatch ? <IconRefresh className="w-3.5 h-3.5 animate-spin" /> : <IconSend className="w-3.5 h-3.5" />}
                   Submit Selected ({selectedUrls.length})
@@ -1144,7 +1122,7 @@ export default function IndexingTab() {
                 <button
                   onClick={handleAutoDiscoverAndIndexProducts}
                   disabled={autoDiscovering || submittingBatch}
-                  className="h-8 px-3 bg-raised hover:bg-surface border border-hairline hover:border-signal text-ink text-xs font-bold uppercase transition-colors flex items-center gap-1.5 rounded-xs cursor-pointer disabled:opacity-40"
+                  className={ui.cx(ui.btn, ui.secondary)}
                   title="Auto-discover all live products from the database and submit unindexed pages"
                 >
                   {autoDiscovering ? <IconRefresh className="w-3.5 h-3.5 animate-spin" /> : <IconZap className="w-3.5 h-3.5 text-signal" />}
@@ -1155,7 +1133,7 @@ export default function IndexingTab() {
                   <button
                     onClick={handleSubmitAllUnsubmitted}
                     disabled={submittingBatch || autoDiscovering}
-                    className="h-8 px-3 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold uppercase transition-colors flex items-center gap-1.5 rounded-xs cursor-pointer disabled:opacity-40 shadow-xs"
+                    className="h-8 px-3 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold uppercase transition-colors flex items-center gap-1.5 rounded-md cursor-pointer disabled:opacity-40 shadow-xs"
                   >
                     {submittingBatch ? <IconRefresh className="w-3.5 h-3.5 animate-spin" /> : <IconZap className="w-3.5 h-3.5" />}
                     Submit All Unsubmitted ({unsubmittedCount})
@@ -1168,12 +1146,12 @@ export default function IndexingTab() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Filter 1: Status (Unsubmitted / Submitted / All) */}
               <div>
-                <label className="text-[10px] text-ink-dim uppercase block mb-1">Index Status Filter</label>
-                <div className="grid grid-cols-3 gap-1 bg-raised/50 p-1 border border-hairline rounded-xs text-[11px] text-center">
+                <label className={ui.cx(ui.label, "mb-1.5")}>Index Status Filter</label>
+                <div className="rounded-xl border border-hairline bg-card shadow-card grid grid-cols-3 gap-1 bg-raised/50 p-1 text-[11px] text-center">
                   <button
                     type="button"
                     onClick={() => setDirStatusFilter("UNSUBMITTED")}
-                    className={`py-1 rounded-xs transition-colors cursor-pointer font-bold ${
+                    className={`py-1 rounded-md transition-colors cursor-pointer font-bold ${
                       dirStatusFilter === "UNSUBMITTED" ? "bg-amber-500 text-black shadow-xs" : "text-ink-dim hover:text-ink"
                     }`}
                   >
@@ -1182,7 +1160,7 @@ export default function IndexingTab() {
                   <button
                     type="button"
                     onClick={() => setDirStatusFilter("SUBMITTED")}
-                    className={`py-1 rounded-xs transition-colors cursor-pointer font-bold ${
+                    className={`py-1 rounded-md transition-colors cursor-pointer font-bold ${
                       dirStatusFilter === "SUBMITTED" ? "bg-emerald-500 text-black shadow-xs" : "text-ink-dim hover:text-ink"
                     }`}
                   >
@@ -1191,7 +1169,7 @@ export default function IndexingTab() {
                   <button
                     type="button"
                     onClick={() => setDirStatusFilter("ALL")}
-                    className={`py-1 rounded-xs transition-colors cursor-pointer font-bold ${
+                    className={`py-1 rounded-md transition-colors cursor-pointer font-bold ${
                       dirStatusFilter === "ALL" ? "bg-ink text-surface shadow-xs" : "text-ink-dim hover:text-ink"
                     }`}
                   >
@@ -1202,11 +1180,11 @@ export default function IndexingTab() {
 
               {/* Filter 2: Type Filter */}
               <div>
-                <label className="text-[10px] text-ink-dim uppercase block mb-1">Content Type</label>
+                <label className={ui.cx(ui.label, "mb-1.5")}>Content Type</label>
                 <select
                   value={dirTypeFilter}
                   onChange={(e) => setDirTypeFilter(e.target.value as any)}
-                  className="w-full h-8 bg-raised border border-hairline px-2.5 text-xs font-mono text-ink cursor-pointer focus:outline-hidden rounded-xs"
+                  className={ui.cx(ui.input, "cursor-pointer w-full h-8")}
                 >
                   <option value="ALL">All Types ({urlsData?.totalCount ?? 0})</option>
                   <option value="PRODUCT">Products Only ({urlsData?.productsCount ?? 0})</option>
@@ -1218,7 +1196,7 @@ export default function IndexingTab() {
 
               {/* Filter 3: Search text */}
               <div>
-                <label className="text-[10px] text-ink-dim uppercase block mb-1">Search Directory</label>
+                <label className={ui.cx(ui.label, "mb-1.5")}>Search Directory</label>
                 <div className="relative">
                   <IconSearch className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-dim pointer-events-none" />
                   <input
@@ -1226,7 +1204,7 @@ export default function IndexingTab() {
                     placeholder="Filter by name or /path…"
                     value={dirSearch}
                     onChange={(e) => setDirSearch(e.target.value)}
-                    className="w-full h-8 pl-8 pr-2.5 bg-raised/50 border border-hairline text-xs font-mono text-ink placeholder:text-ink-dim/50 focus:outline-hidden focus:border-signal rounded-xs"
+                    className={ui.cx(ui.input, "w-full h-8 pl-8")}
                   />
                 </div>
               </div>
@@ -1234,7 +1212,7 @@ export default function IndexingTab() {
           </div>
 
           {/* Directory List Container */}
-          <div className="border border-hairline bg-surface rounded-xs overflow-hidden shadow-xs font-mono">
+          <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden shadow-xs">
             <div className="p-3 border-b border-hairline bg-surface flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
                 <input
@@ -1244,7 +1222,7 @@ export default function IndexingTab() {
                     filteredPlatformUrls.every((u) => selectedUrls.includes(u.url))
                   }
                   onChange={toggleSelectAllFiltered}
-                  className="cursor-pointer accent-signal w-4 h-4 rounded-xs"
+                  className={ui.cx(ui.checkbox, "w-4")}
                 />
                 <span className="text-ink font-bold">Select All Filtered ({filteredPlatformUrls.length})</span>
               </div>
@@ -1277,12 +1255,12 @@ export default function IndexingTab() {
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelectUrl(item.url)}
-                            className="cursor-pointer accent-signal w-4 h-4 rounded-xs mt-0.5 shrink-0"
+                            className={ui.cx(ui.checkbox, "w-4 mt-0.5 shrink-0")}
                           />
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-ink text-[12px] truncate">{item.title}</span>
-                              <span className="px-1.5 py-0.2 text-[9px] font-bold uppercase border border-hairline rounded-xs bg-raised text-ink-dim shrink-0">
+                              <span className="px-1.5 py-0.2 text-[10px] font-bold uppercase border border-hairline rounded-md bg-raised text-ink-dim shrink-0">
                                 {item.type}
                               </span>
                             </div>
@@ -1295,12 +1273,12 @@ export default function IndexingTab() {
                         {/* Status Badge */}
                         <div className="shrink-0">
                           {item.isSubmitted ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-xs bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
                               <IconCheckCircle className="w-3 h-3" />
                               Indexed ({item.submissionCount}x)
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
                               <IconClock className="w-3 h-3" />
                               Not Submitted
                             </span>
@@ -1332,7 +1310,7 @@ export default function IndexingTab() {
                         <button
                           onClick={() => handleSingleDirectorySubmit(item.url)}
                           disabled={submittingSingleUrl === item.url}
-                          className="px-2.5 py-1 bg-ink text-surface hover:bg-signal text-[10px] font-bold uppercase transition-colors rounded-xs cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                          className={ui.cx(ui.btnSm, ui.primary)}
                         >
                           {submittingSingleUrl === item.url ? (
                             <IconRefresh className="w-3 h-3 animate-spin" />
@@ -1350,10 +1328,10 @@ export default function IndexingTab() {
 
             {/* Desktop Directory Table View */}
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-raised/70 border-b border-hairline text-[11px] text-ink-dim uppercase">
+              <table className={ui.table}>
+                <thead className={ui.thead}>
                   <tr>
-                    <th className="py-2.5 px-3 w-10 text-center">
+                    <th className={ui.cx(ui.th, "w-10 text-center")}>
                       <input
                         type="checkbox"
                         checked={
@@ -1361,21 +1339,21 @@ export default function IndexingTab() {
                           filteredPlatformUrls.every((u) => selectedUrls.includes(u.url))
                         }
                         onChange={toggleSelectAllFiltered}
-                        className="cursor-pointer accent-signal w-3.5 h-3.5 rounded-xs"
+                        className={ui.cx(ui.checkbox, "w-3.5")}
                       />
                     </th>
-                    <th className="py-2.5 px-3">Title & Type</th>
-                    <th className="py-2.5 px-3">Platform Path</th>
-                    <th className="py-2.5 px-3">Indexing Status</th>
-                    <th className="py-2.5 px-3">Submissions</th>
-                    <th className="py-2.5 px-3">Last Checked</th>
-                    <th className="py-2.5 px-3 text-right">Quick Submit</th>
+                    <th className={ui.th}>Title & Type</th>
+                    <th className={ui.th}>Platform Path</th>
+                    <th className={ui.th}>Indexing Status</th>
+                    <th className={ui.th}>Submissions</th>
+                    <th className={ui.th}>Last Checked</th>
+                    <th className={ui.cx(ui.th, "text-right")}>Quick Submit</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-hairline">
                   {filteredPlatformUrls.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-ink-dim text-xs">
+                      <td colSpan={7} className={ui.cx(ui.td, "text-center text-ink-dim text-xs")}>
                         <IconGlobe className="w-6 h-6 opacity-40 mx-auto mb-2" />
                         No platform URLs match the selected criteria.
                       </td>
@@ -1390,21 +1368,21 @@ export default function IndexingTab() {
                             isSelected ? "bg-signal/5" : "hover:bg-raised/40"
                           }`}
                         >
-                          <td className="py-2.5 px-3 text-center">
+                          <td className={ui.cx(ui.td, "text-center")}>
                             <input
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => toggleSelectUrl(item.url)}
-                              className="cursor-pointer accent-signal w-3.5 h-3.5 rounded-xs"
+                              className={ui.cx(ui.checkbox, "w-3.5")}
                             />
                           </td>
-                          <td className="py-2.5 px-3 max-w-[240px]">
+                          <td className={ui.cx(ui.td, "max-w-[240px]")}>
                             <div className="font-bold text-ink truncate">{item.title}</div>
-                            <span className="text-[10px] text-ink-dim uppercase px-1 py-0.2 border border-hairline rounded-xs bg-raised inline-block mt-0.5">
+                            <span className="text-[10px] text-ink-dim uppercase px-1 py-0.2 border border-hairline rounded-md bg-raised inline-block mt-0.5">
                               {item.type}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 max-w-[280px] truncate">
+                          <td className={ui.cx(ui.td, "max-w-[280px] truncate")}>
                             <a
                               href={item.url}
                               target="_blank"
@@ -1416,23 +1394,23 @@ export default function IndexingTab() {
                               <IconExternalLink className="w-3 h-3 opacity-60 shrink-0" />
                             </a>
                           </td>
-                          <td className="py-2.5 px-3">
+                          <td className={ui.td}>
                             {item.isSubmitted ? (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-xs bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/30">
                                 <IconCheckCircle className="w-3 h-3" />
                                 Submitted
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-xs bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold rounded-md bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/40">
                                 <IconClock className="w-3 h-3" />
                                 Not Submitted
                               </span>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 text-ink-dim">
+                          <td className={ui.cx(ui.td, "text-ink-dim")}>
                             {item.submissionCount > 0 ? `${item.submissionCount} time(s)` : "-"}
                           </td>
-                          <td className="py-2.5 px-3 text-ink-dim text-[11px] whitespace-nowrap">
+                          <td className={ui.cx(ui.td, "text-ink-dim text-xs whitespace-nowrap")}>
                             {item.lastSubmittedAt ? (
                               <>
                                 {new Date(item.lastSubmittedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}{" "}
@@ -1444,11 +1422,11 @@ export default function IndexingTab() {
                               <span className="text-amber-500/70 font-semibold">Never</span>
                             )}
                           </td>
-                          <td className="py-2.5 px-3 text-right">
+                          <td className={ui.cx(ui.td, "text-right")}>
                             <button
                               onClick={() => handleSingleDirectorySubmit(item.url)}
                               disabled={submittingSingleUrl === item.url}
-                              className="px-2.5 py-1 bg-ink text-surface hover:bg-signal text-[11px] font-bold uppercase transition-colors rounded-xs cursor-pointer disabled:opacity-50 inline-flex items-center gap-1"
+                              className={ui.cx(ui.btnSm, ui.primary)}
                             >
                               {submittingSingleUrl === item.url ? (
                                 <IconRefresh className="w-3 h-3 animate-spin" />
@@ -1472,7 +1450,7 @@ export default function IndexingTab() {
       {/* Inspect Log Modal */}
       {selectedLog && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-surface border border-hairline max-w-xl w-full max-h-[88vh] flex flex-col p-4 sm:p-5 rounded-xs font-mono shadow-xl animate-in fade-in zoom-in-95 duration-150">
+          <div className="rounded-xl border border-hairline bg-card shadow-card shadow-[var(--shadow-lift)] max-w-xl w-full max-h-[88vh] flex flex-col p-4 sm:p-5 animate-in fade-in zoom-in-95 duration-150">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-hairline pb-2.5 shrink-0">
               <div className="flex items-center gap-2">
@@ -1494,7 +1472,7 @@ export default function IndexingTab() {
                 <span className="text-ink-dim text-[10px] sm:text-[11px] block mb-0.5 uppercase tracking-wider">
                   Submitted URL
                 </span>
-                <div className="flex items-center justify-between gap-2 p-2 bg-raised/50 border border-hairline rounded-xs">
+                <div className="rounded-xl border border-hairline bg-card shadow-card flex items-center justify-between gap-2 p-2 bg-raised/50">
                   <span className="text-ink font-bold break-all text-[11px]">{selectedLog.url}</span>
                   <button
                     type="button"
@@ -1508,21 +1486,21 @@ export default function IndexingTab() {
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <div className="p-2 bg-raised/40 border border-hairline rounded-xs">
-                  <span className="text-ink-dim text-[9px] sm:text-[10px] block uppercase">Engine</span>
+                <div className="rounded-xl border border-hairline bg-card shadow-card p-2 bg-raised/40">
+                  <span className="text-ink-dim text-[10px] sm:text-[10px] block uppercase">Engine</span>
                   <span className="text-ink font-bold text-[10px] sm:text-[11px] inline-flex items-center gap-1 mt-0.5 truncate">
                     {selectedLog.engine === "GOOGLE" ? <IconGoogle className="w-3 h-3 shrink-0" /> : <IconMicrosoft className="w-3 h-3 shrink-0" />}
                     <span className="truncate">{selectedLog.engine}</span>
                   </span>
                 </div>
-                <div className="p-2 bg-raised/40 border border-hairline rounded-xs">
-                  <span className="text-ink-dim text-[9px] sm:text-[10px] block uppercase">Status</span>
+                <div className="rounded-xl border border-hairline bg-card shadow-card p-2 bg-raised/40">
+                  <span className="text-ink-dim text-[10px] sm:text-[10px] block uppercase">Status</span>
                   <span className={`text-[10px] sm:text-[11px] font-bold mt-0.5 inline-block truncate ${selectedLog.status === "SUCCESS" ? "text-emerald-500" : selectedLog.status === "SKIPPED_QUOTA" ? "text-amber-500" : "text-red-500"}`}>
                     {selectedLog.status}
                   </span>
                 </div>
-                <div className="p-2 bg-raised/40 border border-hairline rounded-xs">
-                  <span className="text-ink-dim text-[9px] sm:text-[10px] block uppercase">HTTP</span>
+                <div className="rounded-xl border border-hairline bg-card shadow-card p-2 bg-raised/40">
+                  <span className="text-ink-dim text-[10px] sm:text-[10px] block uppercase">HTTP</span>
                   <span className="text-ink font-bold text-[10px] sm:text-[11px] mt-0.5 inline-block truncate">
                     {selectedLog.httpStatus || "N/A"}
                   </span>
@@ -1535,7 +1513,7 @@ export default function IndexingTab() {
               </div>
 
               {selectedLog.errorMessage && (
-                <div className="p-2.5 bg-red-500/10 border border-red-500/30 text-red-500 rounded-xs space-y-1">
+                <div className="rounded-xl border p-2.5 bg-red-500/10 border-red-500/30 text-red-500 space-y-1">
                   <div className="font-bold text-[11px] flex items-center gap-1.5">
                     <IconAlertTriangle className="w-3.5 h-3.5" />
                     Error Message:
@@ -1566,7 +1544,7 @@ export default function IndexingTab() {
                       )}
                     </button>
                   </div>
-                  <pre className="p-2.5 bg-raised border border-hairline text-[10px] sm:text-[11px] overflow-x-auto max-h-44 text-ink rounded-xs leading-relaxed">
+                  <pre className="p-2.5 bg-raised border border-hairline text-[10px] sm:text-[11px] overflow-x-auto max-h-44 text-ink rounded-md leading-relaxed">
                     {selectedLog.responseBody}
                   </pre>
                 </div>
@@ -1577,7 +1555,7 @@ export default function IndexingTab() {
             <div className="flex justify-end pt-2.5 border-t border-hairline shrink-0">
               <button
                 onClick={() => setSelectedLog(null)}
-                className="w-full sm:w-auto px-4 py-2 sm:py-1.5 border border-hairline bg-raised hover:bg-surface text-xs font-mono font-bold uppercase cursor-pointer rounded-xs"
+                className={ui.cx(ui.btn, ui.secondary, "w-full sm:w-auto")}
               >
                 Close
               </button>

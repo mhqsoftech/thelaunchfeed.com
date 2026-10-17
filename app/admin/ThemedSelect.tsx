@@ -115,7 +115,7 @@ export default function ThemedSelect({
         <ul
           ref={listRef}
           role="listbox"
-          className="absolute z-40 mt-1 w-full max-h-72 overflow-y-auto bg-surface border border-hairline font-mono shadow-none"
+          className="absolute z-40 mt-1 w-full max-h-72 overflow-y-auto bg-surface border border-hairline shadow-none"
         >
           {options.map((o, i) => {
             const selected = o.value === value;

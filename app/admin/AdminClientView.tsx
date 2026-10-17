@@ -50,6 +50,7 @@ import { TEMPLATES, getTemplate, EmailTemplateId, TemplateVars } from "./emailTe
 import SubmissionTimer from "@/app/components/SubmissionTimer";
 import SubmissionPreview, { imageSrc, launchTierInfo, type AdminSubmission } from "./SubmissionPreview";
 import ThemedSelect from "./ThemedSelect";
+import * as ui from "./ui";
 import {
   listSubmissions,
   updateSchedule,
@@ -537,7 +538,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
           <button
             onClick={cycleTheme}
             title={`Theme: ${themeMode}`}
-            className="h-8 px-2.5 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold font-mono transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 rounded-xs"
+            className="h-8 px-2.5 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold font-mono transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 rounded-md"
           >
             <span className="text-xs">{themeMode === "light" ? "☀" : themeMode === "void" ? "◐" : "◉"}</span>
             <span className="hidden sm:inline uppercase text-[11px] font-bold">{themeMode}</span>
@@ -548,10 +549,10 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
             href="/profile"
             target="_blank"
             rel="noopener noreferrer"
-            className="h-8 px-2 border border-hairline bg-surface hover:bg-raised text-ink flex items-center gap-2 shrink-0 rounded-xs transition-colors"
+            className="h-8 pl-1 pr-2.5 border border-hairline bg-card hover:border-ink/60 text-ink flex items-center gap-2 shrink-0 rounded-full transition-colors"
             title="View your profile"
           >
-            <div className="w-5.5 h-5.5 rounded-xs bg-ink text-surface flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden border border-hairline relative">
+            <div className="w-6 h-6 rounded-full bg-ink text-surface flex items-center justify-center text-[10px] font-bold shrink-0 overflow-hidden border border-hairline relative">
               {session.image ? (
                 <img
                   src={session.image}
@@ -733,8 +734,8 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
           <div
             className={
               tab === "products" || tab === "users"
-                ? "flex-1 min-h-0 flex flex-col"
-                : "flex-1 min-h-0 overflow-y-auto"
+                ? "flex-1 min-h-0 flex flex-col font-sans"
+                : "flex-1 min-h-0 overflow-y-auto font-sans"
             }
           >
             {tab === "overview" && <OverviewTab onNavigate={changeTab} />}
@@ -1014,51 +1015,59 @@ function ProductsTab({ query, setQuery }: { query: string; setQuery: (q: string)
   });
   return (
     <div className="h-full flex flex-col gap-3 min-h-0">
-      <input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search products by name, maker, category…"
-        className="w-full px-3 py-2 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink shrink-0"
-      />
-      <div className="border border-hairline min-h-[350px] md:min-h-0 flex-1 overflow-auto bg-void">
-        <table className="w-full text-sm min-w-[720px]">
-          <thead className="sticky top-0 bg-surface z-10">
-            <tr className="text-xs uppercase text-ink-dim font-bold">
-              <th className="text-left px-3 py-2 border-b border-hairline">ID</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Name</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Tagline</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Maker</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Category</th>
-              <th className="text-right px-3 py-2 border-b border-hairline">Votes</th>
-              <th className="text-right px-3 py-2 border-b border-hairline">Actions</th>
+      <div className="flex flex-wrap items-center gap-3 shrink-0">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search products by name, maker, category…"
+          className={ui.cx(ui.input, "font-sans flex-1 min-w-[220px]")}
+        />
+        <span className="font-sans text-xs text-ink-dim tabular-nums">
+          {filtered.length} of {products.length} products
+        </span>
+      </div>
+      <div className={ui.cx(ui.tableWrap, "min-h-[350px] md:min-h-0 flex-1")}>
+        <table className={ui.cx(ui.table, "min-w-[720px]")}>
+          <thead className={ui.thead}>
+            <tr>
+              <th className={ui.th}>Product</th>
+              <th className={ui.th}>Maker</th>
+              <th className={ui.th}>Category</th>
+              <th className={ui.cx(ui.th, "text-right")}>Votes</th>
+              <th className={ui.cx(ui.th, "text-right")}>
+                <span className="sr-only">Actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((p) => (
-              <tr key={p.id} className="border-t border-hairline">
-                <td className="px-3 py-2 text-ink-dim tabular-nums text-xs">{p.id}</td>
-                <td className="px-3 py-2 font-bold">{p.name}</td>
-                <td className="px-3 py-2 text-xs text-ink-dim truncate max-w-[260px]">{p.tagline}</td>
-                <td className="px-3 py-2 text-xs">{p.maker}</td>
-                <td className="px-3 py-2 uppercase text-xs font-bold text-ink-dim">{p.category}</td>
-                <td className="px-3 py-2 tabular-nums text-right font-bold">{p.votes}</td>
-                <td className="px-3 py-2 text-right">
+              <tr key={p.id} className={ui.tr}>
+                <td className={ui.cx(ui.td, "max-w-[360px]")}>
+                  <div className="font-semibold text-ink truncate">{p.name}</div>
+                  <div className="text-xs text-ink-dim truncate">{p.tagline}</div>
+                </td>
+                <td className={ui.cx(ui.td, "text-ink-dim")}>{p.maker}</td>
+                <td className={ui.td}>
+                  <span className={ui.pill()}>{p.category}</span>
+                </td>
+                <td className={ui.cx(ui.td, "tabular-nums text-right font-semibold")}>▲ {p.votes}</td>
+                <td className={ui.cx(ui.td, "text-right")}>
                   <Link
                     href={`/product/${slugify(p.name)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     prefetch={false}
-                    className="text-xs uppercase font-bold underline underline-offset-2 hover:text-signal"
+                    className={ui.cx(ui.btnSm, ui.secondary)}
                   >
-                    view ↗
+                    View ↗
                   </Link>
                 </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-6 text-center text-ink-dim text-sm">
-                  No products match “{query}”.
+                <td colSpan={5} className={ui.emptyState}>
+                  {query.trim() ? <>No products match “{query}”.</> : "No live products yet."}
                 </td>
               </tr>
             )}
@@ -1070,8 +1079,7 @@ function ProductsTab({ query, setQuery }: { query: string; setQuery: (q: string)
 }
 
 /**
- * Parallelogram-styled Role Selector Dropdown matching the platform's brutalist geometry.
- * Only allows selecting MAKER or MODERATOR.
+ * Role selector pill. Only allows selecting MAKER or MODERATOR.
  */
 function ParallelogramRoleDropdown({
   role,
@@ -1106,21 +1114,20 @@ function ParallelogramRoleDropdown({
   const isMaker = !isMod && !isAdmin;
 
   return (
-    <div ref={ref} className="relative inline-block text-left font-mono">
+    <div ref={ref} className="relative inline-block text-left">
       <button
         type="button"
         disabled={disabled}
         onClick={() => setOpen((prev) => !prev)}
-        className={`group inline-flex items-center gap-1.5 ${
-          size === "md" ? "pl-3.5 pr-2.5 py-1.5 text-xs" : "pl-2.5 pr-2 py-1 text-[10px]"
-        } font-bold uppercase transition-all cursor-pointer border ${
+        className={`group inline-flex items-center gap-1.5 rounded-full ${
+          size === "md" ? "h-8 pl-3.5 pr-2.5 text-xs" : "h-6 pl-2.5 pr-2 text-[10px]"
+        } font-bold uppercase tracking-wide transition-colors cursor-pointer border ${
           isAdmin
-            ? "bg-signal/15 border-signal text-signal font-black"
+            ? "bg-signal-dim border-signal/40 text-signal"
             : isMod
-            ? "bg-sky-500/10 border-sky-400 text-sky-400 hover:border-sky-300 font-bold"
-            : "bg-surface border-hairline text-ink-dim hover:text-ink hover:border-ink font-bold"
+            ? "bg-sky-500/10 border-sky-500/40 text-sky-600 dark:text-sky-400 hover:border-sky-500"
+            : "bg-card border-hairline text-ink-dim hover:text-ink hover:border-ink/60"
         } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
-        style={{ clipPath: "polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%)" }}
       >
         <span className="truncate">
           {isAdmin ? "ADMIN" : isMod ? "MODERATOR" : "MAKER"}
@@ -1138,8 +1145,7 @@ function ParallelogramRoleDropdown({
 
       {open && (
         <div
-          className="absolute left-0 mt-1 z-50 min-w-[120px] bg-void border border-hairline shadow-2xl font-mono divide-y divide-hairline/40 overflow-hidden"
-          style={{ clipPath: "polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%)" }}
+          className="absolute left-0 mt-1 z-50 min-w-[140px] p-1 rounded-lg bg-card border border-hairline shadow-[var(--shadow-lift)]"
         >
           <button
             type="button"
@@ -1147,14 +1153,12 @@ function ParallelogramRoleDropdown({
               onChange("MAKER");
               setOpen(false);
             }}
-            className={`w-full text-left pl-3.5 pr-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors cursor-pointer flex items-center justify-between ${
-              isMaker
-                ? "bg-signal/20 text-signal font-black"
-                : "text-ink hover:bg-surface hover:text-signal"
+            className={`w-full text-left h-8 px-2.5 rounded-md text-[11px] font-bold uppercase transition-colors cursor-pointer flex items-center justify-between ${
+              isMaker ? "bg-signal-dim text-signal" : "text-ink hover:bg-surface"
             }`}
           >
             <span>MAKER</span>
-            {isMaker && <span className="text-signal text-[9px]">✓</span>}
+            {isMaker && <span className="text-signal">✓</span>}
           </button>
           <button
             type="button"
@@ -1162,14 +1166,12 @@ function ParallelogramRoleDropdown({
               onChange("MODERATOR");
               setOpen(false);
             }}
-            className={`w-full text-left pl-3.5 pr-2.5 py-1.5 text-[10px] font-bold uppercase transition-colors cursor-pointer flex items-center justify-between ${
-              isMod
-                ? "bg-sky-500/20 text-sky-400 font-black"
-                : "text-ink hover:bg-surface hover:text-sky-400"
+            className={`w-full text-left h-8 px-2.5 rounded-md text-[11px] font-bold uppercase transition-colors cursor-pointer flex items-center justify-between ${
+              isMod ? "bg-sky-500/10 text-sky-600 dark:text-sky-400" : "text-ink hover:bg-surface"
             }`}
           >
             <span>MODERATOR</span>
-            {isMod && <span className="text-sky-400 text-[9px]">✓</span>}
+            {isMod && <span>✓</span>}
           </button>
         </div>
       )}
@@ -1410,10 +1412,10 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
     });
 
   return (
-    <div className="flex flex-col gap-3 min-h-0 md:h-full font-mono">
+    <div className="flex flex-col gap-3 min-h-0 md:h-full">
       {/* Toast feedback banner */}
       {flash && (
-        <div className="p-3 border border-signal/40 bg-signal/10 text-signal text-xs font-bold flex items-center justify-between shrink-0">
+        <div className="rounded-xl border p-3 border-signal/40 bg-signal/10 text-signal text-xs font-bold flex items-center justify-between shrink-0">
           <span>{flash}</span>
           <button onClick={() => setFlash(null)} className="text-ink-dim hover:text-ink">
             ✕
@@ -1423,45 +1425,45 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
 
       {/* Telemetry Counter Grid - Horizontal scroll on mobile, 6 cols on desktop */}
       <div className="flex gap-2 overflow-x-auto pb-1 md:grid md:grid-cols-6 md:gap-3 md:overflow-visible shrink-0 scrollbar-none">
-        <div className="border border-hairline p-2.5 sm:p-3 bg-surface/30 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
-          <div className="text-[9px] sm:text-[10px] text-ink-dim uppercase font-bold">Total Users</div>
-          <div className="text-lg sm:text-xl font-black font-display text-ink">{totalCount}</div>
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-2.5 sm:p-3 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
+          <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase font-bold">Total Users</div>
+          <div className="text-lg sm:text-xl font-bold font-sans text-ink">{totalCount}</div>
         </div>
-        <div className="border border-hairline p-2.5 sm:p-3 bg-surface/30 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
-          <div className="text-[9px] sm:text-[10px] text-signal uppercase font-bold">Admins</div>
-          <div className="text-lg sm:text-xl font-black font-display text-signal">{adminCount}</div>
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-2.5 sm:p-3 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
+          <div className="text-[10px] sm:text-[10px] text-signal uppercase font-bold">Admins</div>
+          <div className="text-lg sm:text-xl font-bold font-sans text-signal">{adminCount}</div>
         </div>
-        <div className="border border-hairline p-2.5 sm:p-3 bg-surface/30 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
-          <div className="text-[9px] sm:text-[10px] text-ink-dim uppercase font-bold">Moderators</div>
-          <div className="text-lg sm:text-xl font-black font-display text-ink">{modCount}</div>
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-2.5 sm:p-3 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
+          <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase font-bold">Moderators</div>
+          <div className="text-lg sm:text-xl font-bold font-sans text-ink">{modCount}</div>
         </div>
-        <div className="border border-hairline p-2.5 sm:p-3 bg-surface/30 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
-          <div className="text-[9px] sm:text-[10px] text-ink-dim uppercase font-bold">Makers</div>
-          <div className="text-lg sm:text-xl font-black font-display text-ink">{makerCount}</div>
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-2.5 sm:p-3 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
+          <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase font-bold">Makers</div>
+          <div className="text-lg sm:text-xl font-bold font-sans text-ink">{makerCount}</div>
         </div>
-        <div className="border border-hairline p-2.5 sm:p-3 bg-surface/30 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
-          <div className="text-[9px] sm:text-[10px] text-ink-dim uppercase font-bold">Verified</div>
-          <div className="text-lg sm:text-xl font-black font-display text-ink">{verifiedCount}</div>
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-2.5 sm:p-3 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
+          <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase font-bold">Verified</div>
+          <div className="text-lg sm:text-xl font-bold font-sans text-ink">{verifiedCount}</div>
         </div>
-        <div className="border border-hairline p-2.5 sm:p-3 bg-surface/30 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
-          <div className="text-[9px] sm:text-[10px] text-ink-dim uppercase font-bold">Public Profiles</div>
-          <div className="text-lg sm:text-xl font-black font-display text-ink">{publicCount}</div>
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-2.5 sm:p-3 space-y-0.5 sm:space-y-1 min-w-[110px] md:min-w-0 shrink-0 md:shrink">
+          <div className="text-[10px] sm:text-[10px] text-ink-dim uppercase font-bold">Public Profiles</div>
+          <div className="text-lg sm:text-xl font-bold font-sans text-ink">{publicCount}</div>
         </div>
       </div>
 
       {/* Controls Bar: Search, Filters, Sort, Actions */}
-      <div className="border border-hairline p-3.5 bg-surface/20 space-y-3 shrink-0">
+      <div className="rounded-xl border border-hairline bg-card shadow-card p-3.5 space-y-3 shrink-0">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search users by name, username, email, title…"
-            className="flex-1 px-3 py-2 text-xs bg-void border border-hairline focus:outline-none focus:border-signal font-mono text-ink placeholder:text-ink-faint"
+            className={ui.cx(ui.input, "w-full md:flex-1 shrink-0 md:shrink")}
           />
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => setIsCreating(true)}
-              className="px-3.5 py-2 bg-signal text-void text-xs font-bold hover:bg-signal/90 transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
+              className={ui.cx(ui.btn, ui.primary, "shrink-0")}
             >
               <span>+</span>
               <span>Create User</span>
@@ -1469,7 +1471,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
             <button
               onClick={() => loadUsers()}
               disabled={pending}
-              className="px-3 py-2 border border-hairline bg-surface hover:bg-raised text-xs font-bold text-ink transition-colors cursor-pointer shrink-0 disabled:opacity-40"
+              className={ui.cx(ui.btn, ui.secondary, "shrink-0")}
               title="Refresh User List"
             >
               ↻ Refresh
@@ -1480,11 +1482,11 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
         {/* Filter & Sort Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-hairline/60">
           <div>
-            <label className="block text-[9px] uppercase font-bold text-ink-faint mb-1">Role Filter</label>
+            <label className={ui.cx(ui.label, "mb-1.5")}>Role Filter</label>
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value as any)}
-              className="w-full px-2 py-1 text-xs bg-void border border-hairline text-ink font-mono focus:border-signal outline-none"
+              className={ui.cx(ui.input, "cursor-pointer w-full")}
             >
               <option value="ALL">All Roles ({totalCount})</option>
               <option value="ADMIN">Admins ({adminCount})</option>
@@ -1494,11 +1496,11 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
           </div>
 
           <div>
-            <label className="block text-[9px] uppercase font-bold text-ink-faint mb-1">Email Verification</label>
+            <label className={ui.cx(ui.label, "mb-1.5")}>Email Verification</label>
             <select
               value={verifiedFilter}
               onChange={(e) => setVerifiedFilter(e.target.value as any)}
-              className="w-full px-2 py-1 text-xs bg-void border border-hairline text-ink font-mono focus:border-signal outline-none"
+              className={ui.cx(ui.input, "cursor-pointer w-full")}
             >
               <option value="ALL">All Status</option>
               <option value="VERIFIED">Verified ({verifiedCount})</option>
@@ -1507,11 +1509,11 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
           </div>
 
           <div>
-            <label className="block text-[9px] uppercase font-bold text-ink-faint mb-1">Public Profile</label>
+            <label className={ui.cx(ui.label, "mb-1.5")}>Public Profile</label>
             <select
               value={visibilityFilter}
               onChange={(e) => setVisibilityFilter(e.target.value as any)}
-              className="w-full px-2 py-1 text-xs bg-void border border-hairline text-ink font-mono focus:border-signal outline-none"
+              className={ui.cx(ui.input, "cursor-pointer w-full")}
             >
               <option value="ALL">All Visibility</option>
               <option value="PUBLIC">Public ({publicCount})</option>
@@ -1520,11 +1522,11 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
           </div>
 
           <div>
-            <label className="block text-[9px] uppercase font-bold text-ink-faint mb-1">Sort By</label>
+            <label className={ui.cx(ui.label, "mb-1.5")}>Sort By</label>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as any)}
-              className="w-full px-2 py-1 text-xs bg-void border border-hairline text-ink font-mono focus:border-signal outline-none"
+              className={ui.cx(ui.input, "cursor-pointer w-full")}
             >
               <option value="newest">Newest Joined</option>
               <option value="oldest">Oldest Joined</option>
@@ -1537,28 +1539,28 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
       </div>
 
       {/* Users Interactive Table — Contained & Scrollable */}
-      <div className="border border-hairline min-h-[380px] md:min-h-0 flex-1 overflow-auto bg-void relative">
-        <table className="w-full text-xs min-w-[960px]">
-          <thead className="sticky top-0 bg-surface z-10 border-b border-hairline">
-            <tr className="text-[10px] uppercase text-ink-dim font-bold">
-              <th className="text-left px-3 py-2.5">User / Creator</th>
-              <th className="text-left px-3 py-2.5">Email &amp; Auth</th>
-              <th className="text-left px-3 py-2.5">Role</th>
-              <th className="text-left px-3 py-2.5">Visibility</th>
-              <th className="text-center px-3 py-2.5">Products</th>
-              <th className="text-center px-3 py-2.5">Votes</th>
-              <th className="text-center px-3 py-2.5">Comments</th>
-              <th className="text-left px-3 py-2.5">Joined</th>
-              <th className="text-right px-3 py-2.5">Actions</th>
+      <div className="rounded-xl border border-hairline bg-card shadow-card min-h-[380px] md:min-h-0 flex-1 overflow-auto relative">
+        <table className={ui.cx(ui.table, "min-w-[960px]")}>
+          <thead className={ui.thead}>
+            <tr>
+              <th className={ui.th}>User / Creator</th>
+              <th className={ui.th}>Email &amp; Auth</th>
+              <th className={ui.th}>Role</th>
+              <th className={ui.th}>Visibility</th>
+              <th className={ui.cx(ui.th, "text-center")}>Products</th>
+              <th className={ui.cx(ui.th, "text-center")}>Votes</th>
+              <th className={ui.cx(ui.th, "text-center")}>Comments</th>
+              <th className={ui.th}>Joined</th>
+              <th className={ui.cx(ui.th, "text-right")}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((u) => (
-              <tr key={u.id} className="border-t border-hairline hover:bg-surface/20 transition-colors">
+              <tr key={u.id} className={ui.tr}>
                 {/* User Info */}
-                <td className="px-3 py-2.5">
+                <td className={ui.td}>
                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-[2px] bg-ink text-surface flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden border border-hairline relative">
+                    <div className="w-8 h-8 rounded-md bg-ink text-surface flex items-center justify-center text-xs font-bold shrink-0 overflow-hidden border border-hairline relative">
                       {u.image ? (
                         <img src={u.image} alt={u.name} className="w-full h-full object-cover" />
                       ) : (
@@ -1587,13 +1589,13 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                 </td>
 
                 {/* Email & Verified Toggle */}
-                <td className="px-3 py-2.5">
+                <td className={ui.td}>
                   <div className="space-y-1">
                     <div className="text-xs text-ink truncate max-w-[180px]">{u.email}</div>
                     <button
                       onClick={() => handleToggleVerified(u)}
                       disabled={pending}
-                      className={`text-[9px] px-1.5 py-0.2 border uppercase font-bold cursor-pointer transition-colors ${
+                      className={`text-[10px] px-1.5 py-0.2 border uppercase font-bold cursor-pointer transition-colors ${
                         u.emailVerified
                           ? "border-signal/40 bg-signal/10 text-signal hover:bg-signal/20"
                           : "border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
@@ -1606,7 +1608,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                 </td>
 
                 {/* Role Switcher — Parallelogram styled, allows only MAKER / MODERATOR */}
-                <td className="px-3 py-2.5">
+                <td className={ui.td}>
                   <ParallelogramRoleDropdown
                     role={u.role}
                     onChange={(r) => handleRoleChange(u, r)}
@@ -1615,11 +1617,11 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                 </td>
 
                 {/* Visibility Toggle */}
-                <td className="px-3 py-2.5">
+                <td className={ui.td}>
                   <button
                     onClick={() => handleToggleVisibility(u)}
                     disabled={pending}
-                    className={`text-[9px] px-1.5 py-0.5 border uppercase font-bold cursor-pointer transition-colors ${
+                    className={`text-[10px] px-1.5 py-0.5 border uppercase font-bold cursor-pointer transition-colors ${
                       u.isProfilePublic
                         ? "border-hairline text-ink-dim hover:border-ink hover:text-ink"
                         : "border-rose-500/40 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20"
@@ -1631,33 +1633,33 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                 </td>
 
                 {/* Counts */}
-                <td className="px-3 py-2.5 tabular-nums text-center font-bold text-ink">
+                <td className={ui.cx(ui.td, "tabular-nums text-center font-bold text-ink")}>
                   {u.productCount}
                 </td>
-                <td className="px-3 py-2.5 tabular-nums text-center text-ink-dim">
+                <td className={ui.cx(ui.td, "tabular-nums text-center text-ink-dim")}>
                   {u.voteCount}
                 </td>
-                <td className="px-3 py-2.5 tabular-nums text-center text-ink-dim">
+                <td className={ui.cx(ui.td, "tabular-nums text-center text-ink-dim")}>
                   {u.commentCount}
                 </td>
 
                 {/* Joined Date */}
-                <td className="px-3 py-2.5 tabular-nums text-ink-dim text-[10px] whitespace-nowrap">
+                <td className={ui.cx(ui.td, "tabular-nums text-ink-dim text-xs whitespace-nowrap")}>
                   {new Date(u.createdAt).toISOString().slice(0, 10)}
                 </td>
 
                 {/* Action Buttons */}
-                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                <td className={ui.cx(ui.td, "text-right whitespace-nowrap")}>
                   <div className="flex items-center justify-end gap-1.5">
                     <button
                       onClick={() => openEditModal(u)}
-                      className="px-2 py-1 border border-hairline bg-surface hover:bg-raised text-[10px] uppercase font-bold text-ink hover:text-signal transition-colors cursor-pointer"
+                      className={ui.cx(ui.btnSm, ui.secondary)}
                     >
                       Edit
                     </button>
                     <button
                       onClick={() => setDeletingUser(u)}
-                      className="px-2 py-1 border border-rose-500/30 hover:border-rose-500 bg-rose-500/10 text-[10px] uppercase font-bold text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                      className={ui.cx(ui.btnSm, ui.danger)}
                       title="Delete User"
                     >
                       Delete
@@ -1668,7 +1670,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-ink-dim text-xs">
+                <td colSpan={9} className={ui.cx(ui.td, "text-center text-ink-dim text-xs")}>
                   No users match the search and filter criteria.
                 </td>
               </tr>
@@ -1680,7 +1682,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
       {/* Edit User Modal */}
       {editingUser && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="border border-hairline bg-surface p-6 max-w-xl w-full space-y-4 max-h-[90vh] overflow-y-auto font-mono text-ink shadow-2xl">
+          <div className="rounded-xl border border-hairline bg-card shadow-card shadow-[var(--shadow-lift)] p-6 max-w-xl w-full space-y-4 max-h-[90vh] overflow-y-auto text-ink">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>
                 <div className="text-[10px] text-signal font-bold uppercase">ADMINISTRATIVE USER EDITOR</div>
@@ -1697,88 +1699,88 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
             <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Full Name</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Full Name</label>
                   <input
                     type="text"
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Username / Handle</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Username / Handle</label>
                   <input
                     type="text"
                     required
                     value={editForm.username}
                     onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Email Address</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Email Address</label>
                   <input
                     type="email"
                     required
                     value={editForm.email}
                     onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Job Title / Headline</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Job Title / Headline</label>
                   <input
                     type="text"
                     placeholder="e.g. Founder & CTO"
                     value={editForm.title}
                     onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Bio / Story</label>
+                <label className={ui.cx(ui.label, "mb-1.5")}>Bio / Story</label>
                 <textarea
                   rows={3}
                   value={editForm.bio}
                   onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                  className={ui.cx(ui.textarea, "w-full")}
                   placeholder="Founder bio or manifesto..."
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Website URL</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Website URL</label>
                   <input
                     type="url"
                     value={editForm.websiteUrl}
                     onChange={(e) => setEditForm({ ...editForm, websiteUrl: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                     placeholder="https://..."
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">𝕏 / Twitter Handle</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>𝕏 / Twitter Handle</label>
                   <input
                     type="text"
                     value={editForm.twitterHandle}
                     onChange={(e) => setEditForm({ ...editForm, twitterHandle: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                     placeholder="username"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">GitHub Handle</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>GitHub Handle</label>
                   <input
                     type="text"
                     value={editForm.githubHandle}
                     onChange={(e) => setEditForm({ ...editForm, githubHandle: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                     placeholder="username"
                   />
                 </div>
@@ -1786,7 +1788,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-hairline">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Role Assignment</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Role Assignment</label>
                   <ParallelogramRoleDropdown
                     role={editForm.role}
                     onChange={(r) => setEditForm({ ...editForm, role: r })}
@@ -1799,7 +1801,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                       type="checkbox"
                       checked={editForm.emailVerified}
                       onChange={(e) => setEditForm({ ...editForm, emailVerified: e.target.checked })}
-                      className="accent-signal"
+                      className={ui.checkbox}
                     />
                     <span className="text-[11px] font-bold">Email Verified</span>
                   </label>
@@ -1808,7 +1810,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                       type="checkbox"
                       checked={editForm.isProfilePublic}
                       onChange={(e) => setEditForm({ ...editForm, isProfilePublic: e.target.checked })}
-                      className="accent-signal"
+                      className={ui.checkbox}
                     />
                     <span className="text-[11px] font-bold">Public Profile Visible</span>
                   </label>
@@ -1817,7 +1819,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                       type="checkbox"
                       checked={editForm.showRevenuePublic}
                       onChange={(e) => setEditForm({ ...editForm, showRevenuePublic: e.target.checked })}
-                      className="accent-signal"
+                      className={ui.checkbox}
                     />
                     <span className="text-[11px] font-bold">Show Revenue Publicly</span>
                   </label>
@@ -1828,14 +1830,14 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs text-ink"
+                  className={ui.cx(ui.btn, ui.secondary)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="px-4 py-1.5 bg-signal text-void text-xs font-bold hover:bg-signal/90 disabled:opacity-40"
+                  className={ui.cx(ui.btn, ui.primary)}
                 >
                   {pending ? "Saving..." : "Save Profile"}
                 </button>
@@ -1849,7 +1851,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
       {/* Create User Modal */}
       {isCreating && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="border border-hairline bg-surface p-6 max-w-xl w-full space-y-4 max-h-[90vh] overflow-y-auto font-mono text-ink shadow-2xl">
+          <div className="rounded-xl border border-hairline bg-card shadow-card shadow-[var(--shadow-lift)] p-6 max-w-xl w-full space-y-4 max-h-[90vh] overflow-y-auto text-ink">
             <div className="flex items-center justify-between border-b border-hairline pb-3">
               <div>
                 <div className="text-[10px] text-signal font-bold uppercase">PROVISION USER ACCOUNT</div>
@@ -1866,100 +1868,100 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
             <form onSubmit={handleCreateSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Full Name *</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Full Name *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Satoshi Nakamoto"
                     value={createForm.name}
                     onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Username *</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Username *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. satoshi"
                     value={createForm.username}
                     onChange={(e) => setCreateForm({ ...createForm, username: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Email Address *</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Email Address *</label>
                   <input
                     type="email"
                     required
                     placeholder="satoshi@example.com"
                     value={createForm.email}
                     onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Job Title</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Job Title</label>
                   <input
                     type="text"
                     placeholder="e.g. Chief Architect"
                     value={createForm.title}
                     onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Bio</label>
+                <label className={ui.cx(ui.label, "mb-1.5")}>Bio</label>
                 <textarea
                   rows={2}
                   placeholder="Short founder biography..."
                   value={createForm.bio}
                   onChange={(e) => setCreateForm({ ...createForm, bio: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                  className={ui.cx(ui.textarea, "w-full")}
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Website</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Website</label>
                   <input
                     type="url"
                     placeholder="https://..."
                     value={createForm.websiteUrl}
                     onChange={(e) => setCreateForm({ ...createForm, websiteUrl: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">𝕏 / Twitter</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>𝕏 / Twitter</label>
                   <input
                     type="text"
                     placeholder="@handle"
                     value={createForm.twitterHandle}
                     onChange={(e) => setCreateForm({ ...createForm, twitterHandle: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">GitHub</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>GitHub</label>
                   <input
                     type="text"
                     placeholder="@handle"
                     value={createForm.githubHandle}
                     onChange={(e) => setCreateForm({ ...createForm, githubHandle: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-void border border-hairline focus:border-signal outline-none font-mono"
+                    className={ui.cx(ui.input, "w-full")}
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-hairline">
                 <div>
-                  <label className="block text-[10px] uppercase font-bold text-ink-dim mb-1">Initial Role</label>
+                  <label className={ui.cx(ui.label, "mb-1.5")}>Initial Role</label>
                   <ParallelogramRoleDropdown
                     role={createForm.role}
                     onChange={(r) => setCreateForm({ ...createForm, role: r })}
@@ -1972,7 +1974,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                       type="checkbox"
                       checked={createForm.emailVerified}
                       onChange={(e) => setCreateForm({ ...createForm, emailVerified: e.target.checked })}
-                      className="accent-signal"
+                      className={ui.checkbox}
                     />
                     <span className="text-[11px] font-bold">Email Verified</span>
                   </label>
@@ -1981,7 +1983,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                       type="checkbox"
                       checked={createForm.isProfilePublic}
                       onChange={(e) => setCreateForm({ ...createForm, isProfilePublic: e.target.checked })}
-                      className="accent-signal"
+                      className={ui.checkbox}
                     />
                     <span className="text-[11px] font-bold">Public Profile Visible</span>
                   </label>
@@ -1992,14 +1994,14 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
                 <button
                   type="button"
                   onClick={() => setIsCreating(false)}
-                  className="px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs text-ink"
+                  className={ui.cx(ui.btn, ui.secondary)}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="px-4 py-1.5 bg-signal text-void text-xs font-bold hover:bg-signal/90 disabled:opacity-40 cursor-pointer"
+                  className={ui.cx(ui.btn, ui.primary)}
                 >
                   {pending ? "Creating..." : "Create Account"}
                 </button>
@@ -2013,7 +2015,7 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
       {/* Delete User Confirmation Modal */}
       {deletingUser && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fadeIn">
-          <div className="border border-rose-500/50 bg-surface p-6 max-w-md w-full space-y-4 font-mono text-ink shadow-2xl">
+          <div className="rounded-xl border shadow-[var(--shadow-lift)] border-rose-500/50 p-6 max-w-md w-full space-y-4 text-ink">
             <div className="text-xs uppercase font-bold text-rose-400">DANGER: PERMANENT USER DELETION</div>
             <h3 className="text-base font-bold text-ink">Delete user @{deletingUser.username}?</h3>
             <p className="text-xs text-ink-dim font-sans leading-relaxed">
@@ -2022,14 +2024,14 @@ function UsersTab({ query, setQuery }: { query: string; setQuery: (q: string) =>
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-hairline">
               <button
                 onClick={() => setDeletingUser(null)}
-                className="px-3 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs text-ink cursor-pointer"
+                className={ui.cx(ui.btn, ui.secondary)}
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleDeleteUser(deletingUser)}
                 disabled={pending}
-                className="px-4 py-1.5 bg-rose-600 text-white text-xs font-bold hover:bg-rose-500 disabled:opacity-40 cursor-pointer"
+                className={ui.cx(ui.btn, "bg-rose-600 text-white hover:bg-rose-500")}
               >
                 {pending ? "Deleting..." : "Permanently Delete"}
               </button>
@@ -2503,7 +2505,7 @@ function SlotEditor({
   };
 
   return (
-    <div className="border border-hairline">
+    <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
       <div className="flex items-center justify-between border-b border-hairline px-3.5 py-2.5 flex-wrap gap-2">
         <div className="text-xs uppercase text-ink-dim font-bold">
           {title}{" "}
@@ -2516,23 +2518,23 @@ function SlotEditor({
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm min-w-[760px]">
+        <table className={ui.cx(ui.table, "min-w-[760px]")}>
         <thead>
-          <tr className="text-xs uppercase text-ink-dim font-bold">
-            <th className="text-left px-3 py-2 border-b border-hairline w-8">#</th>
-            <th className="text-left px-3 py-2 border-b border-hairline">Logo & Product</th>
-            <th className="text-left px-3 py-2 border-b border-hairline">Tagline</th>
-            <th className="text-left px-3 py-2 border-b border-hairline">Link</th>
-            <th className="text-left px-3 py-2 border-b border-hairline">Source</th>
-            <th className="text-right px-3 py-2 border-b border-hairline">Actions</th>
+          <tr>
+            <th className={ui.cx(ui.th, "w-8")}>#</th>
+            <th className={ui.th}>Logo & Product</th>
+            <th className={ui.th}>Tagline</th>
+            <th className={ui.th}>Link</th>
+            <th className={ui.th}>Source</th>
+            <th className={ui.cx(ui.th, "text-right")}>Actions</th>
           </tr>
         </thead>
         <tbody>
           {paid.map((s, i) =>
             editingId === s.id ? (
-              <tr key={s.id} className="border-t border-hairline bg-surface-subtle/80">
-                <td colSpan={6} className="p-3">
-                  <div className="p-3.5 border border-ink/40 bg-surface space-y-3.5">
+              <tr key={s.id} className={ui.tr}>
+                <td colSpan={6} className={ui.td}>
+                  <div className="rounded-lg border border-signal/30 bg-surface/60 p-3.5 space-y-3.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs uppercase font-bold text-signal tracking-wider flex items-center gap-1.5">
                         <span>✎</span> Modify Listing & Logo · #{i + 1} ({s.kind})
@@ -2549,39 +2551,39 @@ function SlotEditor({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Product Name *</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Product Name *</label>
                         <input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
                           placeholder="Product Name"
                           disabled={pending}
-                          className="w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                          className={ui.cx(ui.input, "w-full")}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Tagline</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Tagline</label>
                         <input
                           value={editTagline}
                           onChange={(e) => setEditTagline(e.target.value)}
                           placeholder="Tagline"
                           disabled={pending}
-                          className="w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                          className={ui.cx(ui.input, "w-full")}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Destination URL</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Destination URL</label>
                         <input
                           value={editUrl}
                           onChange={(e) => setEditUrl(e.target.value)}
                           placeholder="https://… or /product/…"
                           disabled={pending}
-                          className="w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                          className={ui.cx(ui.input, "w-full")}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Logo URL or Upload</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Logo URL or Upload</label>
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xs border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                          <div className="w-8 h-8 rounded-md border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                             {editLogoUrl ? (
                               <img src={editLogoUrl} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
@@ -2593,7 +2595,7 @@ function SlotEditor({
                             onChange={(e) => setEditLogoUrl(e.target.value)}
                             placeholder="https://… or upload"
                             disabled={pending}
-                            className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                            className={ui.cx(ui.input, "flex-1 min-w-0")}
                           />
                           <input
                             type="file"
@@ -2606,7 +2608,7 @@ function SlotEditor({
                             type="button"
                             onClick={() => editFileInputRef.current?.click()}
                             disabled={pending}
-                            className="px-2 py-1.5 text-xs uppercase font-bold border border-hairline bg-surface hover:bg-raised text-ink shrink-0 cursor-pointer disabled:opacity-40"
+                            className={ui.cx(ui.btnSm, ui.secondary, "shrink-0")}
                             title="Upload logo from file"
                           >
                             Upload
@@ -2622,7 +2624,7 @@ function SlotEditor({
                           value={editPosition}
                           onChange={(e) => setEditPosition(e.target.value as "FEATURED" | "ROTATING")}
                           disabled={pending}
-                          className="px-2.5 py-1 text-sm bg-surface border border-hairline focus:outline-none focus:border-ink text-ink font-mono cursor-pointer"
+                          className={ui.cx(ui.input, "cursor-pointer")}
                         >
                           <option value="FEATURED">FEATURED (Top marquee strip)</option>
                           <option value="ROTATING">ROTATING (Header floaters)</option>
@@ -2633,7 +2635,7 @@ function SlotEditor({
                           type="button"
                           onClick={cancelEditing}
                           disabled={pending}
-                          className="px-3 py-1.5 text-xs uppercase font-bold border border-hairline text-ink hover:bg-surface-subtle disabled:opacity-30"
+                          className={ui.cx(ui.btn, ui.secondary)}
                         >
                           Cancel
                         </button>
@@ -2641,7 +2643,7 @@ function SlotEditor({
                           type="button"
                           onClick={saveEdit}
                           disabled={pending || !editName.trim()}
-                          className="px-3 py-1.5 text-xs uppercase font-bold border border-ink bg-ink text-surface hover:opacity-90 disabled:opacity-30"
+                          className={ui.cx(ui.btn, ui.primary)}
                         >
                           {pending ? "Saving..." : "Save Changes"}
                         </button>
@@ -2651,11 +2653,11 @@ function SlotEditor({
                 </td>
               </tr>
             ) : (
-              <tr key={s.id} className="border-t border-hairline first:border-t-0">
-                <td className="px-3 py-2.5 text-ink-dim tabular-nums text-xs">{i + 1}</td>
-                <td className="px-3 py-2.5">
+              <tr key={s.id} className={ui.tr}>
+                <td className={ui.cx(ui.td, "text-ink-dim tabular-nums text-xs")}>{i + 1}</td>
+                <td className={ui.td}>
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-xs border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                    <div className="w-7 h-7 rounded-md border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                       {s.logoUrl ? (
                         <img src={s.logoUrl} alt={s.name} className="w-full h-full object-cover" />
                       ) : (
@@ -2665,19 +2667,19 @@ function SlotEditor({
                     <span className="font-bold">{s.name}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 text-xs text-ink-dim truncate max-w-[240px]">{s.tagline}</td>
-                <td className="px-3 py-2.5">
+                <td className={ui.cx(ui.td, "text-xs text-ink-dim truncate max-w-[240px]")}>{s.tagline}</td>
+                <td className={ui.td}>
                   <a
                     href={s.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs uppercase underline underline-offset-2 hover:text-signal"
+                    className="font-mono text-xs text-ink-dim hover:text-signal underline-offset-2 hover:underline"
                   >
                     {s.url.replace(/^https?:\/\//, "")} ↗
                   </a>
                 </td>
-                <td className="px-3 py-2.5">
-                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 border border-[color:var(--verified,#00D97E)] text-[color:var(--verified,#00D97E)]">
+                <td className={ui.td}>
+                  <span className={ui.pill("good")}>
                     PAID
                   </span>
                   {s.subscription && (
@@ -2686,11 +2688,11 @@ function SlotEditor({
                     </div>
                   )}
                 </td>
-                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                <td className={ui.cx(ui.td, "text-right whitespace-nowrap")}>
                   <button
                     onClick={() => startEditing(s)}
                     disabled={pending}
-                    className="px-2 py-1 text-xs uppercase font-bold border border-hairline hover:bg-surface-subtle cursor-pointer"
+                    className={ui.cx(ui.btnSm, ui.secondary)}
                     title="Modify listing & logo"
                   >
                     Edit
@@ -2701,9 +2703,9 @@ function SlotEditor({
           )}
           {custom.map((c, i) =>
             editingId === c.id ? (
-              <tr key={c.id} className="border-t border-hairline bg-surface-subtle/80">
-                <td colSpan={6} className="p-3">
-                  <div className="p-3.5 border border-ink/40 bg-surface space-y-3.5">
+              <tr key={c.id} className={ui.tr}>
+                <td colSpan={6} className={ui.td}>
+                  <div className="rounded-lg border border-signal/30 bg-surface/60 p-3.5 space-y-3.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs uppercase font-bold text-signal tracking-wider flex items-center gap-1.5">
                         <span>✎</span> Modify Listing & Logo · #{paid.length + i + 1} ({c.kind})
@@ -2720,39 +2722,39 @@ function SlotEditor({
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Product Name *</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Product Name *</label>
                         <input
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
                           placeholder="Product Name"
                           disabled={pending}
-                          className="w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                          className={ui.cx(ui.input, "w-full")}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Tagline</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Tagline</label>
                         <input
                           value={editTagline}
                           onChange={(e) => setEditTagline(e.target.value)}
                           placeholder="Tagline"
                           disabled={pending}
-                          className="w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                          className={ui.cx(ui.input, "w-full")}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Destination URL</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Destination URL</label>
                         <input
                           value={editUrl}
                           onChange={(e) => setEditUrl(e.target.value)}
                           placeholder="https://… or /product/…"
                           disabled={pending}
-                          className="w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                          className={ui.cx(ui.input, "w-full")}
                         />
                       </div>
                       <div>
-                        <label className="block text-xs uppercase text-ink-dim mb-1 font-bold">Logo URL or Upload</label>
+                        <label className={ui.cx(ui.label, "mb-1.5")}>Logo URL or Upload</label>
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-xs border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                          <div className="w-8 h-8 rounded-md border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                             {editLogoUrl ? (
                               <img src={editLogoUrl} alt="Logo" className="w-full h-full object-cover" />
                             ) : (
@@ -2764,7 +2766,7 @@ function SlotEditor({
                             onChange={(e) => setEditLogoUrl(e.target.value)}
                             placeholder="https://… or upload"
                             disabled={pending}
-                            className="flex-1 min-w-0 px-2 py-1.5 text-xs bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono disabled:opacity-40"
+                            className={ui.cx(ui.input, "flex-1 min-w-0")}
                           />
                           <input
                             type="file"
@@ -2777,7 +2779,7 @@ function SlotEditor({
                             type="button"
                             onClick={() => editFileInputRef.current?.click()}
                             disabled={pending}
-                            className="px-2 py-1.5 text-xs uppercase font-bold border border-hairline bg-surface hover:bg-raised text-ink shrink-0 cursor-pointer disabled:opacity-40"
+                            className={ui.cx(ui.btnSm, ui.secondary, "shrink-0")}
                             title="Upload logo from file"
                           >
                             Upload
@@ -2793,7 +2795,7 @@ function SlotEditor({
                           value={editPosition}
                           onChange={(e) => setEditPosition(e.target.value as "FEATURED" | "ROTATING")}
                           disabled={pending}
-                          className="px-2.5 py-1 text-sm bg-surface border border-hairline focus:outline-none focus:border-ink text-ink font-mono cursor-pointer"
+                          className={ui.cx(ui.input, "cursor-pointer")}
                         >
                           <option value="FEATURED">FEATURED (Top marquee strip)</option>
                           <option value="ROTATING">ROTATING (Header floaters)</option>
@@ -2804,7 +2806,7 @@ function SlotEditor({
                           type="button"
                           onClick={cancelEditing}
                           disabled={pending}
-                          className="px-3 py-1.5 text-xs uppercase font-bold border border-hairline text-ink hover:bg-surface-subtle disabled:opacity-30 cursor-pointer"
+                          className={ui.cx(ui.btn, ui.secondary)}
                         >
                           Cancel
                         </button>
@@ -2812,7 +2814,7 @@ function SlotEditor({
                           type="button"
                           onClick={saveEdit}
                           disabled={pending || !editName.trim()}
-                          className="px-3 py-1.5 text-xs uppercase font-bold border border-ink bg-ink text-surface hover:opacity-90 disabled:opacity-30 cursor-pointer"
+                          className={ui.cx(ui.btn, ui.primary)}
                         >
                           {pending ? "Saving..." : "Save Changes"}
                         </button>
@@ -2822,11 +2824,11 @@ function SlotEditor({
                 </td>
               </tr>
             ) : (
-              <tr key={c.id} className="border-t border-hairline">
-                <td className="px-3 py-2.5 text-ink-dim tabular-nums text-xs">{paid.length + i + 1}</td>
-                <td className="px-3 py-2.5">
+              <tr key={c.id} className={ui.tr}>
+                <td className={ui.cx(ui.td, "text-ink-dim tabular-nums text-xs")}>{paid.length + i + 1}</td>
+                <td className={ui.td}>
                   <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-xs border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
+                    <div className="w-7 h-7 rounded-md border border-hairline bg-void flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                       {c.logoUrl ? (
                         <img src={c.logoUrl} alt={c.name} className="w-full h-full object-cover" />
                       ) : (
@@ -2836,14 +2838,14 @@ function SlotEditor({
                     <span className="font-bold">{c.name}</span>
                   </div>
                 </td>
-                <td className="px-3 py-2.5 text-xs text-ink-dim truncate max-w-[240px]">{c.tagline}</td>
-                <td className="px-3 py-2.5">
+                <td className={ui.cx(ui.td, "text-xs text-ink-dim truncate max-w-[240px]")}>{c.tagline}</td>
+                <td className={ui.td}>
                   {c.url && c.url !== "#" ? (
                     <a
                       href={c.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs uppercase underline underline-offset-2 hover:text-signal"
+                      className="font-mono text-xs text-ink-dim hover:text-signal underline-offset-2 hover:underline"
                     >
                       {c.url.replace(/^https?:\/\//, "")}
                     </a>
@@ -2851,16 +2853,16 @@ function SlotEditor({
                     <span className="text-xs text-ink-dim">—</span>
                   )}
                 </td>
-                <td className="px-3 py-2.5">
-                  <span className="text-[10px] uppercase font-bold px-1.5 py-0.5 border border-signal text-signal">
+                <td className={ui.td}>
+                  <span className={ui.pill("signal")}>
                     CUSTOM
                   </span>
                 </td>
-                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                <td className={ui.cx(ui.td, "text-right whitespace-nowrap")}>
                   <button
                     onClick={() => startEditing(c)}
                     disabled={pending}
-                    className="px-2 py-1 text-xs uppercase font-bold border border-hairline hover:bg-surface-subtle mr-1 cursor-pointer"
+                    className={ui.cx(ui.btnSm, ui.secondary, "mr-1")}
                     title="Modify listing & logo"
                   >
                     Edit
@@ -2868,7 +2870,7 @@ function SlotEditor({
                   <button
                     onClick={() => startTransition(async () => { await reorderSlot(c.id, -1); await refresh(); })}
                     disabled={i === 0 || pending}
-                    className="px-2 py-1 text-xs font-bold border border-hairline mr-1 disabled:opacity-30 cursor-pointer"
+                    className={ui.cx(ui.btnSm, ui.secondary, "mr-1")}
                     title="Move up"
                   >
                     ↑
@@ -2876,7 +2878,7 @@ function SlotEditor({
                   <button
                     onClick={() => startTransition(async () => { await reorderSlot(c.id, 1); await refresh(); })}
                     disabled={i === custom.length - 1 || pending}
-                    className="px-2 py-1 text-xs font-bold border border-hairline mr-1 disabled:opacity-30 cursor-pointer"
+                    className={ui.cx(ui.btnSm, ui.secondary, "mr-1")}
                     title="Move down"
                   >
                     ↓
@@ -2884,7 +2886,7 @@ function SlotEditor({
                   <button
                     onClick={() => startTransition(async () => { await removeCustomSlot(c.id); await refresh(); })}
                     disabled={pending}
-                    className="px-2.5 py-1 text-xs uppercase font-bold border border-hairline hover:bg-signal hover:text-surface hover:border-signal cursor-pointer"
+                    className={ui.cx(ui.btnSm, ui.secondary)}
                   >
                     Remove
                   </button>
@@ -2894,7 +2896,7 @@ function SlotEditor({
           )}
           {total === 0 && (
             <tr>
-              <td colSpan={6} className="px-3 py-6 text-center text-ink-dim text-sm">
+              <td colSpan={6} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>
                 No placements yet — either wait for a paid slot or add a custom one below.
               </td>
             </tr>
@@ -2910,21 +2912,21 @@ function SlotEditor({
           onChange={(e) => setName(e.target.value)}
           placeholder="Product name *"
           disabled={!canAdd}
-          className="px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink disabled:opacity-40"
+          className={ui.cx(ui.input, "w-full min-w-0")}
         />
         <input
           value={tagline}
           onChange={(e) => setTagline(e.target.value)}
           placeholder="Tagline"
           disabled={!canAdd}
-          className="px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink disabled:opacity-40"
+          className={ui.cx(ui.input, "w-full min-w-0")}
         />
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="Destination URL (https://…)"
           disabled={!canAdd}
-          className="px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink disabled:opacity-40"
+          className={ui.cx(ui.input, "w-full min-w-0")}
         />
         <div className="flex items-center gap-1.5">
           <input
@@ -2932,7 +2934,7 @@ function SlotEditor({
             onChange={(e) => setLogoUrl(e.target.value)}
             placeholder="Logo URL or upload"
             disabled={!canAdd}
-            className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-transparent border border-hairline focus:outline-none focus:border-ink disabled:opacity-40 font-mono"
+            className={ui.cx(ui.input, "flex-1 min-w-0")}
           />
           <input
             type="file"
@@ -2945,7 +2947,7 @@ function SlotEditor({
             type="button"
             onClick={() => addFileInputRef.current?.click()}
             disabled={!canAdd}
-            className="px-2 py-1.5 text-xs uppercase font-bold border border-hairline bg-surface hover:bg-raised text-ink shrink-0 cursor-pointer disabled:opacity-40"
+            className={ui.cx(ui.btnSm, ui.secondary, "shrink-0")}
             title="Upload logo file"
           >
             Upload
@@ -2954,7 +2956,7 @@ function SlotEditor({
         <button
           onClick={add}
           disabled={!canAdd || !name.trim() || pending}
-          className="text-xs uppercase font-bold px-3.5 py-1.5 border border-ink bg-ink text-surface disabled:opacity-30 cursor-pointer shrink-0"
+          className={ui.cx(ui.btn, ui.primary, "shrink-0")}
         >
           + Add custom
         </button>
@@ -3047,7 +3049,7 @@ function CategoriesTab() {
         with it.
       </p>
 
-      <div className="border border-hairline p-3 flex flex-wrap gap-2 items-center">
+      <div className="rounded-xl border border-hairline bg-card shadow-card p-3 flex flex-wrap gap-2 items-center">
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -3058,18 +3060,18 @@ function CategoriesTab() {
             }
           }}
           placeholder="New category name (e.g. Robotics & Automation)"
-          className="flex-1 min-w-[220px] px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink"
+          className={ui.cx(ui.input, "flex-1 min-w-[220px]")}
         />
         <button
           onClick={submit}
           disabled={!newName.trim() || pending}
-          className="text-xs uppercase font-bold px-3.5 py-1.5 border border-ink bg-ink text-surface disabled:opacity-30"
+          className={ui.cx(ui.btn, ui.primary)}
         >
           + Add category
         </button>
       </div>
 
-      <div className="border border-hairline">
+      <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
         <SectionTitle>Categories ({cats.length})</SectionTitle>
         <ul>
           {cats.map((c) => (
@@ -3084,7 +3086,7 @@ function CategoriesTab() {
               <button
                 onClick={() => startTransition(async () => { await removeCategory(c.id); await refresh(); })}
                 disabled={pending}
-                className="text-xs uppercase font-bold px-2.5 py-1 border border-hairline hover:bg-signal hover:text-surface hover:border-signal disabled:opacity-40 shrink-0"
+                className={ui.cx(ui.btnSm, ui.secondary, "shrink-0")}
               >
                 Remove
               </button>
@@ -3127,31 +3129,31 @@ function ModerationTab() {
         `isDeleted=true` and drops it from the thread. Dismissing marks all open flags as
         DISMISSED and leaves the comment visible.
       </p>
-      <div className="border border-hairline">
+      <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
         <SectionTitle>Flagged comments ({items.length})</SectionTitle>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[760px]">
+          <table className={ui.cx(ui.table, "min-w-[760px]")}>
           <thead>
-            <tr className="text-xs uppercase text-ink-dim font-bold">
-              <th className="text-left px-3 py-2 border-b border-hairline">Author</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Body</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Product</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Reported by</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">When</th>
-              <th className="text-right px-3 py-2 border-b border-hairline">Actions</th>
+            <tr>
+              <th className={ui.th}>Author</th>
+              <th className={ui.th}>Body</th>
+              <th className={ui.th}>Product</th>
+              <th className={ui.th}>Reported by</th>
+              <th className={ui.th}>When</th>
+              <th className={ui.cx(ui.th, "text-right")}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {items.map((c) => (
-              <tr key={c.id} className="border-t border-hairline align-top">
-                <td className="px-3 py-2.5">
+              <tr key={c.id} className={ui.cx(ui.tr, "align-top")}>
+                <td className={ui.td}>
                   <div className="font-bold">{c.user.name || c.user.username}</div>
                   <div className="text-xs text-ink-dim">@{c.user.username}</div>
                 </td>
-                <td className="px-3 py-2.5 max-w-[320px]">
+                <td className={ui.cx(ui.td, "max-w-[320px]")}>
                   <div className="text-sm whitespace-pre-wrap">{c.body}</div>
                 </td>
-                <td className="px-3 py-2.5">
+                <td className={ui.td}>
                   <Link
                     href={`/product/${c.product.slug}#comments`}
                     target="_blank"
@@ -3161,24 +3163,24 @@ function ModerationTab() {
                     {c.product.slug} ↗
                   </Link>
                 </td>
-                <td className="px-3 py-2.5 text-ink-dim text-xs">
+                <td className={ui.cx(ui.td, "text-ink-dim text-xs")}>
                   {c.flags.length > 0 ? c.flags[0].raisedBy.email : "—"}
                 </td>
-                <td className="px-3 py-2.5 text-ink-dim tabular-nums whitespace-nowrap text-xs">
+                <td className={ui.cx(ui.td, "text-ink-dim tabular-nums whitespace-nowrap text-xs")}>
                   {c.createdAt.toString().replace("T", " ").slice(0, 19)}
                 </td>
-                <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                <td className={ui.cx(ui.td, "text-right whitespace-nowrap")}>
                   <button
                     onClick={() => startTransition(async () => { await dismissFlags(c.id); await refresh(); })}
                     disabled={pending}
-                    className="text-xs uppercase font-bold px-2.5 py-1 border border-hairline mr-1 hover:bg-ink hover:text-surface disabled:opacity-40"
+                    className={ui.cx(ui.btnSm, ui.secondary, "mr-1")}
                   >
                     Dismiss flag
                   </button>
                   <button
                     onClick={() => startTransition(async () => { await deleteFlaggedComment(c.id); await refresh(); })}
                     disabled={pending}
-                    className="text-xs uppercase font-bold px-2.5 py-1 border border-signal bg-signal text-surface disabled:opacity-40"
+                    className={ui.cx(ui.btnSm, ui.primary)}
                   >
                     Delete
                   </button>
@@ -3187,7 +3189,7 @@ function ModerationTab() {
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-ink-dim text-sm">
+                <td colSpan={6} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>
                   Nothing to review. All threads are clean.
                 </td>
               </tr>
@@ -3246,10 +3248,10 @@ function FounderTab({ session }: { session: UserSession }) {
 
   return (
     <div className="space-y-4">
-      <div className="border border-hairline p-4">
+      <div className="rounded-xl border border-hairline bg-card shadow-card p-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[2px] bg-ink text-surface flex items-center justify-center text-base font-bold shrink-0 overflow-hidden border border-hairline relative">
+            <div className="w-10 h-10 rounded-md bg-ink text-surface flex items-center justify-center text-base font-bold shrink-0 overflow-hidden border border-hairline relative">
               {session.image ? (
                 <img
                   src={session.image}
@@ -3272,7 +3274,7 @@ function FounderTab({ session }: { session: UserSession }) {
               href={`/founder/${founderSlug}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs uppercase font-bold px-3 py-1.5 border border-hairline hover:bg-ink hover:text-surface transition-colors"
+              className={ui.cx(ui.btn, ui.secondary)}
             >
               ◆ View founder page ↗
             </Link>
@@ -3280,7 +3282,7 @@ function FounderTab({ session }: { session: UserSession }) {
               href="/profile"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs uppercase font-bold px-3 py-1.5 border border-hairline hover:bg-ink hover:text-surface transition-colors"
+              className={ui.cx(ui.btn, ui.secondary)}
             >
               ⚙ Edit profile ↗
             </Link>
@@ -3288,7 +3290,7 @@ function FounderTab({ session }: { session: UserSession }) {
               href="/submit"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs uppercase font-bold px-3.5 py-1.5 border border-signal bg-signal text-surface hover:opacity-90"
+              className={ui.cx(ui.btn, ui.primary)}
             >
               + Submit product ↗
             </Link>
@@ -3300,33 +3302,33 @@ function FounderTab({ session }: { session: UserSession }) {
         </p>
       </div>
 
-      <div className="border border-hairline">
+      <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
         <SectionTitle>My products ({myProducts.length})</SectionTitle>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
+          <table className={ui.cx(ui.table, "min-w-[640px]")}>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-ink-dim text-sm">Loading your products…</td>
+                <td colSpan={6} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>Loading your products…</td>
               </tr>
             )}
             {!loading && loadError && (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-signal text-sm">{loadError}</td>
+                <td colSpan={6} className={ui.cx(ui.td, "text-center text-signal text-sm")}>{loadError}</td>
               </tr>
             )}
             {!loading && !loadError && myProducts.map((p) => (
-              <tr key={p.id} className="border-t border-hairline first:border-t-0">
-                <td className="px-3 py-2.5 font-bold">{p.name}</td>
-                <td className="px-3 py-2.5 text-xs text-ink-dim truncate max-w-[260px]">{p.tagline}</td>
-                <td className="px-3 py-2.5 uppercase text-xs font-bold text-ink-dim">{p.category}</td>
-                <td className="px-3 py-2.5">
+              <tr key={p.id} className={ui.tr}>
+                <td className={ui.cx(ui.td, "font-bold")}>{p.name}</td>
+                <td className={ui.cx(ui.td, "text-xs text-ink-dim truncate max-w-[260px]")}>{p.tagline}</td>
+                <td className={ui.cx(ui.td, "uppercase text-xs font-bold text-ink-dim")}>{p.category}</td>
+                <td className={ui.td}>
                   <span className={`text-[10px] uppercase font-bold px-2 py-0.5 border ${statusStyle(p.status)}`}>
                     {p.status}
                   </span>
                 </td>
-                <td className="px-3 py-2.5 tabular-nums text-right font-bold">{p.status === "LIVE" ? p.votes : "—"}</td>
-                <td className="px-3 py-2.5 text-right">
+                <td className={ui.cx(ui.td, "tabular-nums text-right font-bold")}>{p.status === "LIVE" ? p.votes : "—"}</td>
+                <td className={ui.cx(ui.td, "text-right")}>
                   {p.status === "LIVE" && p.slug ? (
                     <Link
                       href={`/product/${p.slug}`}
@@ -3344,7 +3346,7 @@ function FounderTab({ session }: { session: UserSession }) {
             ))}
             {!loading && !loadError && myProducts.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-4 text-center text-ink-dim text-sm">
+                <td colSpan={6} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>
                   No products yet. Submit your first one.
                 </td>
               </tr>
@@ -3430,7 +3432,7 @@ function EmailsTab({ session }: { session: UserSession }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="border border-hairline">
+        <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
           <SectionTitle>Compose</SectionTitle>
           <div className="p-3.5 space-y-3">
             <ThemedSelect
@@ -3441,13 +3443,13 @@ function EmailsTab({ session }: { session: UserSession }) {
             />
             <p className="text-xs text-ink-dim">{tpl.description}</p>
 
-            <label className="block text-xs uppercase font-bold text-ink-dim">
+            <label className={ui.cx(ui.label, "mb-1.5")}>
               To
               <input
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
                 placeholder="user@example.com"
-                className="mt-1 w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono"
+                className={ui.cx(ui.input, "mt-1 w-full")}
               />
             </label>
 
@@ -3470,13 +3472,13 @@ function EmailsTab({ session }: { session: UserSession }) {
             </div>
 
             {templateId === "custom-broadcast" && (
-              <label className="block text-xs uppercase font-bold text-ink-dim">
+              <label className={ui.cx(ui.label, "mb-1.5")}>
                 Body
                 <textarea
                   value={vars.customBody ?? ""}
                   onChange={(e) => setVars({ ...vars, customBody: e.target.value })}
                   rows={5}
-                  className="mt-1 w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink"
+                  className={ui.cx(ui.textarea, "mt-1 w-full")}
                 />
               </label>
             )}
@@ -3485,14 +3487,14 @@ function EmailsTab({ session }: { session: UserSession }) {
               <button
                 onClick={send}
                 disabled={pending}
-                className="text-xs uppercase font-bold px-3 py-1.5 border border-ink bg-ink text-surface disabled:opacity-40"
+                className={ui.cx(ui.btn, ui.primary)}
               >
                 ✉ Send test
               </button>
               <button
                 onClick={sendAll}
                 disabled={pending}
-                className="text-xs uppercase font-bold px-3 py-1.5 border border-signal bg-signal text-surface disabled:opacity-40"
+                className={ui.cx(ui.btn, ui.primary)}
               >
                 ⚡ Broadcast to all users
               </button>
@@ -3501,12 +3503,12 @@ function EmailsTab({ session }: { session: UserSession }) {
               </span>
             </div>
             {status && (
-              <div className="text-xs text-ink border border-hairline px-2.5 py-1.5 font-bold">{status}</div>
+              <div className="rounded-xl border border-hairline bg-card shadow-card text-xs text-ink px-2.5 py-1.5 font-bold">{status}</div>
             )}
           </div>
         </div>
 
-        <div className="border border-hairline">
+        <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
           <div className="flex items-center justify-between border-b border-hairline px-3 py-2">
             <div className="text-xs uppercase text-ink-dim font-bold">Preview</div>
             <div className="text-xs text-ink-dim truncate max-w-[60%]" title={subject}>
@@ -3517,34 +3519,34 @@ function EmailsTab({ session }: { session: UserSession }) {
         </div>
       </div>
 
-      <div className="border border-hairline">
+      <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
         <SectionTitle>Send log ({log.length})</SectionTitle>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[680px]">
+          <table className={ui.cx(ui.table, "min-w-[680px]")}>
           <thead>
-            <tr className="text-xs uppercase text-ink-dim font-bold">
-              <th className="text-left px-3 py-2 border-b border-hairline">Sent at</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">To</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Template</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Subject</th>
-              <th className="text-right px-3 py-2 border-b border-hairline">Status</th>
+            <tr>
+              <th className={ui.th}>Sent at</th>
+              <th className={ui.th}>To</th>
+              <th className={ui.th}>Template</th>
+              <th className={ui.th}>Subject</th>
+              <th className={ui.cx(ui.th, "text-right")}>Status</th>
             </tr>
           </thead>
           <tbody>
             {log.map((e) => (
-              <tr key={e.id} className="border-t border-hairline">
-                <td className="px-3 py-2 text-ink-dim tabular-nums text-xs">
+              <tr key={e.id} className={ui.tr}>
+                <td className={ui.cx(ui.td, "text-ink-dim tabular-nums text-xs")}>
                   {(e.sentAt ?? e.createdAt).toString().replace("T", " ").slice(0, 19)}
                 </td>
-                <td className="px-3 py-2 text-xs">{e.toEmail}</td>
-                <td className="px-3 py-2 uppercase text-xs font-bold">{e.templateId}</td>
-                <td className="px-3 py-2 text-ink-dim truncate max-w-[300px] text-xs">{e.subject}</td>
-                <td className="px-3 py-2 text-right uppercase text-xs font-bold text-signal">{e.status}</td>
+                <td className={ui.cx(ui.td, "text-xs")}>{e.toEmail}</td>
+                <td className={ui.cx(ui.td, "uppercase text-xs font-bold")}>{e.templateId}</td>
+                <td className={ui.cx(ui.td, "text-ink-dim truncate max-w-[300px] text-xs")}>{e.subject}</td>
+                <td className={ui.cx(ui.td, "text-right uppercase text-xs font-bold text-signal")}>{e.status}</td>
               </tr>
             ))}
             {log.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-4 text-center text-ink-dim text-sm">
+                <td colSpan={5} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>
                   No emails sent yet.
                 </td>
               </tr>
@@ -3567,12 +3569,12 @@ function VarInput({
   onChange: (v: string) => void;
 }) {
   return (
-    <label className="block text-xs uppercase font-bold text-ink-dim">
+    <label className={ui.cx(ui.label, "mb-1.5")}>
       {label}
       <input
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full px-2.5 py-1.5 text-sm bg-transparent border border-hairline focus:outline-none focus:border-ink font-mono"
+        className={ui.cx(ui.input, "mt-1 w-full")}
       />
     </label>
   );
@@ -3606,14 +3608,14 @@ function AutomationTab() {
         <span className="text-ink font-bold">isAutomationEnabled</span> before dispatching and logs it
         as SKIPPED). Manual sends from the Compose tab always work regardless.
       </p>
-      <div className="border border-hairline overflow-x-auto">
-        <table className="w-full text-sm min-w-[720px]">
+      <div className="rounded-xl border border-hairline bg-card shadow-card overflow-x-auto">
+        <table className={ui.cx(ui.table, "min-w-[720px]")}>
           <thead>
-            <tr className="text-xs uppercase text-ink-dim font-bold">
-              <th className="text-left px-3 py-2 border-b border-hairline">Template</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Trigger</th>
-              <th className="text-left px-3 py-2 border-b border-hairline">Description</th>
-              <th className="text-right px-3 py-2 border-b border-hairline">Auto-send</th>
+            <tr>
+              <th className={ui.th}>Template</th>
+              <th className={ui.th}>Trigger</th>
+              <th className={ui.th}>Description</th>
+              <th className={ui.cx(ui.th, "text-right")}>Auto-send</th>
             </tr>
           </thead>
           <tbody>
@@ -3621,11 +3623,11 @@ function AutomationTab() {
               const rule = rules.find((r) => r.templateId === t.id);
               const on = rule ? rule.enabled : true;
               return (
-                <tr key={t.id} className="border-t border-hairline">
-                  <td className="px-3 py-2.5 font-bold">{t.name}</td>
-                  <td className="px-3 py-2.5 uppercase text-xs font-bold text-ink-dim">{t.trigger}</td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim">{t.description}</td>
-                  <td className="px-3 py-2.5 text-right">
+                <tr key={t.id} className={ui.tr}>
+                  <td className={ui.cx(ui.td, "font-bold")}>{t.name}</td>
+                  <td className={ui.cx(ui.td, "uppercase text-xs font-bold text-ink-dim")}>{t.trigger}</td>
+                  <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>{t.description}</td>
+                  <td className={ui.cx(ui.td, "text-right")}>
                     <button
                       onClick={() => startTransition(async () => { await setAutomationEnabled(t.id, !on); await refresh(); })}
                       disabled={pending}
@@ -3676,13 +3678,13 @@ function RevenueTab() {
       <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="border border-hairline p-3.5 animate-pulse">
+            <div key={i} className="rounded-xl border border-hairline bg-card shadow-card p-3.5 animate-pulse">
               <div className="h-3 w-20 bg-hairline mb-2" />
               <div className="h-7 w-16 bg-hairline" />
             </div>
           ))}
         </div>
-        <div className="border border-hairline p-8 text-center text-ink-dim text-sm">
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-8 text-center text-ink-dim text-sm">
           Loading revenue data from database…
         </div>
       </div>
@@ -3691,12 +3693,12 @@ function RevenueTab() {
 
   if (error) {
     return (
-      <div className="border border-signal/30 bg-signal/5 p-5 text-sm">
+      <div className="rounded-xl border border-signal/30 bg-signal/5 p-5 text-sm">
         <div className="font-bold text-signal uppercase text-xs mb-1">Error Loading Revenue</div>
         <div className="text-ink-dim">{error}</div>
         <button
           onClick={fetchData}
-          className="mt-3 px-3 py-1.5 border border-hairline text-xs font-bold uppercase hover:bg-raised transition-colors"
+          className={ui.cx(ui.btn, ui.secondary, "mt-3")}
         >
           Retry
         </button>
@@ -3727,7 +3729,7 @@ function RevenueTab() {
         <div className="text-xs uppercase font-bold text-ink-dim">Platform Revenue & Subscriptions</div>
         <button
           onClick={fetchData}
-          className="px-2.5 py-1 border border-hairline text-[10px] font-bold uppercase hover:bg-raised transition-colors"
+          className={ui.cx(ui.btnSm, ui.secondary)}
         >
           ↻ Refresh
         </button>
@@ -3757,40 +3759,40 @@ function RevenueTab() {
       </div>
 
       {/* ── Section 1: Purchase History ── */}
-      <div>
-        <div className="px-3 py-2 border border-hairline border-b-0 text-xs uppercase text-ink-dim font-bold bg-surface/30">
+      <div className={ui.cardList}>
+        <div className="px-4 py-3 border-b border-hairline text-[11px] uppercase tracking-wider text-ink-dim font-bold">
           Purchase History ({purchases.length})
         </div>
-        <div className="border border-hairline overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
+        <div className="overflow-x-auto">
+          <table className={ui.cx(ui.table, "min-w-[800px]")}>
             <thead>
-              <tr className="text-xs uppercase text-ink-dim font-bold">
-                <th className="text-left px-3 py-2 border-b border-hairline">User</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Email</th>
-                <th className="text-right px-3 py-2 border-b border-hairline">Amount</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Status</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Placement</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Date</th>
+              <tr>
+                <th className={ui.th}>User</th>
+                <th className={ui.th}>Email</th>
+                <th className={ui.cx(ui.th, "text-right")}>Amount</th>
+                <th className={ui.th}>Status</th>
+                <th className={ui.th}>Placement</th>
+                <th className={ui.th}>Date</th>
               </tr>
             </thead>
             <tbody>
               {purchases.map((p) => (
-                <tr key={p.id} className="border-t border-hairline hover:bg-surface/30 transition-colors">
-                  <td className="px-3 py-2.5 font-bold">{p.userName}</td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim font-mono">{p.userEmail}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-right font-bold">{fmtCents(p.amountCents)}</td>
+                <tr key={p.id} className={ui.tr}>
+                  <td className={ui.cx(ui.td, "font-bold")}>{p.userName}</td>
+                  <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>{p.userEmail}</td>
+                  <td className={ui.cx(ui.td, "tabular-nums text-right font-bold")}>{fmtCents(p.amountCents)}</td>
                   <td className={`px-3 py-2.5 uppercase text-xs font-bold ${statusColor(p.status)}`}>{p.status}</td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim">
+                  <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>
                     {p.slots.length > 0
                       ? p.slots.map((s) => `${s.position}${s.productName ? ` · ${s.productName}` : ""}`).join(", ")
                       : "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim">{fmtDate(p.createdAt)}</td>
+                  <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>{fmtDate(p.createdAt)}</td>
                 </tr>
               ))}
               {purchases.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-3 py-6 text-center text-ink-dim text-sm">
+                  <td colSpan={6} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>
                     No purchases recorded yet.
                   </td>
                 </tr>
@@ -3801,27 +3803,27 @@ function RevenueTab() {
       </div>
 
       {/* ── Section 2: Active Placement Slots ── */}
-      <div>
-        <div className="px-3 py-2 border border-hairline border-b-0 text-xs uppercase text-ink-dim font-bold bg-surface/30">
+      <div className={ui.cardList}>
+        <div className="px-4 py-3 border-b border-hairline text-[11px] uppercase tracking-wider text-ink-dim font-bold">
           Active Placement Slots ({activeSlots.length})
         </div>
-        <div className="border border-hairline overflow-x-auto">
-          <table className="w-full text-sm min-w-[860px]">
+        <div className="overflow-x-auto">
+          <table className={ui.cx(ui.table, "min-w-[860px]")}>
             <thead>
-              <tr className="text-xs uppercase text-ink-dim font-bold">
-                <th className="text-left px-3 py-2 border-b border-hairline">Product</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Owner</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Tier</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Position</th>
-                <th className="text-right px-3 py-2 border-b border-hairline">Price</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Days Left</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Expires</th>
+              <tr>
+                <th className={ui.th}>Product</th>
+                <th className={ui.th}>Owner</th>
+                <th className={ui.th}>Tier</th>
+                <th className={ui.th}>Position</th>
+                <th className={ui.cx(ui.th, "text-right")}>Price</th>
+                <th className={ui.th}>Days Left</th>
+                <th className={ui.th}>Expires</th>
               </tr>
             </thead>
             <tbody>
               {activeSlots.map((s) => (
-                <tr key={s.id} className="border-t border-hairline hover:bg-surface/30 transition-colors">
-                  <td className="px-3 py-2.5 font-bold">
+                <tr key={s.id} className={ui.tr}>
+                  <td className={ui.cx(ui.td, "font-bold")}>
                     {s.productSlug ? (
                       <Link href={`/product/${s.productSlug}`} className="hover:text-signal transition-colors">
                         {s.productName || "—"}
@@ -3830,21 +3832,21 @@ function RevenueTab() {
                       s.productName || "—"
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim">{s.ownerName || "—"}</td>
-                  <td className="px-3 py-2.5 text-xs font-bold uppercase">{s.tierName}</td>
-                  <td className="px-3 py-2.5 text-xs uppercase text-ink-dim">{s.position}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-right font-bold">{s.priceFormatted}</td>
-                  <td className="px-3 py-2.5">
+                  <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>{s.ownerName || "—"}</td>
+                  <td className={ui.cx(ui.td, "text-xs font-bold uppercase")}>{s.tierName}</td>
+                  <td className={ui.cx(ui.td, "text-xs uppercase text-ink-dim")}>{s.position}</td>
+                  <td className={ui.cx(ui.td, "tabular-nums text-right font-bold")}>{s.priceFormatted}</td>
+                  <td className={ui.td}>
                     <span className={`text-xs font-bold ${s.daysRemaining <= 3 ? "text-signal" : s.daysRemaining <= 7 ? "text-amber-500" : "text-verified"}`}>
                       {s.daysRemaining >= 999 ? "∞" : `${s.daysRemaining}d`}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim">{s.endsAt ? fmtDate(s.endsAt) : "No expiry"}</td>
+                  <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>{s.endsAt ? fmtDate(s.endsAt) : "No expiry"}</td>
                 </tr>
               ))}
               {activeSlots.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-6 text-center text-ink-dim text-sm">
+                  <td colSpan={7} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>
                     No active placement slots.
                   </td>
                 </tr>
@@ -3855,32 +3857,32 @@ function RevenueTab() {
       </div>
 
       {/* ── Section 3: Maker Revenue Connections ── */}
-      <div>
-        <div className="px-3 py-2 border border-hairline border-b-0 text-xs uppercase text-ink-dim font-bold bg-surface/30">
+      <div className={ui.cardList}>
+        <div className="px-4 py-3 border-b border-hairline text-[11px] uppercase tracking-wider text-ink-dim font-bold">
           Maker Revenue Connections ({revenueConnections.length})
         </div>
-        <div className="border border-hairline overflow-x-auto">
-          <table className="w-full text-sm min-w-[900px]">
+        <div className="overflow-x-auto">
+          <table className={ui.cx(ui.table, "min-w-[900px]")}>
             <thead>
-              <tr className="text-xs uppercase text-ink-dim font-bold">
-                <th className="text-left px-3 py-2 border-b border-hairline">Maker</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Product</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Provider</th>
-                <th className="text-right px-3 py-2 border-b border-hairline">MRR</th>
-                <th className="text-right px-3 py-2 border-b border-hairline">ARR</th>
-                <th className="text-right px-3 py-2 border-b border-hairline">Total Revenue</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Verified</th>
-                <th className="text-left px-3 py-2 border-b border-hairline">Last Sync</th>
+              <tr>
+                <th className={ui.th}>Maker</th>
+                <th className={ui.th}>Product</th>
+                <th className={ui.th}>Provider</th>
+                <th className={ui.cx(ui.th, "text-right")}>MRR</th>
+                <th className={ui.cx(ui.th, "text-right")}>ARR</th>
+                <th className={ui.cx(ui.th, "text-right")}>Total Revenue</th>
+                <th className={ui.th}>Verified</th>
+                <th className={ui.th}>Last Sync</th>
               </tr>
             </thead>
             <tbody>
               {revenueConnections.map((r) => (
-                <tr key={r.id} className="border-t border-hairline hover:bg-surface/30 transition-colors">
-                  <td className="px-3 py-2.5">
+                <tr key={r.id} className={ui.tr}>
+                  <td className={ui.td}>
                     <div className="font-bold">{r.userName}</div>
-                    <div className="text-[10px] text-ink-dim font-mono">{r.userEmail}</div>
+                    <div className="text-[10px] text-ink-dim">{r.userEmail}</div>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className={ui.td}>
                     {r.productSlug ? (
                       <Link href={`/product/${r.productSlug}`} className="font-bold hover:text-signal transition-colors">
                         {r.productName || "—"}
@@ -3889,23 +3891,23 @@ function RevenueTab() {
                       <span className="text-ink-dim">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-xs font-bold uppercase">{r.provider}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-right font-bold">{fmtCents(r.mrrCents)}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-right text-ink-dim">{fmtCents(r.arrCents)}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-right text-ink-dim">{fmtCents(r.totalRevenueCents)}</td>
-                  <td className="px-3 py-2.5">
+                  <td className={ui.cx(ui.td, "text-xs font-bold uppercase")}>{r.provider}</td>
+                  <td className={ui.cx(ui.td, "tabular-nums text-right font-bold")}>{fmtCents(r.mrrCents)}</td>
+                  <td className={ui.cx(ui.td, "tabular-nums text-right text-ink-dim")}>{fmtCents(r.arrCents)}</td>
+                  <td className={ui.cx(ui.td, "tabular-nums text-right text-ink-dim")}>{fmtCents(r.totalRevenueCents)}</td>
+                  <td className={ui.td}>
                     {r.isVerified ? (
                       <span className="text-xs font-bold text-verified uppercase">✓ Verified</span>
                     ) : (
                       <span className="text-xs text-ink-dim uppercase">Unverified</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-ink-dim">{r.syncedAt ? fmtDate(r.syncedAt) : "—"}</td>
+                  <td className={ui.cx(ui.td, "text-xs text-ink-dim")}>{r.syncedAt ? fmtDate(r.syncedAt) : "—"}</td>
                 </tr>
               ))}
               {revenueConnections.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-6 text-center text-ink-dim text-sm">
+                  <td colSpan={8} className={ui.cx(ui.td, "text-center text-ink-dim text-sm")}>
                     No maker revenue connections yet.
                   </td>
                 </tr>
@@ -4061,9 +4063,9 @@ function SeedDataTab() {
   const delistedSections = status?.delistedSections ?? [];
 
   return (
-    <div className="space-y-6 font-mono text-ink">
+    <div className="space-y-6 text-ink">
       {/* Overview Status Cards */}
-      <div className="border border-hairline p-4 sm:p-6 bg-surface/30 space-y-4">
+      <div className="rounded-xl border border-hairline bg-card shadow-card p-4 sm:p-6 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3 border-b border-hairline pb-4">
           <div>
             <h3 className="text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
@@ -4077,7 +4079,7 @@ function SeedDataTab() {
           <button
             onClick={refreshStatus}
             disabled={loading || isProcessing}
-            className="px-3.5 py-1.5 border border-hairline bg-surface hover:bg-raised text-xs font-mono text-ink transition-colors cursor-pointer disabled:opacity-50 font-bold flex items-center gap-1.5"
+            className={ui.cx(ui.btn, ui.secondary)}
           >
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
@@ -4090,45 +4092,45 @@ function SeedDataTab() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-          <div className="border border-hairline p-3 bg-surface">
+          <div className="rounded-lg border border-hairline bg-surface/60 p-3">
             <div className="text-[10px] uppercase font-bold text-ink-faint">Total In DB</div>
-            <div className="text-xl font-bold font-display text-ink mt-1">
+            <div className="text-xl font-bold font-sans text-ink mt-1">
               {loading ? "..." : totalCount}
             </div>
           </div>
-          <div className="border border-hairline p-3 bg-surface">
+          <div className="rounded-lg border border-hairline bg-surface/60 p-3">
             <div className="text-[10px] uppercase font-bold text-signal">Live on Feeds</div>
-            <div className="text-xl font-bold font-display text-signal mt-1">
+            <div className="text-xl font-bold font-sans text-signal mt-1">
               {loading ? "..." : liveCount}
             </div>
           </div>
-          <div className="border border-hairline p-3 bg-surface">
+          <div className="rounded-lg border border-hairline bg-surface/60 p-3">
             <div className="text-[10px] uppercase font-bold text-ink-faint">Delisted / Stored</div>
-            <div className="text-xl font-bold font-display text-ink-dim mt-1">
+            <div className="text-xl font-bold font-sans text-ink-dim mt-1">
               {loading ? "..." : archivedCount}
             </div>
           </div>
-          <div className="border border-hairline p-3 bg-surface">
+          <div className="rounded-lg border border-hairline bg-surface/60 p-3">
             <div className="text-[10px] uppercase font-bold text-ink-faint">Submissions</div>
-            <div className="text-xl font-bold font-display text-ink mt-1">
+            <div className="text-xl font-bold font-sans text-ink mt-1">
               {loading ? "..." : (status?.submissionsCount ?? 0)}
             </div>
           </div>
-          <div className="border border-hairline p-3 bg-surface">
+          <div className="rounded-lg border border-hairline bg-surface/60 p-3">
             <div className="text-[10px] uppercase font-bold text-ink-faint">User Profiles</div>
-            <div className="text-xl font-bold font-display text-ink mt-1">
+            <div className="text-xl font-bold font-sans text-ink mt-1">
               {loading ? "..." : (status?.usersCount ?? 0)}
             </div>
           </div>
-          <div className="border border-hairline p-3 bg-surface">
+          <div className="rounded-lg border border-hairline bg-surface/60 p-3">
             <div className="text-[10px] uppercase font-bold text-ink-faint">Votes Cast</div>
-            <div className="text-xl font-bold font-display text-ink mt-1">
+            <div className="text-xl font-bold font-sans text-ink mt-1">
               {loading ? "..." : (status?.votesCount ?? 0)}
             </div>
           </div>
-          <div className="border border-hairline p-3 bg-surface">
+          <div className="rounded-lg border border-hairline bg-surface/60 p-3">
             <div className="text-[10px] uppercase font-bold text-ink-faint">Categories</div>
-            <div className="text-xl font-bold font-display text-ink mt-1">
+            <div className="text-xl font-bold font-sans text-ink mt-1">
               {loading ? "..." : (status?.categoriesCount ?? 0)}
             </div>
           </div>
@@ -4137,7 +4139,7 @@ function SeedDataTab() {
 
       {/* Success Notification */}
       {resultMsg && (
-        <div className="border border-signal/40 bg-signal/10 p-4 text-xs font-mono text-signal flex items-start justify-between">
+        <div className="rounded-xl border border-signal/40 bg-signal/10 p-4 text-xs text-signal flex items-start justify-between">
           <div className="flex items-center gap-2">
             <span className="font-bold text-xs uppercase px-1.5 py-0.5 border border-signal/40 bg-void">OK</span>
             <span>{resultMsg}</span>
@@ -4153,7 +4155,7 @@ function SeedDataTab() {
 
       {/* Error Notification */}
       {errorMsg && (
-        <div className="border border-red-500/40 bg-red-500/10 p-4 text-xs font-mono text-red-400 flex items-start justify-between">
+        <div className="rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-xs text-red-400 flex items-start justify-between">
           <div className="flex items-center gap-2">
             <span className="font-bold text-xs uppercase px-1.5 py-0.5 border border-red-500/40 bg-void">ERROR</span>
             <span>{errorMsg}</span>
@@ -4168,14 +4170,14 @@ function SeedDataTab() {
       )}
 
       {/* SECTION-WISE DELISTING SUITE */}
-      <div className="border border-hairline p-5 space-y-5 bg-void">
+      <div className="rounded-xl border border-hairline bg-card shadow-card p-5 space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-3 border-b border-hairline pb-4">
           <div>
             <div className="flex items-center gap-2">
               <h4 className="text-sm font-bold text-ink uppercase tracking-wider">
                 Section-Wise Delisting Controls
               </h4>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 border border-hairline bg-surface text-ink-dim">
+              <span className={ui.pill()}>
                 DATABASE SAFE · ZERO LOSS
               </span>
             </div>
@@ -4188,7 +4190,7 @@ function SeedDataTab() {
             <button
               onClick={handleDelistAllSections}
               disabled={isProcessing}
-              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-mono font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              className={ui.cx(ui.btn, ui.danger)}
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -4199,7 +4201,7 @@ function SeedDataTab() {
             <button
               onClick={handleRestoreAllSections}
               disabled={isProcessing}
-              className="px-3 py-1.5 bg-surface hover:bg-raised text-signal border border-signal/40 text-xs font-mono font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              className={ui.cx(ui.btn, ui.secondary)}
             >
               <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -4217,7 +4219,7 @@ function SeedDataTab() {
             return (
               <div
                 key={sec.id}
-                className={`p-4 border transition-colors flex flex-col justify-between gap-3 ${
+                className={`p-4 rounded-lg border transition-colors flex flex-col justify-between gap-3 ${
                   isDelisted
                     ? "border-red-500/30 bg-red-950/10"
                     : "border-hairline bg-surface/40 hover:bg-surface/70"
@@ -4234,11 +4236,7 @@ function SeedDataTab() {
                       <span>{sec.name}</span>
                     </div>
                     <span
-                      className={`text-[10px] uppercase font-bold px-2 py-0.5 border ${
-                        isDelisted
-                          ? "border-red-500/40 text-red-400 bg-red-500/10"
-                          : "border-signal/40 text-signal bg-signal/10"
-                      }`}
+                      className={ui.pill(isDelisted ? "bad" : "good")}
                     >
                       {isDelisted ? "DELISTED / HIDDEN" : "VISIBLE ON FEED"}
                     </span>
@@ -4257,7 +4255,7 @@ function SeedDataTab() {
                     <button
                       onClick={() => handleToggleSection(sec.id, false)}
                       disabled={isProcessing}
-                      className="px-3 py-1 bg-signal text-void text-xs font-bold font-mono hover:bg-signal/90 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      className={ui.cx(ui.btnSm, ui.primary)}
                     >
                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -4269,7 +4267,7 @@ function SeedDataTab() {
                     <button
                       onClick={() => handleToggleSection(sec.id, true)}
                       disabled={isProcessing}
-                      className="px-3 py-1 bg-surface hover:bg-raised text-red-400 border border-hairline hover:border-red-500/40 text-xs font-bold font-mono transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                      className={ui.cx(ui.btnSm, ui.danger)}
                     >
                       <svg className="w-3 h-3 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <line x1="18" y1="6" x2="6" y2="18" />
@@ -4288,13 +4286,13 @@ function SeedDataTab() {
       {/* Dual Operational Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Operation 1: Database Status Switch (Archive / Unarchive Products) */}
-        <div className="border border-hairline p-5 space-y-4 bg-void flex flex-col justify-between">
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-5 space-y-4 flex flex-col justify-between">
           <div className="space-y-2">
             <div className="flex items-center justify-between border-b border-hairline pb-2.5">
               <h4 className="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
                 <span>Database Product Status Mode</span>
               </h4>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 border border-hairline bg-surface text-ink-dim">
+              <span className={ui.pill()}>
                 DATABASE SAFE · ZERO LOSS
               </span>
             </div>
@@ -4312,7 +4310,7 @@ function SeedDataTab() {
                 <button
                   onClick={handleUnpublishFromFeeds}
                   disabled={isProcessing}
-                  className="px-4 py-2 bg-surface hover:bg-raised text-ink border border-hairline font-mono text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  className={ui.cx(ui.btn, ui.secondary)}
                 >
                   <svg className="w-3.5 h-3.5 text-signal" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
@@ -4326,7 +4324,7 @@ function SeedDataTab() {
                 <button
                   onClick={handlePublishToFeeds}
                   disabled={isProcessing}
-                  className="px-4 py-2 bg-signal text-void font-mono text-xs font-bold hover:bg-signal/90 transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  className={ui.cx(ui.btn, ui.primary)}
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -4337,20 +4335,20 @@ function SeedDataTab() {
               )}
             </div>
 
-            <div className="text-[10px] text-ink-dim font-mono">
+            <div className="text-[10px] text-ink-dim">
               Status: <strong className="text-ink">{liveCount}</strong> live · <strong className="text-ink">{archivedCount}</strong> archived in DB
             </div>
           </div>
         </div>
 
         {/* Operation 2: Clean Slate Permanent Database Purge (Hard Wipe) */}
-        <div className="border border-hairline p-5 space-y-4 bg-void flex flex-col justify-between">
+        <div className="rounded-xl border border-hairline bg-card shadow-card p-5 space-y-4 flex flex-col justify-between">
           <div className="space-y-2">
             <div className="flex items-center justify-between border-b border-hairline pb-2.5">
               <h4 className="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
                 <span>Permanent Database Purge</span>
               </h4>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 border border-red-500/40 bg-red-500/10 text-red-400">
+              <span className={ui.pill("bad")}>
                 HARD DATABASE WIPE
               </span>
             </div>
@@ -4368,7 +4366,7 @@ function SeedDataTab() {
                 <button
                   onClick={() => setConfirmPurge(true)}
                   disabled={isProcessing}
-                  className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/40 font-mono text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                  className={ui.cx(ui.btn, ui.danger)}
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="3 6 5 6 21 6" />
@@ -4380,7 +4378,7 @@ function SeedDataTab() {
                 </button>
               </div>
             ) : (
-              <div className="space-y-3 p-3.5 bg-red-950/20 border border-red-500/30">
+              <div className="rounded-xl border space-y-3 p-3.5 bg-red-950/20 border-red-500/30">
                 <div className="text-xs font-bold text-red-400 flex items-center gap-1.5 uppercase">
                   <span>Confirm Complete Database Purge:</span>
                 </div>
@@ -4391,14 +4389,14 @@ function SeedDataTab() {
                   <button
                     onClick={handlePurge}
                     disabled={isProcessing}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-mono text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-2"
                   >
                     <span>{isProcessing ? "Purging..." : "Yes, Wipe All Seed Data Now"}</span>
                   </button>
                   <button
                     onClick={() => setConfirmPurge(false)}
                     disabled={isProcessing}
-                    className="px-4 py-2 border border-hairline bg-surface hover:bg-raised text-ink font-mono text-xs transition-colors cursor-pointer"
+                    className={ui.cx(ui.btn, ui.secondary)}
                   >
                     Cancel
                   </button>
