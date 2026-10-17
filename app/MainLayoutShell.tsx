@@ -945,10 +945,13 @@ export default function MainLayoutShell({
             {userSession ? (
               <Link
                 href="/profile"
-                className="hidden sm:flex items-center gap-2 h-10 pl-1 pr-3 rounded-full border border-hairline bg-card hover:border-ink-faint transition-colors"
+                // A centred circle around the avatar; it only widens into a
+                // pill on 2xl screens, where the handle is shown beside it.
+                className="hidden sm:flex items-center justify-center w-10 h-10 2xl:w-auto 2xl:justify-start 2xl:gap-2 2xl:pl-[3px] 2xl:pr-3 rounded-full border border-hairline bg-card hover:border-signal/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 transition-colors"
                 title={`${userSession.name}'s dashboard`}
+                aria-label="Your dashboard"
               >
-                <Avatar src={userSession.image} name={userSession.name || userSession.handle || "Me"} size={30} round />
+                <Avatar src={userSession.image} name={userSession.name || userSession.handle || "Me"} size={32} round />
                 <span className="hidden 2xl:inline text-sm font-medium text-ink max-w-[120px] truncate">{userSession.handle}</span>
               </Link>
             ) : (

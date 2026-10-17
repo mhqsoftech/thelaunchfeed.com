@@ -473,7 +473,7 @@ export default function ProductClientView({
 
   return (
     <MainLayoutShell>
-      <div className="space-y-6 pb-12 font-mono text-ink max-w-full">
+      <div className="product-type space-y-6 pb-12 font-mono text-ink max-w-full">
         {/* Navigation Breadcrumb Bar — Sticky & Pinned */}
         <div className="sticky -top-4 z-30 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
           <div className="h-10 flex items-center justify-between pb-2.5 gap-3">
@@ -487,7 +487,7 @@ export default function ProductClientView({
               <span className="text-ink-faint shrink-0">/</span>
               <Link
                 href={product.category ? `/category/${slugify(product.category)}` : "/"}
-                className="hover:text-ink transition-colors shrink-0 uppercase text-[11px] font-bold"
+                className="hover:text-ink transition-colors shrink-0 uppercase text-xs font-bold"
               >
                 {product.category || "Products"}
               </Link>
@@ -499,7 +499,7 @@ export default function ProductClientView({
 
             <Link
               href="/"
-              className="text-xs font-mono text-ink-dim hover:text-ink transition-colors hidden sm:flex items-center gap-1 shrink-0 text-[11px]"
+              className="text-xs font-mono text-ink-dim hover:text-ink transition-colors hidden sm:flex items-center gap-1 shrink-0 text-xs"
             >
               ← Leaderboard
             </Link>
@@ -531,13 +531,13 @@ export default function ProductClientView({
                   {product.categorySlug ? (
                     <Link
                       href={`/category/${product.categorySlug}`}
-                      className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-dim hover:text-signal hover:border-signal/50 uppercase bg-surface/60 font-bold tracking-wider transition-colors inline-flex items-center gap-1 group/cat"
+                      className="text-[11px] sm:text-xs font-mono px-2 py-0.5 border border-hairline text-ink-dim hover:text-signal hover:border-signal/50 uppercase bg-surface/60 font-bold tracking-wider transition-colors inline-flex items-center gap-1 group/cat"
                     >
                       <span>{product.category}</span>
-                      <span className="text-[9px] text-ink-faint group-hover/cat:text-signal transition-colors">→</span>
+                      <span className="text-xs text-ink-faint group-hover/cat:text-signal transition-colors">→</span>
                     </Link>
                   ) : (
-                    <span className="text-[10px] font-mono px-2 py-0.5 border border-hairline text-ink-dim uppercase bg-surface/60 font-bold tracking-wider">
+                    <span className="text-[11px] sm:text-xs font-mono px-2 py-0.5 border border-hairline text-ink-dim uppercase bg-surface/60 font-bold tracking-wider">
                       {product.category}
                     </span>
                   )}
@@ -550,17 +550,17 @@ export default function ProductClientView({
                         href={acc.downloadUrl}
                         download
                         title={`Official Award: ${acc.title} — Click to download vector badge asset`}
-                        className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors ${acc.tone.border} ${acc.tone.text} ${acc.tone.bg}`}
+                        className={`text-[11px] sm:text-xs font-mono px-2 py-0.5 border font-bold uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors ${acc.tone.border} ${acc.tone.text} ${acc.tone.bg}`}
                       >
                         <span>{acc.shortTag}</span>
-                        <span className="text-[9px] opacity-70 leading-none">↓</span>
+                        <span className="text-xs opacity-70 leading-none">↓</span>
                       </a>
                     ) : (
                       <Link
                         key={aIdx}
                         href={`/badges/${product.slug}?award=${acc.badgeAwardParam}`}
                         title={`Official Award: ${acc.title}`}
-                        className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase tracking-wider flex items-center gap-1 transition-colors ${acc.tone.border} ${acc.tone.text} ${acc.tone.bg}`}
+                        className={`text-[11px] sm:text-xs font-mono px-2 py-0.5 border font-bold uppercase tracking-wider flex items-center gap-1 transition-colors ${acc.tone.border} ${acc.tone.text} ${acc.tone.bg}`}
                       >
                         <span>{acc.shortTag}</span>
                       </Link>
@@ -569,7 +569,7 @@ export default function ProductClientView({
 
                   {/* Verified MRR pill — only when revenue has actually been verified via a payment provider */}
                   {product.isRevenueVerified && product.revenue && !wonAccolades.some((a) => a.id === "revenue") && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 border border-signal/40 bg-void text-signal uppercase font-bold flex items-center gap-1">
+                    <span className="text-[11px] sm:text-xs font-mono px-2 py-0.5 border border-signal/40 bg-void text-signal uppercase font-bold flex items-center gap-1">
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                         <path strokeLinecap="square" strokeLinejoin="miter" d="M5 13l4 4L19 7" />
                       </svg>
@@ -582,23 +582,23 @@ export default function ProductClientView({
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  <h1 className="font-mono text-xl sm:text-2xl lg:text-3xl font-bold text-ink break-words leading-tight">
+                  <h1 className="font-mono text-2xl sm:text-3xl lg:text-4xl font-bold text-ink break-words leading-tight">
                     {product.name}
                   </h1>
                 </div>
 
-                <p className="font-mono text-xs sm:text-sm text-ink-dim max-w-2xl break-words leading-relaxed">
+                <p className="font-sans text-base sm:text-lg text-ink-dim max-w-2xl break-words leading-relaxed">
                   {product.tagline}
                 </p>
 
-                <address className="not-italic flex items-center gap-x-2 gap-y-1 pt-0.5 text-[11px] sm:text-xs font-mono text-ink-faint flex-wrap">
+                <address className="not-italic flex items-center gap-x-2 gap-y-1 pt-0.5 text-xs sm:text-sm font-mono text-ink-faint flex-wrap">
                   <span>Maker:</span>
                   <Link
                     href={`/founder/${product.makerUsername || slugify(product.makerName || product.maker)}`}
                     rel="author"
                     className="flex items-center gap-1.5 text-ink hover:underline font-medium hover:text-signal transition-colors group"
                   >
-                    <span className="w-4 h-4 rounded-lg bg-surface border border-hairline flex items-center justify-center font-mono text-[8px] font-bold text-ink-dim overflow-hidden relative shrink-0">
+                    <span className="w-4 h-4 rounded-lg bg-surface border border-hairline flex items-center justify-center font-mono text-[11px] sm:text-xs font-bold text-ink-dim overflow-hidden relative shrink-0">
                       {product.makerImage ? (
                         <img width="64" height="64" src={product.makerImage} alt={product.makerName} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       ) : (
@@ -725,7 +725,7 @@ export default function ProductClientView({
                     className="w-full sm:w-auto px-4 py-2 border border-hairline/60 bg-surface/25 text-ink-dim/40 font-mono text-xs font-bold flex items-center justify-center gap-1.5 text-center shrink-0 uppercase tracking-wider cursor-not-allowed opacity-50 select-none pointer-events-none"
                   >
                     <span>API Docs</span>
-                    <span className="text-[10px] text-ink-dim/40">✕</span>
+                    <span className="text-[11px] sm:text-xs text-ink-dim/40">✕</span>
                   </button>
                 )
               )}
@@ -763,7 +763,7 @@ export default function ProductClientView({
                   {activeTags.slice(0, 8).map((tag: string, tIdx: number) => (
                     <span
                       key={tIdx}
-                      className="text-[10px] font-mono px-1.5 py-0.5 border border-hairline/60 text-ink-faint uppercase bg-surface/30 hover:border-ink-dim hover:text-ink-dim transition-colors"
+                      className="text-[11px] sm:text-xs font-mono px-1.5 py-0.5 border border-hairline/60 text-ink-faint uppercase bg-surface/30 hover:border-ink-dim hover:text-ink-dim transition-colors"
                     >
                       #{tag}
                     </span>
@@ -782,7 +782,7 @@ export default function ProductClientView({
           return (
             <div className="border border-hairline bg-surface/30 p-4 sm:p-6 space-y-3 max-w-full overflow-hidden">
               <div className="flex items-center justify-between border-b border-hairline pb-2">
-                <h2 className="font-mono text-xs sm:text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-signal" />
                   <span>Product Video Demo &amp; Walkthrough</span>
                 </h2>
@@ -790,7 +790,7 @@ export default function ProductClientView({
                   href={hrefUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-[10px] font-mono text-signal hover:underline"
+                  className="text-[11px] sm:text-xs font-mono text-signal hover:underline"
                 >
                   Open Original ↗
                 </a>
@@ -805,9 +805,9 @@ export default function ProductClientView({
         {/* Horizontally Scrollable Product Media Gallery */}
         <div className="space-y-3 max-w-full overflow-hidden">
           <div className="flex items-center justify-between border-b border-hairline pb-2">
-            <h2 className="font-mono text-xs font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+            <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider flex items-center gap-2">
               <span>Product Gallery</span>
-              <span className="text-[10px] font-mono text-ink-faint font-normal">
+              <span className="text-[11px] sm:text-xs font-mono text-ink-faint font-normal">
                 ({galleryItems.length} Images)
               </span>
             </h2>
@@ -834,7 +834,7 @@ export default function ProductClientView({
                       <div className="font-mono text-xs sm:text-sm font-bold text-ink truncate">
                         {img.title}
                       </div>
-                      <div className="font-mono text-[11px] sm:text-xs text-ink-dim truncate">
+                      <div className="font-mono text-xs sm:text-sm text-ink-dim truncate">
                         {img.subtitle}
                       </div>
                     </div>
@@ -914,8 +914,8 @@ export default function ProductClientView({
                 <div className="space-y-4 leading-relaxed">
                   {hasOverviewPitch && (
                     <div className="space-y-1.5">
-                      <h3 className="font-bold text-ink uppercase">Executive Pitch Summary</h3>
-                      <div className="space-y-3 text-ink-dim leading-relaxed whitespace-pre-line break-words font-sans text-xs sm:text-sm">
+                      <h3 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Executive Pitch Summary</h3>
+                      <div className="space-y-3 text-ink-dim leading-relaxed whitespace-pre-line break-words font-sans text-sm sm:text-base">
                         {pitchParagraphs.map((para: string, idx: number) => (
                           <p key={idx} className="leading-relaxed">
                             {para}
@@ -927,8 +927,8 @@ export default function ProductClientView({
 
                   {hasFeatures && (
                     <div className={`space-y-1.5 ${hasOverviewPitch ? "pt-3 border-t border-hairline" : ""}`}>
-                      <h3 className="font-bold text-ink uppercase font-mono text-xs">Core Value Propositions</h3>
-                      <ul className="space-y-1.5 text-ink-dim font-mono text-xs">
+                      <h3 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Core Value Propositions</h3>
+                      <ul className="space-y-2 text-ink-dim">
                         {featuresList.map((f: string, i: number) => (
                           <li key={i} className="break-words">· {f}</li>
                         ))}
@@ -937,8 +937,8 @@ export default function ProductClientView({
                   )}
 
                   {hasTargetAudience && (
-                    <div className="space-y-1.5 pt-3 border-t border-hairline font-mono text-xs">
-                      <h3 className="font-bold text-ink uppercase">Target Audience &amp; ICP</h3>
+                    <div className="space-y-1.5 pt-3 border-t border-hairline">
+                      <h3 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Target Audience &amp; ICP</h3>
                       <div className="space-y-2 text-ink-dim leading-relaxed whitespace-pre-line break-words">
                         {d.targetAudience.split(/\n\s*\n/).map((para: string, idx: number) => (
                           <p key={idx} className="leading-relaxed">{para.trim()}</p>
@@ -948,36 +948,36 @@ export default function ProductClientView({
                   )}
 
                   {hasPlans && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-hairline font-mono text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-hairline">
                       {hasCustomPricing ? (
                         pricingTiersList.map((tier: any, tIdx: number) => (
                           <div key={tIdx} className="p-3 border border-hairline bg-surface/20 space-y-1">
-                            <h4 className="font-bold uppercase text-[10px] text-ink">{tier.name || `Tier ${tIdx + 1}`}</h4>
-                            <p className="font-bold text-sm text-ink">{tier.price || "—"}</p>
-                            <p className="text-ink-dim text-[11px] leading-relaxed">{tier.specs || "—"}</p>
+                            <h4 className="font-mono font-bold uppercase tracking-wider text-xs text-ink">{tier.name || `Tier ${tIdx + 1}`}</h4>
+                            <p className="font-bold text-lg text-ink">{tier.price || "—"}</p>
+                            <p className="text-ink-dim text-sm leading-relaxed">{tier.specs || "—"}</p>
                           </div>
                         ))
                       ) : (
                         <>
                           {d.freePlan && (
                             <div className="p-3 border border-hairline bg-surface/20 space-y-1">
-                              <h4 className="font-bold uppercase text-[10px] text-ink">Free Tier</h4>
-                              <p className="font-bold text-sm text-ink">$0/mo</p>
-                              <p className="text-ink-dim text-[11px] leading-relaxed">{d.freePlan}</p>
+                              <h4 className="font-mono font-bold uppercase tracking-wider text-xs text-ink">Free Tier</h4>
+                              <p className="font-bold text-lg text-ink">$0/mo</p>
+                              <p className="text-ink-dim text-sm leading-relaxed">{d.freePlan}</p>
                             </div>
                           )}
                           {d.proPlan && (
                             <div className="p-3 border border-ink bg-surface/50 space-y-1">
-                              <h4 className="font-bold uppercase text-[10px] text-signal">Pro Tier</h4>
-                              <p className="font-bold text-sm text-signal">$29/mo</p>
-                              <p className="text-ink-dim text-[11px] leading-relaxed">{d.proPlan}</p>
+                              <h4 className="font-mono font-bold uppercase tracking-wider text-xs text-signal">Pro Tier</h4>
+                              <p className="font-bold text-lg text-signal">$29/mo</p>
+                              <p className="text-ink-dim text-sm leading-relaxed">{d.proPlan}</p>
                             </div>
                           )}
                           {d.enterprisePlan && (
                             <div className="p-3 border border-hairline bg-surface/20 space-y-1">
-                              <h4 className="font-bold uppercase text-[10px] text-ink">Enterprise</h4>
-                              <p className="font-bold text-sm text-ink">$199/mo</p>
-                              <p className="text-ink-dim text-[11px] leading-relaxed">{d.enterprisePlan}</p>
+                              <h4 className="font-mono font-bold uppercase tracking-wider text-xs text-ink">Enterprise</h4>
+                              <p className="font-bold text-lg text-ink">$199/mo</p>
+                              <p className="text-ink-dim text-sm leading-relaxed">{d.enterprisePlan}</p>
                             </div>
                           )}
                         </>
@@ -994,13 +994,13 @@ export default function ProductClientView({
               id: "architecture",
               title: "Architecture & Technical Specs",
               content: (
-                <div className="space-y-4 leading-relaxed font-mono text-xs">
+                <div className="space-y-4 leading-relaxed">
                   {hasTechStack && (
                     <div className="space-y-2">
-                      <h3 className="font-bold text-ink uppercase">Primary Tech Stack</h3>
+                      <h3 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Primary Tech Stack</h3>
                       <div className="flex gap-2 flex-wrap max-w-full">
                         {techStackList.map((tech: string, i: number) => (
-                          <span key={i} className="px-2 py-0.5 border border-hairline bg-surface text-ink font-bold shrink-0">
+                          <span key={i} className="px-2 py-0.5 border border-hairline bg-surface text-ink font-mono text-xs font-bold shrink-0">
                             {tech}
                           </span>
                         ))}
@@ -1012,14 +1012,14 @@ export default function ProductClientView({
                     <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${hasTechStack ? "pt-3 border-t border-hairline" : ""}`}>
                       {hasInfra && (
                         <div>
-                          <h4 className="font-bold text-ink uppercase text-[11px]">Infrastructure &amp; Mesh</h4>
-                          <p className="text-ink-dim mt-0.5 leading-relaxed break-words">{d.infraHosting}</p>
+                          <h4 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Infrastructure &amp; Mesh</h4>
+                          <p className="text-ink-dim mt-1 leading-relaxed break-words">{d.infraHosting}</p>
                         </div>
                       )}
                       {hasSecurity && (
                         <div>
-                          <h4 className="font-bold text-ink uppercase text-[11px]">Security &amp; Compliance</h4>
-                          <p className="text-ink-dim mt-0.5 leading-relaxed break-words">{d.securityStandards}</p>
+                          <h4 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Security &amp; Compliance</h4>
+                          <p className="text-ink-dim mt-1 leading-relaxed break-words">{d.securityStandards}</p>
                         </div>
                       )}
                     </div>
@@ -1029,31 +1029,31 @@ export default function ProductClientView({
                     <div className="pt-3 border-t border-hairline space-y-2.5">
                       {hasApiUrl && (
                         <div>
-                          <h4 className="font-bold text-ink uppercase text-[11px]">Open API Endpoint</h4>
+                          <h4 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Open API Endpoint</h4>
                           {isValidHttpUrl(d.apiUrl) ? (
                             <a
                               href={d.apiUrl.startsWith("http") ? d.apiUrl : `https://${d.apiUrl}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="text-signal font-mono text-[11px] mt-0.5 hover:underline break-all inline-block"
+                              className="text-signal font-mono text-sm mt-1 hover:underline break-all inline-block"
                             >
                               {d.apiUrl} ↗
                             </a>
                           ) : (
-                            <p className="text-ink-dim/60 font-mono text-[11px] mt-0.5 break-all">
-                              {d.apiUrl} <span className="text-[10px] text-ink-faint">(Not a valid link)</span>
+                            <p className="text-ink-dim/60 font-mono text-sm mt-1 break-all">
+                              {d.apiUrl} <span className="text-[11px] sm:text-xs text-ink-faint">(Not a valid link)</span>
                             </p>
                           )}
                         </div>
                       )}
                       {hasGithubUrl && (
                         <div>
-                          <h4 className="font-bold text-ink uppercase text-[11px]">Source Code Repository</h4>
+                          <h4 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Source Code Repository</h4>
                           <a
                             href={d.githubUrl.startsWith("http") ? d.githubUrl : `https://${d.githubUrl}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="text-signal font-mono text-[11px] mt-0.5 hover:underline break-all inline-block"
+                            className="text-signal font-mono text-sm mt-1 hover:underline break-all inline-block"
                           >
                             {d.githubUrl} ↗
                           </a>
@@ -1071,11 +1071,11 @@ export default function ProductClientView({
               id: "story",
               title: "Founder Story & Manifesto",
               content: (
-                <div className="space-y-4 leading-relaxed font-mono text-xs">
+                <div className="space-y-4 leading-relaxed">
                   {hasOriginStory && (
                     <div className="space-y-1.5">
-                      <h3 className="font-bold text-ink uppercase">Origin Story</h3>
-                      <div className="space-y-2 text-ink-dim leading-relaxed whitespace-pre-line break-words font-sans text-xs sm:text-sm">
+                      <h3 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Origin Story</h3>
+                      <div className="space-y-2 text-ink-dim leading-relaxed whitespace-pre-line break-words font-sans text-sm sm:text-base">
                         {formatPitchParagraphs(d.originStory).map((para: string, idx: number) => (
                           <p key={idx} className="leading-relaxed">{para}</p>
                         ))}
@@ -1085,8 +1085,8 @@ export default function ProductClientView({
 
                   {hasMakerThesis && (
                     <div className={`space-y-1.5 ${hasOriginStory ? "pt-3 border-t border-hairline" : ""}`}>
-                      <h3 className="font-bold text-ink uppercase">Maker Thesis</h3>
-                      <div className="space-y-2 text-ink-dim leading-relaxed italic whitespace-pre-line break-words border-l-2 border-l-signal pl-3 font-sans text-xs sm:text-sm">
+                      <h3 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Maker Thesis</h3>
+                      <div className="space-y-2 text-ink-dim leading-relaxed italic whitespace-pre-line break-words border-l-2 border-l-signal pl-3 font-sans text-sm sm:text-base">
                         {formatPitchParagraphs(d.makerThesis).map((para: string, idx: number) => (
                           <p key={idx} className="leading-relaxed">&ldquo;{para}&rdquo;</p>
                         ))}
@@ -1094,7 +1094,7 @@ export default function ProductClientView({
                     </div>
                   )}
 
-                  <div className="pt-3 border-t border-hairline text-ink-faint break-words font-mono text-xs">
+                  <div className="pt-3 border-t border-hairline text-ink-faint break-words text-sm">
                     <span>Maker Attribution: </span>
                     <strong className="text-ink">{product.makerName}</strong> ({product.maker})
                   </div>
@@ -1108,15 +1108,15 @@ export default function ProductClientView({
               id: "changelog",
               title: "Changelog & Milestones",
               content: (
-                <div className="space-y-4 leading-relaxed font-mono text-xs">
+                <div className="space-y-4 leading-relaxed">
                   {hasChangelog && (
                     <div className="p-3 border border-hairline bg-surface/50 space-y-1.5">
                       <div className="flex items-center justify-between text-ink font-bold flex-wrap gap-1">
-                        <h4 className="font-bold text-signal uppercase text-[11px]">{d.latestVersion || "LATEST DEPLOYMENT"}</h4>
-                        <span className="text-[9px] text-signal uppercase font-bold px-1.5 py-0.5 border border-signal/40 bg-void">LATEST DEPLOYMENT</span>
+                        <h4 className="font-mono font-bold text-signal uppercase tracking-wider text-xs">{d.latestVersion || "LATEST DEPLOYMENT"}</h4>
+                        <span className="text-xs text-signal uppercase font-bold px-1.5 py-0.5 border border-signal/40 bg-void">LATEST DEPLOYMENT</span>
                       </div>
                       {hasLatestChangelog && (
-                        <p className="text-ink-dim text-[11px] leading-relaxed break-words">{d.latestChangelog}</p>
+                        <p className="text-ink-dim leading-relaxed break-words">{d.latestChangelog}</p>
                       )}
                     </div>
                   )}
@@ -1125,13 +1125,13 @@ export default function ProductClientView({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-hairline">
                       {d.roadmapQ3 && (
                         <div className="p-3 border border-hairline bg-void/50 space-y-1">
-                          <h4 className="font-bold text-ink uppercase text-[11px]">Upcoming Milestone 01</h4>
+                          <h4 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Upcoming Milestone 01</h4>
                           <p className="text-ink-dim leading-relaxed break-words">{d.roadmapQ3}</p>
                         </div>
                       )}
                       {d.roadmapQ4 && (
                         <div className="p-3 border border-hairline bg-void/50 space-y-1">
-                          <h4 className="font-bold text-ink uppercase text-[11px]">Upcoming Milestone 02</h4>
+                          <h4 className="font-mono font-bold text-ink uppercase tracking-wider text-xs">Upcoming Milestone 02</h4>
                           <p className="text-ink-dim leading-relaxed break-words">{d.roadmapQ4}</p>
                         </div>
                       )}
@@ -1147,12 +1147,12 @@ export default function ProductClientView({
               id: "faq",
               title: "FAQ & Support",
               content: (
-                <div className="space-y-4 leading-relaxed font-mono text-xs">
+                <div className="space-y-4 leading-relaxed">
                   {hasFaqs && (
                     <div className="space-y-3">
                       {faqsList.map((faq, fIdx) => (
                         <div key={fIdx} className={`space-y-1 ${fIdx > 0 ? "pt-2 border-t border-hairline" : ""}`}>
-                          <h4 className="font-bold text-ink uppercase break-words">Q: {faq.q}</h4>
+                          <h4 className="font-semibold text-ink break-words">Q: {faq.q}</h4>
                           <p className="text-ink-dim pl-3 border-l-2 border-hairline break-words">{faq.a}</p>
                         </div>
                       ))}
@@ -1180,12 +1180,12 @@ export default function ProductClientView({
           return (
             <div className="space-y-6 max-w-full overflow-hidden">
               {visibleSections.map((sec, idx) => (
-                <div key={sec.id} className="border border-hairline bg-surface/30 p-4 sm:p-6 space-y-4 font-mono text-xs max-w-full overflow-hidden">
+                <div key={sec.id} className="border border-hairline bg-surface/30 p-4 sm:p-6 space-y-4 font-sans text-sm sm:text-base max-w-full overflow-hidden">
                   <div className="border-b border-hairline pb-2 flex items-center justify-between gap-2 flex-wrap">
-                    <h2 className="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider">
+                    <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider">
                       {pad(idx + 1)}. {sec.title}
                     </h2>
-                    <span className="text-[10px] text-ink-faint">
+                    <span className="font-mono text-xs text-ink-faint">
                       SECTION {pad(idx + 1)} / {pad(totalCount)}
                     </span>
                   </div>
@@ -1199,11 +1199,11 @@ export default function ProductClientView({
         {/* Founder Showcase Card */}
         <div className="border border-hairline bg-surface/40 p-4 sm:p-6 space-y-4 max-w-full overflow-hidden">
           <div className="flex items-center justify-between border-b border-hairline pb-2.5">
-            <h2 className="font-mono text-xs sm:text-sm font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+            <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-signal" />
               Meet the Founder
             </h2>
-            <span className="text-[10px] font-mono text-ink-faint uppercase">
+            <span className="text-[11px] sm:text-xs font-mono text-ink-faint uppercase">
               Verified Maker
             </span>
           </div>
@@ -1232,7 +1232,7 @@ export default function ProductClientView({
                 <div className="flex items-center gap-2 flex-wrap">
                   <Link
                     href={`/founder/${product.makerUsername || slugify(product.makerName || product.maker)}`}
-                    className="font-mono text-sm sm:text-base font-bold text-ink hover:text-signal transition-colors truncate"
+                    className="font-mono text-base sm:text-lg font-bold text-ink hover:text-signal transition-colors truncate"
                   >
                     {product.makerName}
                   </Link>
@@ -1248,7 +1248,7 @@ export default function ProductClientView({
                 )}
 
                 {product.makerBio && (
-                  <p className="font-sans text-xs sm:text-sm text-ink-dim leading-relaxed pt-1 line-clamp-3">
+                  <p className="font-sans text-sm sm:text-base text-ink-dim leading-relaxed pt-1 line-clamp-3">
                     {product.makerBio}
                   </p>
                 )}
@@ -1261,7 +1261,7 @@ export default function ProductClientView({
                         href={product.makerTwitter.startsWith("http") ? product.makerTwitter : `https://x.com/${product.makerTwitter.replace(/^@/, "")}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ink-dim hover:text-signal transition-colors flex items-center gap-1 text-[11px]"
+                        className="text-ink-dim hover:text-signal transition-colors flex items-center gap-1 text-xs"
                       >
                         <span>𝕏</span>
                         <span>Twitter</span>
@@ -1272,7 +1272,7 @@ export default function ProductClientView({
                         href={product.makerGithub.startsWith("http") ? product.makerGithub : `https://github.com/${product.makerGithub.replace(/^@/, "")}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ink-dim hover:text-signal transition-colors flex items-center gap-1 text-[11px]"
+                        className="text-ink-dim hover:text-signal transition-colors flex items-center gap-1 text-xs"
                       >
                         <span>GitHub</span>
                       </a>
@@ -1282,7 +1282,7 @@ export default function ProductClientView({
                         href={product.makerWebsite.startsWith("http") ? product.makerWebsite : `https://${product.makerWebsite}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-ink-dim hover:text-signal transition-colors flex items-center gap-1 text-[11px]"
+                        className="text-ink-dim hover:text-signal transition-colors flex items-center gap-1 text-xs"
                       >
                         <span>Website</span>
                       </a>
@@ -1308,7 +1308,7 @@ export default function ProductClientView({
               <span className="text-xs font-bold text-signal uppercase tracking-wider">
                 Founder Toolkit · Official Embed Badges
               </span>
-              <span className="text-[10px] text-ink-dim uppercase">
+              <span className="text-[11px] sm:text-xs text-ink-dim uppercase">
                 (Only visible to you)
               </span>
             </div>
@@ -1372,10 +1372,10 @@ export default function ProductClientView({
           <div className="flex items-center justify-between gap-3 border-b border-hairline pb-3">
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-1.5 h-1.5 rounded-full bg-signal shrink-0" />
-              <h2 className="text-xs sm:text-sm font-bold text-ink uppercase tracking-wider truncate">
+              <h2 className="text-sm sm:text-base font-bold text-ink uppercase tracking-wider truncate">
                 Similar Products in {product.category}
               </h2>
-              <span className="text-[10px] text-ink-dim px-2 py-0.5 border border-hairline bg-void shrink-0">
+              <span className="text-[11px] sm:text-xs text-ink-dim px-2 py-0.5 border border-hairline bg-void shrink-0">
                 {similarProducts.length}
               </span>
             </div>
@@ -1384,10 +1384,10 @@ export default function ProductClientView({
               {product.categorySlug && (
                 <Link
                   href={`/category/${product.categorySlug}`}
-                  className="text-[11px] font-mono text-ink-dim hover:text-signal transition-colors hidden sm:inline-flex items-center gap-1 mr-2"
+                  className="text-xs font-mono text-ink-dim hover:text-signal transition-colors hidden sm:inline-flex items-center gap-1 mr-2"
                 >
                   <span>All {product.category}</span>
-                  <span className="text-[10px]">→</span>
+                  <span className="text-[11px] sm:text-xs">→</span>
                 </Link>
               )}
               <button
@@ -1435,22 +1435,22 @@ export default function ProductClientView({
                         sim.name.substring(0, 2).toUpperCase()
                       )}
                     </div>
-                    <span className="text-[9px] font-mono px-1.5 py-0.5 border border-hairline text-ink-dim uppercase bg-surface shrink-0 truncate max-w-[120px]">
+                    <span className="text-xs font-mono px-1.5 py-0.5 border border-hairline text-ink-dim uppercase bg-surface shrink-0 truncate max-w-[120px]">
                       {sim.categoryName}
                     </span>
                   </div>
 
                   <div>
-                    <h3 className="font-mono text-xs font-bold text-ink group-hover:text-signal transition-colors truncate">
+                    <h3 className="font-mono text-sm font-bold text-ink group-hover:text-signal transition-colors truncate">
                       {sim.name}
                     </h3>
-                    <p className="font-mono text-[11px] text-ink-dim line-clamp-2 leading-relaxed mt-1">
+                    <p className="font-mono text-xs text-ink-dim line-clamp-2 leading-relaxed mt-1">
                       {sim.tagline}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-hairline/60 text-[10px] font-mono text-ink-dim">
+                <div className="flex items-center justify-between pt-2 border-t border-hairline/60 text-[11px] sm:text-xs font-mono text-ink-dim">
                   <span className="truncate">{sim.maker || "Indie Maker"}</span>
                   <span className="font-bold text-signal border border-signal/30 px-1.5 py-0.5 bg-void">
                     ▲ {sim.voteCount}

@@ -927,3 +927,15 @@ html {
   animation: lfAssemblePulse 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
+
+/*
+ * Product pages read at a larger scale: every text-xs / text-sm inside
+ * .product-type (the product page body, its comments and widgets) uses these
+ * sizes instead of the site-wide 12px / 14px.
+ */
+.product-type {
+  --text-xs: 0.8125rem; /* 13px */
+  --text-xs--line-height: 1.5;
+  --text-sm: 0.9375rem; /* 15px */
+  --text-sm--line-height: 1.6;
+}
