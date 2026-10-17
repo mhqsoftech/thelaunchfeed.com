@@ -31,12 +31,12 @@ export default function FeaturedOnFooterBar({
   const loopList = shouldMarquee ? [...embeds, ...embeds, ...embeds] : embeds;
 
   return (
-    <div className="w-full border-b border-hairline py-4 space-y-2.5 font-mono overflow-hidden">
+    <div className="w-full space-y-2.5 font-mono overflow-hidden">
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-ink-dim">
           <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
           <span>Featured On</span>
-          <span className="text-[9px] px-1.5 py-0.2 border border-hairline bg-surface/60 text-ink-faint">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-raised text-ink-faint tracking-wide">
             {embeds.length} {embeds.length === 1 ? "Directory" : "Directories"}
           </span>
         </div>
