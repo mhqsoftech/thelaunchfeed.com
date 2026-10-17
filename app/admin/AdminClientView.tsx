@@ -44,7 +44,6 @@ type AdminUser = {
 
 // Fallback empty arrays used before /api/admin/summary responds.
 const ALL_PRODUCTS: AdminProduct[] = [];
-const DEMO_USERS: (AdminUser & { subscriptions: never[]; upvotedProductIds: string[]; savedProductIds: string[] })[] = [];
 import { listMyProducts, type MyProduct } from "@/app/actions/profile";
 import { TEMPLATES, getTemplate, EmailTemplateId, TemplateVars } from "./emailTemplates";
 import SubmissionTimer from "@/app/components/SubmissionTimer";

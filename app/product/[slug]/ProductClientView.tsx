@@ -122,24 +122,6 @@ export type ViewProduct = {
 
 
 
-const SAMPLE_MEDIA_ITEMS = [
-  {
-    id: 1,
-    title: "Dashboard Overview",
-    subtitle: "Realtime analytics & code review telemetry",
-  },
-  {
-    id: 2,
-    title: "Architecture Map",
-    subtitle: "Automatic repository dependency visualization",
-  },
-  {
-    id: 3,
-    title: "CI/CD Pipeline Integration",
-    subtitle: "Zero-latency automated security checks",
-  },
-];
-
 function formatPitchParagraphs(text: string | undefined | null): string[] {
   if (!text || !text.trim()) return [];
   const trimmed = text.trim();
@@ -266,7 +248,7 @@ export default function ProductClientView({
         subtitle: `UI Preview 0${idx + 1}`,
       }));
     }
-    return SAMPLE_MEDIA_ITEMS.map((item) => ({ ...item, url: null }));
+    return [];
   }, [baseProduct.screenshots]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [userSession, setUserSession] = useState<UserSession | null>(null);
@@ -802,7 +784,8 @@ export default function ProductClientView({
           );
         })()}
 
-        {/* Horizontally Scrollable Product Media Gallery */}
+        {/* Horizontally Scrollable Product Media Gallery — only when the maker uploaded screenshots */}
+        {galleryItems.length > 0 && (
         <div className="space-y-3 max-w-full overflow-hidden">
           <div className="flex items-center justify-between border-b border-hairline pb-2">
             <h2 className="font-mono text-sm sm:text-base font-bold text-ink uppercase tracking-wider flex items-center gap-2">
@@ -844,6 +827,7 @@ export default function ProductClientView({
             ))}
           </div>
         </div>
+        )}
 
         {/* Verified Revenue Line Chart — only when the founder has verified this product's revenue */}
         {product.isRevenueVerified && product.revenue && (

@@ -1001,8 +1001,41 @@ export default function MainLayoutShell({
 
       {/* Footer */}
       <footer className="border-t border-hairline bg-surface/40 tlf-safe-bottom">
-        <div className="mx-auto max-w-[1600px] px-4 lg:px-6 py-12 space-y-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-8">
+        <div className="mx-auto max-w-[1600px] px-4 lg:px-6 pt-10 pb-12 space-y-10">
+          {/* Launch call-to-action */}
+          <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-card shadow-card px-5 py-6 sm:px-8 sm:py-7 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
+            <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 rounded-full bg-signal/10 blur-3xl" />
+            <div className="relative space-y-1.5 max-w-2xl">
+              <p className="text-[11px] font-mono font-semibold uppercase tracking-[0.14em] text-signal">Launching something?</p>
+              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-ink">
+                Put it in front of makers at the next 6:00 AM IST batch.
+              </h2>
+              <p className="text-sm text-ink-dim leading-relaxed">
+                Free launches earn a dofollow backlink and a shot at the daily, weekly and monthly boards. Paid launches add a
+                30-day spotlight.
+              </p>
+            </div>
+            <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
+              <NextLaunchCountdown variant="compact" />
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/submit"
+                  className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-signal text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  <SignalMatrix size={14} />
+                  Launch your product
+                </Link>
+                <Link
+                  href="/leaderboard/weekly"
+                  className="inline-flex items-center h-10 px-4 rounded-full border border-hairline bg-card text-sm font-medium text-ink hover:border-ink-faint transition-colors"
+                >
+                  This week&apos;s best
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-8 gap-y-10">
             <div className="col-span-2 space-y-4">
               <Link href="/" className="inline-flex items-center gap-2" aria-label="The Launch Feed — home">
                 <LaunchFeedLogo size={22} />
@@ -1063,38 +1096,22 @@ export default function MainLayoutShell({
                 { href: "/categories", label: "All categories" },
               ])}
             />
-            <div className="space-y-3">
-              <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">Company</h2>
-              <ul className="space-y-2 text-sm">
-                {[
-                  { href: "/about", label: "About" },
-                  { href: "/contact", label: "Contact" },
-                  { href: "/privacy", label: "Privacy" },
-                  { href: "/terms", label: "Terms" },
-                ].map((l) => (
-                  <li key={l.href}>
-                    <Link href={l.href} className="text-ink-dim hover:text-ink transition-colors">
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
-                <li>
-                  <button type="button" onClick={openCookieSettings} className="text-ink-dim hover:text-ink transition-colors">
-                    Cookie preferences
-                  </button>
-                </li>
-                <li>
-                  <a href="/llms.txt" className="text-ink-dim hover:text-ink transition-colors">
-                    llms.txt (for AI)
-                  </a>
-                </li>
-                <li>
-                  <a href="/feed.xml" className="text-ink-dim hover:text-ink transition-colors">
-                    RSS feed
-                  </a>
-                </li>
-              </ul>
-            </div>
+            <FooterColumn
+              title="Company"
+              links={[
+                { href: "/about", label: "About" },
+                { href: "/contact", label: "Contact" },
+                { href: "/privacy", label: "Privacy" },
+                { href: "/terms", label: "Terms" },
+                { href: "/llms.txt", label: "llms.txt (for AI)", external: true },
+                { href: "/feed.xml", label: "RSS feed", external: true },
+              ]}
+              extra={
+                <button type="button" onClick={openCookieSettings} className="text-ink-dim hover:text-signal transition-colors">
+                  Cookie preferences
+                </button>
+              }
+            />
           </div>
 
           <FeaturedOnFooterBar />
@@ -1170,20 +1187,36 @@ export default function MainLayoutShell({
   );
 }
 
-function FooterColumn({ title, links }: { title: string; links: Array<{ href: string; label: string }> }) {
+function FooterColumn({
+  title,
+  links,
+  extra,
+}: {
+  title: string;
+  links: Array<{ href: string; label: string; external?: boolean }>;
+  extra?: React.ReactNode;
+}) {
+  const cls = "text-ink-dim hover:text-signal transition-colors";
   return (
-    <div className="space-y-3">
-      <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">{title}</h2>
-      <ul className="space-y-2 text-sm">
+    <nav aria-label={title} className="space-y-3.5">
+      <h2 className="text-[11px] font-mono font-semibold uppercase tracking-[0.14em] text-ink">{title}</h2>
+      <ul className="space-y-2.5 text-sm">
         {links.map((l) => (
           <li key={l.href}>
-            <Link href={l.href} className="text-ink-dim hover:text-ink transition-colors">
-              {l.label}
-            </Link>
+            {l.external ? (
+              <a href={l.href} className={cls}>
+                {l.label}
+              </a>
+            ) : (
+              <Link href={l.href} className={cls}>
+                {l.label}
+              </Link>
+            )}
           </li>
         ))}
+        {extra ? <li>{extra}</li> : null}
       </ul>
-    </div>
+    </nav>
   );
 }
 
