@@ -327,6 +327,8 @@ export type MyProduct = {
   submissionId?: string; // set when status=SCHEDULED or REJECTED so the UI can act on the row
   rejectionReason?: string;
   rejectedAt?: string;
+  /** DRAFT held because its $5 / $10 checkout hasn't been paid. */
+  awaitingPayment?: boolean;
   awards: ProductAward[];
 };
 
@@ -364,6 +366,7 @@ export async function listMyProducts(): Promise<MyProduct[]> {
         scheduledFor: true,
         rejectedAt: true,
         rejectionReason: true,
+        details: true,
         category: { select: { slug: true, name: true } },
       },
     }),
@@ -409,6 +412,7 @@ export async function listMyProducts(): Promise<MyProduct[]> {
     submissionId: s.id,
     rejectionReason: s.rejectionReason ?? undefined,
     rejectedAt: s.rejectedAt?.toISOString(),
+    awaitingPayment: s.status === "DRAFT" && Boolean((s.details as Record<string, unknown> | null)?.awaitingPayment),
     awards: [], // submissions can't have awards yet — nothing to render
   }));
 

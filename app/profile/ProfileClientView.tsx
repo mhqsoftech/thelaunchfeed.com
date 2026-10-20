@@ -304,7 +304,7 @@ export default function ProfileClientView({
   const [isUpgradingProduct, setIsUpgradingProduct] = useState<string>("");
   const [checkoutSuccessNotice, setCheckoutSuccessNotice] = useState(false);
   // Set by /submit after a product is submitted or saved as a draft.
-  const [submitNotice, setSubmitNotice] = useState<"queued" | "draft" | "paid" | null>(null);
+  const [submitNotice, setSubmitNotice] = useState<"queued" | "draft" | "paid" | "unpaid" | null>(null);
 
   const fetchSubscriptions = async () => {
     try {
@@ -360,7 +360,7 @@ export default function ProfileClientView({
         setActiveTab(tabParam as any);
       }
       const notice = urlParams.get("notice");
-      if (notice === "queued" || notice === "draft" || notice === "paid") {
+      if (notice === "queued" || notice === "draft" || notice === "paid" || notice === "unpaid") {
         setSubmitNotice(notice);
         urlParams.delete("notice");
         const rest = urlParams.toString();
@@ -1181,7 +1181,9 @@ export default function ProfileClientView({
                         ? "Draft saved. You can finish and submit it anytime from My Drafts below."
                         : submitNotice === "paid"
                           ? "Payment confirmed — your product is queued for launch with its 30-day placement."
-                          : "Submitted! Your product is queued for launch and listed below."}
+                          : submitNotice === "unpaid"
+                            ? "Payment wasn't completed, so your launch is not in the queue yet. It's saved in My Drafts — finish checkout from there, or switch it to the free launch (embed our badge + upvote 3 launches). If you did pay, it moves to the queue as soon as the payment confirms."
+                            : "Submitted! Your product is queued for launch and listed below."}
                     </p>
                     <button
                       type="button"
@@ -1206,6 +1208,7 @@ export default function ProfileClientView({
                     <div className="space-y-3">
                       {draftProducts.map((d) => {
                         const submissionId = (d as MyProduct).submissionId;
+                        const awaitingPayment = (d as MyProduct).awaitingPayment === true;
                         return (
                           <div
                             key={d.id}
@@ -1230,8 +1233,12 @@ export default function ProfileClientView({
                                   <span className="font-mono text-sm sm:text-base font-bold text-ink truncate">
                                     {d.name || "Untitled draft"}
                                   </span>
-                                  <span className="font-mono text-[10px] font-bold text-ink-dim border border-hairline px-2 py-0.5 uppercase tracking-wider shrink-0">
-                                    Draft
+                                  <span
+                                    className={`font-mono text-[10px] font-bold border px-2 py-0.5 uppercase tracking-wider shrink-0 ${
+                                      awaitingPayment ? "text-signal border-signal/50" : "text-ink-dim border-hairline"
+                                    }`}
+                                  >
+                                    {awaitingPayment ? "Payment pending" : "Draft"}
                                   </span>
                                 </div>
                                 {d.tagline && (
@@ -1241,7 +1248,9 @@ export default function ProfileClientView({
                             </div>
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-hairline/60">
                               <div className="text-[10px] font-mono text-ink-faint uppercase">
-                                Not scheduled · publish to queue via edit → Submit
+                                {awaitingPayment
+                                  ? "Not in the queue · pay, or launch free with badge + upvotes"
+                                  : "Not scheduled · publish to queue via edit → Submit"}
                               </div>
                               <div className="flex items-center gap-2">
                                 {submissionId && (
@@ -1249,7 +1258,7 @@ export default function ProfileClientView({
                                     href={`/submit?edit=sub:${submissionId}`}
                                     className="px-3 py-1.5 text-[11px] font-mono font-bold border border-signal/50 bg-signal/10 text-signal hover:bg-signal/20 uppercase tracking-wider transition-colors"
                                   >
-                                    Continue Editing →
+                                    {awaitingPayment ? "Finish Launch →" : "Continue Editing →"}
                                   </Link>
                                 )}
                                 {submissionId && (

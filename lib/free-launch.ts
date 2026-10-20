@@ -338,8 +338,18 @@ export function requestedTier(details: unknown): 0 | 5 | 10 {
   return t === 5 || t === 10 ? t : 0;
 }
 
+/**
+ * Stamp for a $5 / $10 launch that hasn't been paid for yet. The row is held
+ * as a DRAFT (out of the review queue) until Dodo confirms the payment —
+ * activatePlacementSlot then moves it to SCHEDULED. `purchaseId` is filled in
+ * when checkout starts so the return-URL verify can find the submission.
+ */
+export function awaitingPaymentStamp(tier: 5 | 10, purchaseId?: string) {
+  return { tier, since: new Date().toISOString(), ...(purchaseId ? { purchaseId } : {}) };
+}
+
 /** Keys only the server may write — never trusted from client-sent details. */
-const PROTECTED_DETAIL_KEYS = ["isPaidPlacement", "purchaseId", "freeLaunch", "freeGateVersion", "backlinkRel", "publishHold", "badgeKeys"];
+const PROTECTED_DETAIL_KEYS = ["isPaidPlacement", "purchaseId", "freeLaunch", "freeGateVersion", "backlinkRel", "publishHold", "badgeKeys", "awaitingPayment"];
 
 /** Secrets must never be persisted in `details` (it is rendered publicly). */
 export const SECRET_DETAIL_KEYS = ["apiKey", "apiSecret", "secretKey", "revenueApiKey", "stripeApiKey"];
@@ -374,7 +384,7 @@ export async function requireFreeGate(userId: string, websiteUrl: string, exclud
 }
 
 /** Internal bookkeeping that public pages don't need. */
-const INTERNAL_DETAIL_KEYS = ["freeLaunch", "publishHold", "badgeKeys", "purchaseId", "freeGateVersion"];
+const INTERNAL_DETAIL_KEYS = ["freeLaunch", "publishHold", "badgeKeys", "purchaseId", "freeGateVersion", "awaitingPayment"];
 
 /** `details` as it may be shown to visitors: no secrets, no internal bookkeeping. */
 export function publicDetails(details: unknown): Record<string, unknown> | null {

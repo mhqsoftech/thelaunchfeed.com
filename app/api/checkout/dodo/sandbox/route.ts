@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { PlacementTier, PLACEMENT_TIERS } from "@/lib/dodopayments";
+import { PlacementTier, PLACEMENT_TIERS, sandboxCheckoutEnabled } from "@/lib/dodopayments";
 
 // Every interpolation into the HTML template below runs through this — a
 // product name containing `</div><script>…</script>` would otherwise execute
@@ -16,6 +16,10 @@ function escapeHtml(s: string): string {
 }
 
 export async function GET(req: Request) {
+  // Fake checkout — "pays" without money, so it never runs in production.
+  if (!sandboxCheckoutEnabled()) {
+    return new Response("Not found", { status: 404 });
+  }
   const { searchParams } = new URL(req.url);
   const purchaseId = searchParams.get("purchaseId");
   const productId = searchParams.get("productId");

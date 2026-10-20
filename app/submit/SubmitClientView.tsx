@@ -557,7 +557,7 @@ export default function SubmitClientView({
   // their profile's Products tab, which lists drafts and queued launches.
   // replace(), not assign(): Back must not return to ?auto_submit=1 / a
   // checkout-return URL and re-run those flows.
-  const goToProfile = (notice: "queued" | "draft" | "paid") => {
+  const goToProfile = (notice: "queued" | "draft" | "paid" | "unpaid") => {
     window.location.replace(`/profile?tab=products&notice=${notice}`);
   };
 
@@ -670,6 +670,9 @@ export default function SubmitClientView({
               localStorage.removeItem("tlf_submit_draft");
             } catch {}
             goToProfile("paid");
+          } else {
+            // Payment not confirmed — the launch stays a held draft.
+            goToProfile("unpaid");
           }
         })
         .catch((err) => {
@@ -855,6 +858,10 @@ export default function SubmitClientView({
           } catch (e) {
             console.warn("[Submit] Paid auto-submit checkout init failed:", e);
           }
+          // No checkout → unpaid: the launch is held as a draft, not queued.
+          setAutoSubmitStage("done");
+          goToProfile("unpaid");
+          return;
         }
 
         setAutoSubmitStage("done");
@@ -1792,11 +1799,10 @@ export default function SubmitClientView({
             goToProfile("draft");
             return;
           }
-          // Draft → publish with paid tier: kick off Dodo checkout BEFORE
-          // showing the queued screen. Return from here — the checkout return
-          // handler at the top of this file completes the submission.
-          const wasDraft = editTarget.status === "DRAFT";
-          if (wasDraft && (launchTier === 5 || launchTier === 10)) {
+          // Unpaid $5 / $10 launch: the server held it as a DRAFT — kick off
+          // Dodo checkout. Return from here — the checkout return handler at
+          // the top of this file completes the submission.
+          if (upd.status === "DRAFT" && (launchTier === 5 || launchTier === 10)) {
             try {
               const res = await fetch("/api/checkout/dodo", {
                 method: "POST",
@@ -1815,6 +1821,8 @@ export default function SubmitClientView({
             } catch (e) {
               console.warn("[Submit] Draft → checkout initialization failed:", e);
             }
+            goToProfile("unpaid");
+            return;
           }
           setQueuedSubmission({ id: upd.id, scheduledFor: upd.scheduledFor.toString(), launchTier });
           setSubmitted(true);
@@ -1916,6 +1924,9 @@ export default function SubmitClientView({
         } catch (e) {
           console.warn("[Submit] Dodo checkout initialization failed:", e);
         }
+        // No checkout → unpaid: the launch is held as a draft, not queued.
+        goToProfile("unpaid");
+        return;
       }
 
       setQueuedSubmission({ id: sub.id, scheduledFor: sub.scheduledFor.toString(), launchTier: 0 });
@@ -3803,6 +3814,8 @@ export default function SubmitClientView({
                             ? "Launch Draft ($10 Spotlight) →"
                             : launchTier === 5
                             ? "Launch Draft ($5 Featured) →"
+                            : freeLocked
+                            ? "Complete the 2 free-launch steps above"
                             : "Launch Draft to Queue →"
                           : isEditMode
                           ? "Save Product Updates →"

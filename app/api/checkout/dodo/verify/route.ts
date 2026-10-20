@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { activatePlacementSlot, PlacementTier } from "@/lib/dodopayments";
+import { activatePlacementSlot, confirmPlacementPayment, PlacementTier } from "@/lib/dodopayments";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -9,9 +9,12 @@ export const dynamic = "force-dynamic";
 /**
  * Called from the client after Dodo redirects back with a payment_id in the
  * URL. This endpoint is a convenience wrapper around the webhook flow — the
- * webhook is still the source of truth. Never trust client-supplied tier,
- * productId, submissionId, or userId: derive everything from the
- * FeaturedPurchase row keyed by purchaseId, and verify the caller owns it.
+ * webhook is still the source of truth. Dodo redirects here whether or not
+ * the payment succeeded, so the payment is confirmed with Dodo before
+ * anything is activated. Never trust client-supplied tier, productId,
+ * submissionId, or userId: derive everything from the FeaturedPurchase row
+ * keyed by purchaseId (and the payment's own metadata), and verify the
+ * caller owns it.
  */
 export async function POST(req: Request) {
   try {
@@ -22,20 +25,16 @@ export async function POST(req: Request) {
 
     let purchaseId = "";
     let paymentId = "";
-    let submissionId = "";
-    let returnTo = "";
 
     const contentType = req.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
       const body = await req.json().catch(() => ({}));
       purchaseId = String(body.purchaseId || "");
       paymentId = String(body.paymentId || "");
-      returnTo = String(body.returnTo || "");
     } else if (contentType.includes("application/x-www-form-urlencoded")) {
       const formData = await req.formData();
       purchaseId = String(formData.get("purchaseId") || "");
       paymentId = String(formData.get("paymentId") || "");
-      returnTo = String(formData.get("returnTo") || "");
     }
 
     if (!purchaseId) {
@@ -58,33 +57,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "INVALID_TIER" }, { status: 400 });
     }
 
-    // productId / submissionId also derived from state stored on the purchase
-    // creation path. We look up any Submission the caller owns whose details
-    // reference this purchase; and any Product on an already-activated slot.
-    const existingSlot = await prisma.featuredSlot.findFirst({ where: { purchaseId: purchase.id } });
-    const submission = await prisma.submission.findFirst({
-      where: {
-        ownerId: user.id,
-        details: { path: ["purchaseId"], equals: purchase.id },
-      },
-      select: { id: true, name: true, scheduledFor: true, status: true, details: true, publishedProductId: true },
-    });
-    const derivedProductId = existingSlot?.productId || submission?.publishedProductId || undefined;
-    const derivedSubmissionId = submission?.id;
+    const isForm = contentType.includes("application/x-www-form-urlencoded");
 
-    submissionId = derivedSubmissionId || "";
+    const payment = await confirmPlacementPayment(purchase, paymentId || undefined);
+    if (!payment.paid) {
+      if (isForm) {
+        return NextResponse.redirect(new URL("/profile?tab=products&notice=unpaid", req.url), 303);
+      }
+      return NextResponse.json(
+        { error: "PAYMENT_NOT_COMPLETED", message: "Payment was not completed. Your launch is saved as a draft." },
+        { status: 402 }
+      );
+    }
+
+    // productId / submissionId come from the payment's metadata (set by us
+    // at checkout, returned by Dodo) or from state stored on the purchase
+    // creation path: a held submission linked to this purchase, a submission
+    // already activated with it, or a Product on an already-activated slot.
+    const existingSlot = await prisma.featuredSlot.findFirst({ where: { purchaseId: purchase.id } });
+    const submissionSelect = { id: true, name: true, scheduledFor: true, status: true, details: true, publishedProductId: true };
+    const metaSubmissionId = payment.metadata?.submissionId || "";
+    const submission =
+      (metaSubmissionId
+        ? await prisma.submission.findFirst({ where: { id: metaSubmissionId, ownerId: user.id }, select: submissionSelect })
+        : null) ??
+      (await prisma.submission.findFirst({
+        where: {
+          ownerId: user.id,
+          OR: [
+            { details: { path: ["purchaseId"], equals: purchase.id } },
+            { details: { path: ["awaitingPayment", "purchaseId"], equals: purchase.id } },
+          ],
+        },
+        select: submissionSelect,
+      }));
+    const derivedProductId =
+      existingSlot?.productId || submission?.publishedProductId || payment.metadata?.productId || undefined;
+    const submissionId = submission?.id || "";
 
     const slot = await activatePlacementSlot({
       purchaseId: purchase.id,
-      paymentId: paymentId || undefined,
+      paymentId: payment.paymentId || paymentId || undefined,
       userId: user.id,
       productId: derivedProductId,
-      submissionId: derivedSubmissionId,
+      submissionId: submissionId || undefined,
       tier,
     });
 
-    if (contentType.includes("application/x-www-form-urlencoded")) {
-      if ((returnTo === "submit" || submissionId) && submissionId) {
+    if (isForm) {
+      if (submissionId) {
         return NextResponse.redirect(
           new URL(`/submit?checkout=success&submissionId=${submissionId}&tier=${tier}`, req.url),
           303
@@ -100,7 +121,9 @@ export async function POST(req: Request) {
       success: true,
       message: "Placement confirmed successfully for 30 days",
       slot,
-      submission,
+      submission: submissionId
+        ? await prisma.submission.findUnique({ where: { id: submissionId }, select: submissionSelect })
+        : null,
     });
   } catch (error: any) {
     console.error("[api/checkout/dodo/verify] error:", error);

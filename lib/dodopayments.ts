@@ -2,6 +2,7 @@ import DodoPayments from "dodopayments";
 import { prisma } from "@/lib/db";
 import { invalidateSlotsCache } from "@/lib/queries/slots";
 import { slugify } from "@/app/data";
+import { getNext6AmIstRelease } from "@/lib/schedule";
 
 export type PlacementTier = 5 | 10;
 
@@ -30,14 +31,30 @@ export const PLACEMENT_TIERS = {
   },
 } as const;
 
+function isLiveMode() {
+  return (
+    process.env.DODO_PAYMENTS_ENV === "live_mode" ||
+    process.env.DODO_PAYMENTS_ENV === "live" ||
+    process.env.DODO_PAYMENTS_ENV === "production"
+  );
+}
+
+/** Purchases whose Dodo session couldn't be created keep this placeholder id. */
+const SANDBOX_SESSION_PREFIX = "dodo_sess_";
+
+/**
+ * The fake checkout page (/api/checkout/dodo/sandbox) "pays" without money,
+ * so it only exists in local dev — or on a test-mode deploy that opts in.
+ */
+export function sandboxCheckoutEnabled(): boolean {
+  if (isLiveMode()) return false;
+  return process.env.NODE_ENV !== "production" || process.env.DODO_PAYMENTS_SANDBOX_CHECKOUT === "true";
+}
+
 export function getDodoClient(): DodoPayments | null {
   const apiKey = process.env.DODO_PAYMENTS_API_KEY;
   if (!apiKey) return null;
-  const isLive =
-    process.env.DODO_PAYMENTS_ENV === "live_mode" ||
-    process.env.DODO_PAYMENTS_ENV === "live" ||
-    process.env.DODO_PAYMENTS_ENV === "production";
-  const env: "live_mode" | "test_mode" = isLive ? "live_mode" : "test_mode";
+  const env: "live_mode" | "test_mode" = isLiveMode() ? "live_mode" : "test_mode";
   return new DodoPayments({
     bearerToken: apiKey,
     environment: env,
@@ -75,7 +92,7 @@ export async function createDodoPlacementCheckout({
 
   // Create pending purchase in database
   const purchaseId = `dodo_pur_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  const sessionId = `dodo_sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const sessionId = `${SANDBOX_SESSION_PREFIX}${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
   const purchase = await prisma.featuredPurchase.create({
     data: {
@@ -139,7 +156,12 @@ export async function createDodoPlacementCheckout({
     }
   }
 
-  // Seamless fallback sandbox checkout URL
+  if (!sandboxCheckoutEnabled()) {
+    await prisma.featuredPurchase.update({ where: { id: purchase.id }, data: { status: "FAILED" } });
+    throw new Error("Checkout is unavailable right now. Please try again in a few minutes.");
+  }
+
+  // Local-dev fallback sandbox checkout URL
   const sandboxCheckoutUrl =
     returnTo === "submit" && submissionId
       ? `${appUrl}/api/checkout/dodo/sandbox?purchaseId=${purchase.id}&submissionId=${submissionId}&tier=${tier}&returnTo=submit`
@@ -154,12 +176,55 @@ export async function createDodoPlacementCheckout({
 }
 
 /**
+ * Asks Dodo whether a placement purchase was actually paid. The checkout
+ * return URL is reachable whether or not the payment went through (and can be
+ * called by hand), so nothing may be activated on its say-so alone.
+ */
+export async function confirmPlacementPayment(
+  purchase: { id: string; status: string; stripeSessionId: string },
+  paymentId?: string
+): Promise<{ paid: boolean; paymentId?: string; metadata?: Record<string, string> }> {
+  if (purchase.status === "PAID") return { paid: true, paymentId };
+  if (purchase.stripeSessionId.startsWith(SANDBOX_SESSION_PREFIX)) {
+    return { paid: sandboxCheckoutEnabled(), paymentId };
+  }
+
+  const client = getDodoClient();
+  if (!client) return { paid: false };
+
+  // Prefer the payment id from the return URL; fall back to the checkout
+  // session when it's missing or still the literal {payment_id} placeholder.
+  let id = paymentId && /^[\w-]+$/.test(paymentId) ? paymentId : undefined;
+  if (!id) {
+    try {
+      const session = await client.checkoutSessions.retrieve(purchase.stripeSessionId);
+      id = session.payment_id ?? undefined;
+    } catch (err) {
+      console.warn("[DodoPayments] checkout session lookup failed:", err);
+    }
+  }
+  if (!id) return { paid: false };
+
+  try {
+    const payment = await client.payments.retrieve(id);
+    const metadata = (payment.metadata ?? {}) as Record<string, string>;
+    // The payment must be for this purchase — never accept someone else's.
+    const paid = payment.status === "succeeded" && metadata.purchaseId === purchase.id;
+    return { paid, paymentId: payment.payment_id, metadata };
+  } catch (err) {
+    console.warn("[DodoPayments] payment lookup failed:", err);
+    return { paid: false };
+  }
+}
+
+/**
  * Activates a 30-day Featured / Spotlight placement upon successful payment confirmation.
+ * Callers must have confirmed the payment (webhook signature or confirmPlacementPayment).
  */
 export async function activatePlacementSlot({
   purchaseId,
   paymentId,
-  userId: _userId,
+  userId,
   productId,
   submissionId,
   tier,
@@ -296,9 +361,12 @@ export async function activatePlacementSlot({
   // 3. Case B: Payment was for a pending/scheduled Submission
   if (submissionId) {
     const sub = await prisma.submission.findUnique({ where: { id: submissionId } });
-    if (sub) {
-      // Update submission details with paid tier info
-      const prevDetails = (sub.details as Record<string, unknown>) || {};
+    if (sub && sub.ownerId === (purchase?.userId ?? userId)) {
+      // Update submission details with paid tier info. A paid launch held as a
+      // draft while checkout was open enters the review queue only now.
+      const { awaitingPayment: _held, ...prevDetails } = (sub.details as Record<string, unknown>) || {};
+      const promote = sub.status === "DRAFT";
+      const scheduledFor = promote ? getNext6AmIstRelease() : sub.scheduledFor;
       await prisma.submission.update({
         where: { id: sub.id },
         data: {
@@ -308,11 +376,16 @@ export async function activatePlacementSlot({
             isPaidPlacement: true,
             purchaseId: purchase?.id,
           },
+          ...(promote ? { status: "SCHEDULED" as const, scheduledFor } : {}),
         },
       });
+      if (promote) {
+        const { emit } = await import("@/lib/jobs");
+        await emit("submission.created", { submissionId: sub.id }, { dedupeKey: `submission.created:paid:${sub.id}` });
+      }
 
       // Compute slot window starting at scheduled release time
-      const startsAt = sub.scheduledFor > now ? sub.scheduledFor : now;
+      const startsAt = scheduledFor > now ? scheduledFor : now;
       const endsAt = new Date(startsAt.getTime() + thirtyDaysMs);
 
       const lastSlot = await prisma.featuredSlot.findFirst({

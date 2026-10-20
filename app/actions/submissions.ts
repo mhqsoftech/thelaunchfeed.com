@@ -283,12 +283,19 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
 
     const isDraft = parsed.asDraft === true;
 
+    // A $5 / $10 launch is held as a DRAFT until checkout succeeds — it must
+    // not reach the review queue (or send the "submitted" email) unpaid.
+    const freeLaunch = await import("@/lib/free-launch");
+    const clientDetails = freeLaunch.stripProtectedDetails(parsed.details as Record<string, unknown> | null);
+    const tier = freeLaunch.requestedTier(clientDetails);
+    const awaitingPayment = !isDraft && tier !== 0;
+
     // Idempotency: Prevent duplicate submissions if triggered twice in quick succession by same user
     const recentDuplicate = await prisma.submission.findFirst({
       where: {
         ownerId: user.id,
         name: { equals: parsed.name, mode: "insensitive" },
-        status: isDraft ? "DRAFT" : "SCHEDULED",
+        status: isDraft || awaitingPayment ? "DRAFT" : "SCHEDULED",
         createdAt: { gte: new Date(Date.now() - 30_000) },
       },
     });
@@ -355,7 +362,30 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
           existingSubmission.name.toLowerCase().trim() === parsed.name.toLowerCase().trim();
         if (isMatch) {
           if (existingSubmission.ownerId === user.id) {
-            // Same user re-submitting — return their existing row silently.
+            // Same user re-submitting their own draft (e.g. a launch held for
+            // payment, now going free or paid again): submit that draft with
+            // this form's content, so it gets the same free-gate / payment
+            // handling as "edit → Launch Draft".
+            if (existingSubmission.status === "DRAFT") {
+              try {
+                const row = await updateMySubmission(existingSubmission.id, {
+                  name: parsed.name,
+                  tagline: parsed.tagline,
+                  description: parsed.description,
+                  websiteUrl: parsed.websiteUrl,
+                  categorySlug: parsed.categorySlug,
+                  logoUrl: parsed.logoUrl,
+                  screenshots: parsed.screenshots,
+                  videoUrl: parsed.videoUrl,
+                  tags: parsed.tags,
+                  details: parsed.details as Record<string, unknown> | null,
+                });
+                return { success: true, submission: row };
+              } catch (err) {
+                return { success: false, error: err instanceof Error ? err.message : "Free launch requirements not met." };
+              }
+            }
+            // Same user re-submitting a queued launch — return their existing row silently.
             const row = await prisma.submission.findUnique({ where: { id: existingSubmission.id } });
             if (row) return { success: true, submission: row };
           }
@@ -375,7 +405,8 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
       }
     }
 
-    const scheduledFor = isDraft ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : getNext6AmIstRelease();
+    const scheduledFor =
+      isDraft || awaitingPayment ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) : getNext6AmIstRelease();
 
     const category = await resolveCategory(parsed.categorySlug);
 
@@ -388,12 +419,10 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
     const screenshots: string[] = uploadedScreenshots.filter((s): s is string => !!s);
 
     // Free launches ($0) must show our badge and upvote other launches first.
-    // Paid tiers are created now and go to checkout; publishing re-checks
-    // that they either paid or met the free requirements.
-    const freeLaunch = await import("@/lib/free-launch");
-    const clientDetails = freeLaunch.stripProtectedDetails(parsed.details as Record<string, unknown> | null);
+    // Paid tiers are created as held drafts and go to checkout; a confirmed
+    // payment (activatePlacementSlot) is what puts them in the queue.
     let freeStamp: Record<string, unknown> | undefined;
-    if (!isDraft && freeLaunch.requestedTier(clientDetails) === 0) {
+    if (!isDraft && tier === 0) {
       const gate = await freeLaunch.requireFreeGate(user.id, parsed.websiteUrl || "");
       if (!gate.qualified) {
         return { success: false, error: gate.message || "Free launch requirements not met.", freeGate: gate };
@@ -409,6 +438,7 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
       // Site keys the "Featured on" badge link resolves by (lib/free-launch).
       badgeKeys: freeLaunch.withBadgeKeys([], parsed.websiteUrl),
       ...(freeStamp ? { freeLaunch: freeStamp } : {}),
+      ...(awaitingPayment ? { awaitingPayment: freeLaunch.awaitingPaymentStamp(tier) } : {}),
     };
 
     const sub = await prisma.submission.create({
@@ -427,12 +457,18 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
         makerName: parsed.makerName,
         makerHandle: parsed.makerHandle,
         makerEmail: user.email,
-        status: isDraft ? "DRAFT" : "SCHEDULED",
+        status: isDraft || awaitingPayment ? "DRAFT" : "SCHEDULED",
         scheduledFor,
       },
     });
 
     if (isDraft) {
+      return { success: true, submission: sub };
+    }
+    if (awaitingPayment) {
+      try {
+        revalidatePath("/profile");
+      } catch {}
       return { success: true, submission: sub };
     }
 
@@ -726,11 +762,6 @@ export async function updateMySubmission(
   const wasRejected = existing.status === "REJECTED";
   const wasDraft = existing.status === "DRAFT";
   const keepAsDraft = opts?.keepAsDraft === true && wasDraft;
-  const scheduledFor = keepAsDraft
-    ? existing.scheduledFor
-    : wasRejected || wasDraft
-      ? getNext6AmIstRelease()
-      : existing.scheduledFor;
 
   const logoUrl = parsed.logoUrl !== undefined ? await processImageString(parsed.logoUrl, "logos") : existing.logoUrl;
   let screenshots = existing.screenshots;
@@ -762,12 +793,23 @@ export async function updateMySubmission(
   };
   freeLaunch.dropSecrets(updatedDetails); // purge any legacy plaintext key
 
-  // Entering the launch queue as a free launch → enforce the requirements.
+  // Entering the launch queue as an unpaid $5 / $10 launch → stay a draft
+  // until checkout succeeds (activatePlacementSlot promotes it).
   const enteringQueue = !keepAsDraft && (wasDraft || wasRejected);
+  const tier = freeLaunch.requestedTier(updatedDetails);
+  const isPaid = freeLaunch.isPaidLaunch(existingDetails);
+  const awaitingPayment = enteringQueue && !isPaid && tier !== 0;
+  if (awaitingPayment) {
+    updatedDetails.awaitingPayment = freeLaunch.awaitingPaymentStamp(tier);
+  } else if (isPaid || tier === 0) {
+    delete updatedDetails.awaitingPayment;
+  }
+
+  // Entering the launch queue as a free launch → enforce the requirements.
   if (
     enteringQueue &&
-    !freeLaunch.isPaidLaunch(existingDetails) &&
-    freeLaunch.requestedTier(updatedDetails) === 0 &&
+    !isPaid &&
+    tier === 0 &&
     !(existingDetails.freeLaunch as { qualified?: boolean } | undefined)?.qualified
   ) {
     const gate = await freeLaunch.requireFreeGate(user.id, parsed.websiteUrl || existing.websiteUrl, existing.id);
@@ -777,6 +819,14 @@ export async function updateMySubmission(
   if (updatedDetails.freeGateVersion === undefined && (wasDraft || wasRejected)) {
     updatedDetails.freeGateVersion = freeLaunch.FREE_GATE_VERSION;
   }
+
+  const scheduledFor = keepAsDraft
+    ? existing.scheduledFor
+    : awaitingPayment
+      ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      : wasRejected || wasDraft
+        ? getNext6AmIstRelease()
+        : existing.scheduledFor;
 
   const sub = await prisma.submission.update({
     where: { id: existing.id },
@@ -791,14 +841,15 @@ export async function updateMySubmission(
       tags: finalTags,
       categoryId: category?.id ?? existing.categoryId,
       details: updatedDetails as any,
-      status: keepAsDraft ? "DRAFT" : "SCHEDULED",
+      status: keepAsDraft || awaitingPayment ? "DRAFT" : "SCHEDULED",
       scheduledFor,
       rejectedAt: null,
       rejectionReason: null,
     },
   });
 
-  if (wasRejected) {
+  // Founder confirmation email whenever the row actually enters the queue.
+  if (enteringQueue && !awaitingPayment) {
     const { emit } = await import("@/lib/jobs");
     await emit("submission.created", { submissionId: sub.id });
   }

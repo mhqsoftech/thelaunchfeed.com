@@ -28,6 +28,7 @@ export async function POST(req: Request) {
     }
 
     let targetName = "";
+    let heldDetails: Record<string, unknown> | null = null;
     let targetSlug = "";
     const targetProductId = productId;
     const targetSubmissionId = submissionId;
@@ -46,6 +47,8 @@ export async function POST(req: Request) {
 
       targetName = sub.name;
       targetSlug = slugify(sub.name);
+      const details = (sub.details as Record<string, unknown>) || {};
+      if (details.awaitingPayment) heldDetails = details;
     } else if (productId) {
       const product = await prisma.product.findFirst({
         where: {
@@ -84,6 +87,20 @@ export async function POST(req: Request) {
       appUrl,
       returnTo: returnTo || (submissionId ? "submit" : "profile"),
     });
+
+    // Link the held submission to this purchase so the return-URL verify can
+    // find it (the latest checkout wins if the maker retries).
+    if (submissionId && heldDetails) {
+      await prisma.submission.update({
+        where: { id: submissionId },
+        data: {
+          details: {
+            ...heldDetails,
+            awaitingPayment: { ...(heldDetails.awaitingPayment as object), purchaseId: result.purchaseId },
+          } as any,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
