@@ -191,7 +191,7 @@ export default function ProfileClientView({
     }
     setResubmitting(true);
     try {
-      await resubmitSubmission({
+      const res = await resubmitSubmission({
         submissionId,
         name: resubmitForm.name.trim(),
         tagline: resubmitForm.tagline.trim(),
@@ -199,6 +199,10 @@ export default function ProfileClientView({
         websiteUrl: resubmitForm.websiteUrl.trim(),
         categorySlug: resubmitForm.categorySlug || undefined,
       });
+      if (!res.success) {
+        setResubmitError(res.error);
+        return;
+      }
       setResubmitOpenFor(null);
       // Re-fetch the list so the row flips back to SCHEDULED
       try {

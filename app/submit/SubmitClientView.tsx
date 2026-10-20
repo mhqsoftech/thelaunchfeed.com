@@ -576,8 +576,17 @@ export default function SubmitClientView({
   // Free ($0) launches unlock only after the badge + 3 upvotes requirements.
   const [freeQualified, setFreeQualified] = useState(false);
   const handleFreeQualified = React.useCallback((q: boolean) => setFreeQualified(q), []);
-  const freeLocked =
-    !isEmbeddedMode && launchTier === 0 && !freeQualified && (!isEditMode || editTarget?.status === "DRAFT");
+  // Saving a draft or rejected submission puts it (back) in the queue, so a
+  // free launch must meet the requirements there too — unless that row is
+  // already paid for or already qualified (mirrors updateMySubmission).
+  const editDetails = (editTarget?.details ?? {}) as { isPaidPlacement?: boolean; freeLaunch?: { qualified?: boolean } };
+  const editEntersQueue =
+    editTarget?.kind === "submission" && (editTarget.status === "DRAFT" || editTarget.status === "REJECTED");
+  const needsFreeGate =
+    !isEmbeddedMode &&
+    launchTier === 0 &&
+    (!isEditMode || (editEntersQueue && !editDetails.isPaidPlacement && !editDetails.freeLaunch?.qualified));
+  const freeLocked = needsFreeGate && !freeQualified;
 
   // Ownership & Authorization Confirmation State
   const [isAuthorizedConfirmed, setIsAuthorizedConfirmed] = useState(false);
@@ -1791,7 +1800,9 @@ export default function SubmitClientView({
         };
         if (editTarget.kind === "submission" && editTarget.submissionId) {
           const keepAsDraft = keepAsDraftIntentRef.current === true;
-          const upd = await updateMySubmission(editTarget.submissionId, fields, { keepAsDraft });
+          const updRes = await updateMySubmission(editTarget.submissionId, fields, { keepAsDraft });
+          if (!updRes.success) throw new Error(updRes.error);
+          const upd = updRes.submission;
           // "Update Draft" path: save changes, stay on the form, show a flash.
           // Do NOT show the queued success screen — the row is still a draft.
           if (keepAsDraft) {
@@ -3690,7 +3701,7 @@ export default function SubmitClientView({
             )}
 
             {/* Free launch requirements — badge + 3 upvotes */}
-            {!isEmbeddedMode && launchTier === 0 && !(isEditMode && editTarget?.status !== "DRAFT") && (
+            {needsFreeGate && (
               <FreeLaunchPanel websiteUrl={formData.websiteUrl} onQualifiedChange={handleFreeQualified} />
             )}
 
@@ -3819,14 +3830,14 @@ export default function SubmitClientView({
                             : freeLocked
                             ? "Complete the 2 free-launch steps above"
                             : "Launch Draft to Queue →"
+                          : freeLocked
+                          ? "Complete the 2 free-launch steps above"
                           : isEditMode
                           ? "Save Product Updates →"
                           : launchTier === 10
                           ? "Proceed with $10 Spotlight Launch →"
                           : launchTier === 5
                           ? "Proceed with $5 Featured Launch →"
-                          : freeLocked
-                          ? "Complete the 2 free-launch steps above"
                           : "Submit Free Product Shipment →"}
                       </span>
                     </>

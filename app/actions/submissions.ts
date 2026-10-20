@@ -367,23 +367,18 @@ export async function createSubmission(input: CreateSubmissionInput): Promise<Cr
             // this form's content, so it gets the same free-gate / payment
             // handling as "edit → Launch Draft".
             if (existingSubmission.status === "DRAFT") {
-              try {
-                const row = await updateMySubmission(existingSubmission.id, {
-                  name: parsed.name,
-                  tagline: parsed.tagline,
-                  description: parsed.description,
-                  websiteUrl: parsed.websiteUrl,
-                  categorySlug: parsed.categorySlug,
-                  logoUrl: parsed.logoUrl,
-                  screenshots: parsed.screenshots,
-                  videoUrl: parsed.videoUrl,
-                  tags: parsed.tags,
-                  details: parsed.details as Record<string, unknown> | null,
-                });
-                return { success: true, submission: row };
-              } catch (err) {
-                return { success: false, error: err instanceof Error ? err.message : "Free launch requirements not met." };
-              }
+              return updateMySubmission(existingSubmission.id, {
+                name: parsed.name,
+                tagline: parsed.tagline,
+                description: parsed.description,
+                websiteUrl: parsed.websiteUrl,
+                categorySlug: parsed.categorySlug,
+                logoUrl: parsed.logoUrl,
+                screenshots: parsed.screenshots,
+                videoUrl: parsed.videoUrl,
+                tags: parsed.tags,
+                details: parsed.details as Record<string, unknown> | null,
+              });
             }
             // Same user re-submitting a queued launch — return their existing row silently.
             const row = await prisma.submission.findUnique({ where: { id: existingSubmission.id } });
@@ -743,7 +738,42 @@ const UpdateFieldsSchema = z.object({
  *  update saves the changes but does NOT promote the row to SCHEDULED — the
  *  draft stays a draft. Used by the "Update Draft" button on the submit
  *  form so founders can iterate on a draft without pushing it live. */
+export type UpdateSubmissionResult =
+  | { success: true; submission: Submission }
+  | { success: false; error: string };
+
+/** A failure whose message is meant for the founder (e.g. free-launch requirements). */
+class FounderFacingError extends Error {}
+
+/**
+ * Failures are *returned*, not thrown: production builds replace a thrown
+ * server-action message with React's generic "Minified React error #441".
+ */
 export async function updateMySubmission(
+  submissionId: string,
+  fields: z.infer<typeof UpdateFieldsSchema>,
+  opts?: { keepAsDraft?: boolean },
+): Promise<UpdateSubmissionResult> {
+  try {
+    return { success: true, submission: await applySubmissionUpdate(submissionId, fields, opts) };
+  } catch (err) {
+    if (err instanceof FounderFacingError) return { success: false, error: err.message };
+    if (err instanceof z.ZodError) {
+      const issue = err.issues[0];
+      return { success: false, error: `Invalid ${issue?.path?.join(".") || "field"}: ${issue?.message || "check the form"}` };
+    }
+    const code = err instanceof Error ? err.message : "";
+    if (code === "UNAUTHENTICATED") return { success: false, error: "UNAUTHENTICATED" };
+    if (code === "SUBMISSION_NOT_FOUND" || code === "FORBIDDEN") {
+      return { success: false, error: "This submission no longer exists or isn't yours." };
+    }
+    if (code === "ALREADY_PUBLISHED") return { success: false, error: "This product is already live — edit it from your profile." };
+    console.error("[updateMySubmission] error:", err);
+    return { success: false, error: "Couldn't save your submission. Please try again." };
+  }
+}
+
+async function applySubmissionUpdate(
   submissionId: string,
   fields: z.infer<typeof UpdateFieldsSchema>,
   opts?: { keepAsDraft?: boolean },
@@ -813,7 +843,9 @@ export async function updateMySubmission(
     !(existingDetails.freeLaunch as { qualified?: boolean } | undefined)?.qualified
   ) {
     const gate = await freeLaunch.requireFreeGate(user.id, parsed.websiteUrl || existing.websiteUrl, existing.id);
-    if (!gate.qualified) throw new Error(gate.message || "FREE_LAUNCH_REQUIREMENTS_NOT_MET");
+    if (!gate.qualified) {
+      throw new FounderFacingError(gate.message || "To launch for free, embed our badge and upvote 3 launches — or pick a paid launch.");
+    }
     updatedDetails.freeLaunch = freeLaunch.freeLaunchStamp(gate);
   }
   if (updatedDetails.freeGateVersion === undefined && (wasDraft || wasRejected)) {
@@ -937,9 +969,8 @@ export async function updateMyProduct(
 }
 
 /**
- * Edit a REJECTED submission and put it back into the queue.
- * Owner-only. Clears rejection metadata, schedules for now + leadHours,
- * fires the "product-submitted" email again.
+ * Edit a REJECTED submission (profile quick form) and put it back into the
+ * queue via updateMySubmission, so the free-launch and payment rules apply.
  */
 const ResubmitSchema = z.object({
   submissionId: z.string().min(1),
@@ -952,49 +983,30 @@ const ResubmitSchema = z.object({
 
 export type ResubmitInput = z.infer<typeof ResubmitSchema>;
 
-export async function resubmitSubmission(input: ResubmitInput): Promise<Submission> {
-  const user = await requireUser();
-  const parsed = ResubmitSchema.parse(input);
+export async function resubmitSubmission(input: ResubmitInput): Promise<UpdateSubmissionResult> {
+  const parsed = ResubmitSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message || "Name and tagline are required." };
 
   const existing = await prisma.submission.findUnique({
-    where: { id: parsed.submissionId },
+    where: { id: parsed.data.submissionId },
+    select: { status: true, tags: true },
   });
-  if (!existing) throw new Error("SUBMISSION_NOT_FOUND");
-  if (existing.ownerId !== user.id) throw new Error("FORBIDDEN");
-  if (existing.status !== "REJECTED") throw new Error("ONLY_REJECTED_CAN_BE_RESUBMITTED");
+  if (!existing) return { success: false, error: "This submission no longer exists or isn't yours." };
+  if (existing.status !== "REJECTED") {
+    return { success: false, error: "Only rejected submissions can be resubmitted." };
+  }
 
-  const category = await resolveCategory(parsed.categorySlug);
-  const scheduledFor = getNext6AmIstRelease();
-
-  const sub = await prisma.submission.update({
-    where: { id: existing.id },
-    data: {
-      name: parsed.name,
-      tagline: parsed.tagline,
-      description: parsed.description ?? existing.description,
-      websiteUrl: parsed.websiteUrl || existing.websiteUrl,
-      categoryId: category?.id ?? existing.categoryId,
-      details: {
-        ...((existing.details as Record<string, unknown>) || {}),
-        badgeKeys: (await import("@/lib/free-launch")).withBadgeKeys(
-          (existing.details as Record<string, unknown> | null)?.badgeKeys,
-          existing.websiteUrl,
-          parsed.websiteUrl || existing.websiteUrl
-        ),
-      } as any,
-      status: "SCHEDULED",
-      scheduledFor,
-      rejectedAt: null,
-      rejectionReason: null,
-    },
+  // Same rules as the full edit form: a free launch must meet the badge +
+  // upvote requirements, and an unpaid $5 / $10 launch is held for payment.
+  const category = await resolveCategory(parsed.data.categorySlug);
+  return updateMySubmission(parsed.data.submissionId, {
+    name: parsed.data.name,
+    tagline: parsed.data.tagline,
+    description: parsed.data.description,
+    websiteUrl: parsed.data.websiteUrl,
+    categorySlug: category?.slug,
+    tags: existing.tags, // this form has no tags field — keep the row's
   });
-
-  const { emit } = await import("@/lib/jobs");
-  await emit("submission.created", { submissionId: sub.id });
-
-  revalidatePath("/admin");
-  revalidatePath("/profile");
-  return sub;
 }
 
 /* ─────────── util ─────────── */
