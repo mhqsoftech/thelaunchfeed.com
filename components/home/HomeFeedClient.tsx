@@ -12,6 +12,7 @@ import type { BoardRow } from "@/app/api/board/route";
 import { BookmarkButton } from "@/components/ui/BookmarkButton";
 import { HomeEditorialSection, type LiveTopProductItem } from "@/components/home/HomeEditorialSection";
 import { NextLaunchCountdown } from "@/components/ui/NextLaunchCountdown";
+import { getDailyCycleRange } from "@/lib/schedule";
 import {
   isProductUpvoted,
   optimisticToggle,
@@ -231,7 +232,10 @@ export default function HomeFeedClient({
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const [, startTransition] = useTransition();
 
-  const now = new Date();
+  // The board's day (cycles at 6:00 AM IST) as a plain calendar date, so the
+  // server (UTC) and every visitor's timezone render the same header text.
+  const [cy, cm, cd] = getDailyCycleRange().key.split("-").map(Number);
+  const now = new Date(cy, cm - 1, cd);
   const year = format(now, "yyyy");
   const subtitle: Record<FeedTab, string> = {
     daily: format(now, "EEEE, d MMMM yyyy"),

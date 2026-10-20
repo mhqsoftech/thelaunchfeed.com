@@ -2861,6 +2861,8 @@ export default function ProfileClientView({
                       setStripeApiKey("");
                       setRevenue(res.mrrFormatted);
                       setTimeout(() => setPaymentsSuccess(false), 4000);
+                    } else {
+                      setTelemetryLog(`[ERROR] ${res.error}`);
                     }
                   } catch (err) {
                     const msg = err instanceof Error ? err.message : "Failed to sync payment key";

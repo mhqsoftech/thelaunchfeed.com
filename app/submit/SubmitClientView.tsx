@@ -3456,11 +3456,13 @@ export default function SubmitClientView({
                         disabled={isExecutingSdk}
                         onClick={async () => {
                           setIsExecutingSdk(true);
-                          const prov = findRevenueProvider(formData.pricingPartner);
+                          // Same default the provider picker shows when nothing is chosen yet.
+                          const prov = findRevenueProvider(formData.pricingPartner || "stripe");
                           try {
                             if (!prov) throw new Error("Choose your payment provider first.");
                             if (!formData.apiKey?.trim()) throw new Error(`Paste a read-only ${prov.name} key to verify revenue.`);
                             const res = await savePaymentApiKey({ provider: prov.id, apiKey: formData.apiKey });
+                            if (!res.success) throw new Error(res.error);
                             setFormData((prev) => ({
                               ...prev,
                               revenue: res.mrrFormatted,

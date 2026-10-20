@@ -32,15 +32,37 @@ export type SaveKeyInput = z.infer<typeof SaveKeySchema>;
 // Per-user throttle: the verifier must not become a free key-checking oracle.
 const lastAttempt = new Map<string, number>();
 
+/** A failure whose message is safe (and useful) to show the founder. */
+class FounderFacingError extends Error {}
+
+/**
+ * Connect a revenue provider key. Failures are *returned*, not thrown:
+ * production builds replace a thrown server-action message with React's
+ * generic "Minified React error #441", so the founder would never see why.
+ */
 export async function savePaymentApiKey(input: SaveKeyInput) {
+  try {
+    return await connectRevenueKey(input);
+  } catch (err) {
+    if (err instanceof FounderFacingError) return { success: false as const, error: err.message };
+    if (err instanceof z.ZodError) return { success: false as const, error: err.issues[0]?.message || "Invalid API key." };
+    if (err instanceof Error && err.message === "UNAUTHENTICATED") {
+      return { success: false as const, error: "Sign in to verify your revenue." };
+    }
+    console.error("[revenue] save key failed:", err);
+    return { success: false as const, error: "Revenue verification failed unexpectedly. No revenue was stored." };
+  }
+}
+
+async function connectRevenueKey(input: SaveKeyInput) {
   const user = await requireUser();
   const parsed = SaveKeySchema.parse(input);
   const provider = parseProviderId(parsed.provider);
-  if (!provider) throw new Error(`Unsupported payment provider "${parsed.provider}".`);
+  if (!provider) throw new FounderFacingError(`Unsupported payment provider "${parsed.provider}".`);
 
   const now = Date.now();
   if (now - (lastAttempt.get(user.id) ?? 0) < 8_000) {
-    throw new Error("Please wait a few seconds before verifying again.");
+    throw new FounderFacingError("Please wait a few seconds before verifying again.");
   }
   lastAttempt.set(user.id, now);
 
@@ -50,10 +72,10 @@ export async function savePaymentApiKey(input: SaveKeyInput) {
   } catch (err) {
     if (err instanceof CredentialError || err instanceof ProviderUnavailableError) {
       // Nothing was stored. Surface the provider's reason to the founder.
-      throw new Error(`${err.message} No revenue was stored.`);
+      throw new FounderFacingError(`${err.message} No revenue was stored.`);
     }
     console.error("[revenue] connect failed:", err instanceof Error ? err.message : err);
-    throw new Error("Revenue verification failed unexpectedly. No revenue was stored.");
+    throw new FounderFacingError("Revenue verification failed unexpectedly. No revenue was stored.");
   }
   const { connection, verified } = result;
 
@@ -77,7 +99,7 @@ export async function savePaymentApiKey(input: SaveKeyInput) {
 
   const mrrFormatted = formatUsdMonthly(verified.mrrCents);
   return {
-    success: true,
+    success: true as const,
     connectionId: connection.id,
     provider: connection.provider,
     keyHint: connection.keyHint,
