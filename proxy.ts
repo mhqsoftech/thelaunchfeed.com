@@ -25,6 +25,7 @@ const EXCLUDE_PREFIXES = [
   "/.well-known/",
   "/static/",
   "/fonts/",
+  "/CL0/",
 ];
 
 // Exact paths that must always fall through untouched.
@@ -94,6 +95,6 @@ export function proxy(req: NextRequest) {
 // and no accidental markdown for admin or API responses.
 export const config = {
   matcher: [
-    "/((?!api|_next|admin|handler|\\.well-known|static|fonts|favicon.ico|robots.txt|sitemap.xml|manifest.json|manifest.webmanifest|llms.txt|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|css|js|mjs|map|woff2?|ttf|otf|pdf|zip|xml|txt|json|mp4|webm|mp3|wav)).*)",
+    "/((?!api|_next|admin|handler|CL0|\\.well-known|static|fonts|favicon.ico|robots.txt|sitemap.xml|manifest.json|manifest.webmanifest|llms.txt|.*\\.(?:png|jpe?g|gif|webp|avif|svg|ico|css|js|mjs|map|woff2?|ttf|otf|pdf|zip|xml|txt|json|mp4|webm|mp3|wav)).*)",
   ],
 };

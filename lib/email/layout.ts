@@ -244,18 +244,18 @@ function renderHtml(c: EmailContent): string {
       ? `<p class="tlf-dim" style="margin:18px 0 0;font-family:${SANS};font-size:14px;line-height:22px;color:${C.dim};">${c.secondary
           .map(
             (l) =>
-              `<a href="${esc(absUrl(l.url))}" target="_blank" class="tlf-link" style="color:${C.signal};text-decoration:none;font-weight:600;">${esc(l.label)}&nbsp;&rarr;</a>`
+              `<a ses:no-track href="${esc(absUrl(l.url))}" target="_blank" class="tlf-link" style="color:${C.signal};text-decoration:none;font-weight:600;">${esc(l.label)}&nbsp;&rarr;</a>`
           )
           .join(`<span style="color:${C.faint};">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>`)}</p>`
       : "";
     parts.push(
       row(`<table role="presentation" cellpadding="0" cellspacing="0" border="0">
           <tr><td class="tlf-btn" bgcolor="${C.signal}" style="border-radius:8px;background-color:${C.signal};">
-            <a href="${href}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${SANS};font-size:15px;line-height:20px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:8px;">${esc(c.cta.label)}</a>
+            <a ses:no-track href="${href}" target="_blank" style="display:inline-block;padding:14px 28px;font-family:${SANS};font-size:15px;line-height:20px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:8px;">${esc(c.cta.label)}</a>
           </td></tr>
         </table>
         ${secondary}
-        <p class="tlf-faint" style="margin:18px 0 0;font-family:${SANS};font-size:12px;line-height:18px;color:${C.faint};">Button not working? Paste this link into your browser:<br><a href="${href}" target="_blank" class="tlf-link" style="color:${C.signal};text-decoration:underline;word-break:break-all;">${esc(absUrl(c.cta.url))}</a></p>`,
+        <p class="tlf-faint" style="margin:18px 0 0;font-family:${SANS};font-size:12px;line-height:18px;color:${C.faint};">Button not working? Paste this link into your browser:<br><a ses:no-track href="${href}" target="_blank" class="tlf-link" style="color:${C.signal};text-decoration:underline;word-break:break-all;">${esc(absUrl(c.cta.url))}</a></p>`,
         "8px 40px 28px")
     );
   }
@@ -275,7 +275,7 @@ function renderHtml(c: EmailContent): string {
   }
 
   const footerLink = (label: string, url: string) =>
-    `<a href="${esc(absUrl(url))}" target="_blank" class="tlf-dim" style="color:${C.dim};text-decoration:underline;">${esc(label)}</a>`;
+    `<a ses:no-track href="${esc(absUrl(url))}" target="_blank" class="tlf-dim" style="color:${C.dim};text-decoration:underline;">${esc(label)}</a>`;
   const dot = `&nbsp;&middot;&nbsp;`;
   const footerLinks = [
     footerLink("thelaunchfeed.com", "/"),
@@ -334,7 +334,7 @@ function renderHtml(c: EmailContent): string {
     <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;">
       <tr><td style="padding:0 4px 18px;">
-        <a href="${esc(absUrl("/"))}" target="_blank" style="text-decoration:none;">
+        <a ses:no-track href="${esc(absUrl("/"))}" target="_blank" style="text-decoration:none;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
             <td valign="middle" style="padding-right:10px;">${logoMark()}</td>
             <td valign="middle" class="tlf-ink" style="font-family:${MONO};font-size:15px;line-height:20px;font-weight:700;letter-spacing:0.08em;color:${C.ink};">THE LAUNCH <span style="color:${C.signal};">FEED</span></td>

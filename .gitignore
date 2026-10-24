@@ -36,7 +36,8 @@
 .mcp.json
 .baileys_auth/
 /scratch/
-/scripts/
+/scripts/*
+!/scripts/disable-resend-tracking.ts
 .storage_backup/
 .neon/
 .neon
