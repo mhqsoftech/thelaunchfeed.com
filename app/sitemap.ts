@@ -93,6 +93,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     },
     {
+      url: `${APP_URL}/launch-guide`,
+      lastModified: new Date("2026-11-05T00:00:00Z"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${APP_URL}/product-hunt-alternative`,
+      lastModified: new Date("2026-11-05T00:00:00Z"),
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
+      url: `${APP_URL}/badges`,
+      lastModified: new Date("2026-11-05T00:00:00Z"),
+      changeFrequency: "monthly",
+      priority: 0.6,
+    },
+    {
       url: `${APP_URL}/about`,
       lastModified: new Date("2026-08-15T00:00:00Z"),
       changeFrequency: "monthly",

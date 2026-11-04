@@ -2,40 +2,44 @@ import { Suspense } from "react";
 import type { Metadata } from "next";
 import SubmitClientView from "./SubmitClientView";
 import { LaunchFeedLoader } from "@/components/ui/LaunchFeedLoader";
+import { FaqSection } from "@/components/seo/LandingParts";
+import { SITE_URL, breadcrumb, webPageNode } from "@/lib/seo/schema";
+import { FAQ_BACKLINK, FAQ_IS_FREE, FAQ_LAUNCH_TIME, FAQ_PAID, FAQ_WHAT_TO_LAUNCH, faqPageNode } from "@/lib/seo/facts";
+
+const SUBMIT_FAQS = [FAQ_IS_FREE, FAQ_LAUNCH_TIME, FAQ_WHAT_TO_LAUNCH, FAQ_BACKLINK, FAQ_PAID];
 
 const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://thelaunchfeed.com").replace(/\/+$/, "");
 
 export const metadata: Metadata = {
-  title: "Submit a Product - The Launch Feed",
+  title: "Submit Your Startup, SaaS or AI Tool Free | The Launch Feed",
   description:
-    "Launch your software product, SaaS, or developer tool on The Launch Feed. 1-click AI autofill, 360° technical blueprints, verified MRR telemetry, and automated 6:00 AM IST releases.",
+    "Submit your startup, SaaS or AI tool and launch it free at 6:00 AM IST. Paste your URL to autofill the listing, pick a launch day, and get a permanent product page.",
   keywords: [
-    "submit product",
+    "submit startup",
+    "submit ai tool",
     "launch saas",
+    "free product launch",
     "product hunt alternative",
-    "software launchpad",
+    "submit product",
     "indie hacker launch",
-    "developer tool submission",
-    "verified mrr startup",
-    "ai tool launch",
     "The Launch Feed",
   ],
   alternates: {
-    canonical: `${siteUrl}/submit`,
+    canonical: "/submit",
   },
   openGraph: {
     type: "website",
     url: `${siteUrl}/submit`,
-    title: "Submit a Product - The Launch Feed",
+    title: "Submit Your Startup, SaaS or AI Tool Free | The Launch Feed",
     description:
-      "Launch your software product, SaaS, or developer tool on The Launch Feed. Complete 360° architecture blueprints and instant AI autofill.",
+      "Launch free at 6:00 AM IST. Paste your URL to autofill the listing, pick a launch day, and get a permanent product page.",
     siteName: "The Launch Feed",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Submit a Product - The Launch Feed",
+    title: "Submit Your Startup, SaaS or AI Tool Free | The Launch Feed",
     description:
-      "Launch your software product, SaaS, or developer tool on The Launch Feed with 360° architecture intelligence.",
+      "Launch free at 6:00 AM IST and get a permanent product page with a link to your site.",
     creator: "@thelaunchfeed",
   },
   robots: {
@@ -54,37 +58,15 @@ export default function SubmitPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
+      webPageNode({ path: "/submit", name: "Submit your product to The Launch Feed", description: metadata.description ?? undefined }),
       {
-        "@type": "WebPage",
-        "@id": `${siteUrl}/submit#webpage`,
-        url: `${siteUrl}/submit`,
-        name: "Submit a Product — The Launch Feed",
-        description:
-          "Launch your software product, SaaS, or developer tool on The Launch Feed with complete 360° technical intelligence.",
-        isPartOf: {
-          "@type": "WebSite",
-          "@id": `${siteUrl}/#website`,
-          url: siteUrl,
-          name: "The Launch Feed",
-        },
+        ...breadcrumb([
+          { name: "Home", url: SITE_URL },
+          { name: "Submit product", url: `${SITE_URL}/submit` },
+        ]),
+        "@id": `${SITE_URL}/submit#breadcrumb`,
       },
-      {
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          {
-            "@type": "ListItem",
-            position: 1,
-            name: "Home",
-            item: siteUrl,
-          },
-          {
-            "@type": "ListItem",
-            position: 2,
-            name: "Submit Product",
-            item: `${siteUrl}/submit`,
-          },
-        ],
-      },
+      faqPageNode(`${SITE_URL}/submit`, SUBMIT_FAQS),
     ],
   };
 
@@ -94,7 +76,6 @@ export default function SubmitPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <h1 className="sr-only">Submit Your Product Launch</h1>
       <Suspense
         fallback={
           <div className="min-h-[50vh] flex items-center justify-center p-8">
@@ -102,7 +83,7 @@ export default function SubmitPage() {
           </div>
         }
       >
-        <SubmitClientView />
+        <SubmitClientView footer={<FaqSection faqs={SUBMIT_FAQS} heading="Questions about launching" />} />
       </Suspense>
     </>
   );

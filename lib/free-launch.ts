@@ -22,8 +22,9 @@
 import { prisma } from "@/lib/db";
 import { safeFetch } from "@/lib/ssrf";
 import { ensureJobTables } from "@/lib/jobs/schema";
+import { FREE_LAUNCH_UPVOTES } from "@/lib/seo/facts";
 
-export const REQUIRED_UPVOTES = 3;
+export const REQUIRED_UPVOTES = FREE_LAUNCH_UPVOTES;
 /** Submissions created from this version on are subject to the gate. */
 export const FREE_GATE_VERSION = 1;
 const REFERER_FRESH_MS = 30 * 24 * 60 * 60 * 1000;

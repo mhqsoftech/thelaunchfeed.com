@@ -4,27 +4,28 @@ import { LaunchTime } from "@/components/ui/LaunchTime";
 import Link from "next/link";
 import { LaunchFeedBrandLogo } from "@/components/ui/LaunchFeedLogo";
 import { breadcrumb, webPageNode } from "@/lib/seo/schema";
+import { ANSWER_SUMMARY } from "@/lib/seo/facts";
 
 export const metadata: Metadata = {
-  title: "About - The Launch Feed",
+  title: "About The Launch Feed: A Free Daily Launch Board for Makers",
   description:
-    "Learn about The Launch Feed: the 360° product intelligence platform and daily software leaderboard built for authentic indie makers, SaaS builders, and engineering teams.",
+    "The Launch Feed is a free daily launch board for software, SaaS and AI products, built by Menajul Hoque. Makers launch at 6:00 AM IST and the community upvotes.",
   alternates: {
     canonical: "https://thelaunchfeed.com/about",
   },
   openGraph: {
-    title: "About - The Launch Feed",
+    title: "About The Launch Feed",
     description:
-      "The 360° product intelligence platform and daily software leaderboard built for authentic indie makers and SaaS builders.",
+      "The Launch Feed is a free daily launch board for software, SaaS and AI products, built by Menajul Hoque. Makers launch at 6:00 AM IST and the community upvotes.",
     type: "website",
     url: "https://thelaunchfeed.com/about",
     siteName: "The Launch Feed",
   },
   twitter: {
     card: "summary_large_image",
-    title: "About - The Launch Feed",
+    title: "About The Launch Feed",
     description:
-      "The 360° product intelligence platform and daily software leaderboard built for authentic indie makers and SaaS builders.",
+      "The Launch Feed is a free daily launch board for software, SaaS and AI products, built by Menajul Hoque. Makers launch at 6:00 AM IST and the community upvotes.",
     creator: "@thelaunchfeed",
   },
 };
@@ -85,7 +86,7 @@ export default function AboutPage() {
           </Link>
         </div>
         <p className="text-xs sm:text-sm text-ink-dim font-sans leading-relaxed">
-          The Launch Feed is a high-signal, community-driven software leaderboard and 360° product intelligence engine. We help indie builders, bootstrapped SaaS founders, and engineering teams ship new products, verify real revenue, and earn prestige on a transparent daily leaderboard.
+          {ANSWER_SUMMARY} We help indie builders, bootstrapped SaaS founders, and engineering teams ship new products, verify real revenue, and earn prestige on a transparent daily leaderboard.
         </p>
         <div className="flex flex-wrap items-center gap-2 pt-1 text-[10px] sm:text-xs">
           <span className="px-2 py-1 border border-signal/40 bg-signal/10 text-signal font-bold rounded-lg">
@@ -150,14 +151,14 @@ export default function AboutPage() {
             <div className="text-[10px] sm:text-xs font-mono font-bold text-signal uppercase">Pillar 02</div>
             <div className="font-bold text-ink text-xs sm:text-sm">Multi-Channel Social Broadcast</div>
             <p className="font-sans text-xs text-ink-dim leading-relaxed">
-              Upon release, every product is automatically broadcasted across official 𝕏 (Twitter), Telegram, and WhatsApp broadcast channels, amplifying makers directly to engaged tech audiences.
+              When a product goes live, it is announced on our Telegram, WhatsApp and Bluesky channels with its tagline, maker handle and a link to the product page.
             </p>
           </div>
           <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-lg">
             <div className="text-[10px] sm:text-xs font-mono font-bold text-signal uppercase">Pillar 03</div>
             <div className="font-bold text-ink text-xs sm:text-sm">Verified MRR &amp; Stripe Telemetry</div>
             <p className="font-sans text-xs text-ink-dim leading-relaxed">
-              Founders can optionally connect read-only Stripe/Polar API keys. Our telemetry engine validates real MRR and displays cryptographic verified badges, celebrating radical financial transparency.
+              Founders can optionally connect a read-only key from Stripe, Polar, Lemon Squeezy, Paddle, Dodo Payments and other providers. We read revenue straight from the provider and show a verified badge; nothing is self-reported.
             </p>
           </div>
           <div className="p-4 sm:p-5 border border-hairline bg-surface/30 space-y-2 rounded-lg">

@@ -505,10 +505,13 @@ export default function SubmitClientView({
   initialProductData,
   onSaveProduct,
   isEmbeddedMode = false,
+  footer,
 }: {
   initialProductData?: any;
   onSaveProduct?: (updatedProduct: any) => void;
   isEmbeddedMode?: boolean;
+  /** Server-rendered content under the form (the page's FAQ). */
+  footer?: React.ReactNode;
 } = {}) {
   const [autofillUrl, setAutofillUrl] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
@@ -4586,6 +4589,7 @@ export default function SubmitClientView({
   return (
     <MainLayoutShell leftSidebar={progressSidebar}>
       {formContent}
+      {footer && !submitted && <div className="mt-8">{footer}</div>}
     </MainLayoutShell>
   );
 }

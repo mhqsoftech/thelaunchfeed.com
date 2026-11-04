@@ -4,9 +4,9 @@ import BadgesClientView from "./BadgesClientView";
 import { breadcrumb, webPageNode } from "@/lib/seo/schema";
 
 export const metadata: Metadata = {
-  title: "Official Embed Badges & Trophies - The Launch Feed",
+  title: "Product Launch Badges and Winner Awards | The Launch Feed",
   description:
-    "Explore official vector SVG badges and trophies for The Launch Feed. Badges are prestigious awards earned by top-performing products on the leaderboard.",
+    "Embeddable launch badges for your website or GitHub README. The top three products of each day, week, month and year on The Launch Feed earn winner badges.",
   alternates: { canonical: "/badges" },
 };
 

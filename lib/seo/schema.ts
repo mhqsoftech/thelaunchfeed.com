@@ -18,10 +18,19 @@ export const organizationNode = () => ({
     width: 1477,
     height: 272,
   },
+  description:
+    "A free daily launch board where makers launch software, SaaS and AI products and the community upvotes them.",
+  founder: {
+    "@type": "Person",
+    name: "Menajul Hoque",
+    sameAs: ["https://x.com/menajulm"],
+  },
+  // Only profiles that exist: github.com/thelaunchfeed 404s and the Bluesky
+  // handle is thelaunchfeed.bsky.social (no custom-domain handle).
   sameAs: [
     "https://x.com/thelaunchfeed",
-    "https://github.com/thelaunchfeed",
-    "https://bsky.app/profile/thelaunchfeed.com",
+    "https://bsky.app/profile/thelaunchfeed.bsky.social",
+    "https://t.me/thelaunchfeed",
   ],
 });
 
@@ -31,7 +40,7 @@ export const websiteNode = () => ({
   name: SITE_NAME,
   url: SITE_URL,
   description:
-    "The daily leaderboard for new software, SaaS and AI products. Makers launch, the community votes, and the best launches rank daily, weekly and monthly.",
+    "The free daily leaderboard for new software, SaaS and AI products. Makers launch at 6:00 AM IST, the community votes, and the best launches rank daily, weekly, monthly and yearly.",
   inLanguage: "en",
   publisher: { "@id": ORG_ID },
 });

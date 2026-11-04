@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDelistedSections, GENUINE_PRODUCT_FILTER } from "@/lib/queries/products";
+import { ANSWER_SUMMARY, FREE_LAUNCH_RULES, LINK_POLICY, PAID_OPTIONS } from "@/lib/seo/facts";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60; // Revalidate every 60 seconds
@@ -43,14 +44,22 @@ export async function GET() {
       });
 
   const lines: string[] = [
-    `# The Launch Feed — Complete 360° Technical & Product Knowledge Base`,
-    `> Comprehensive architectural specifications, founder stories, and full technical specifications for all launched products on The Launch Feed.`,
+    `# The Launch Feed: full product details`,
+    `> ${ANSWER_SUMMARY}`,
+    `> This file lists every live product with its tagline, category, maker, website and technical details.`,
     `> Dynamic source: ${siteUrl}/llms-full.txt`,
     `> Index summary: ${siteUrl}/llms.txt`,
     `> Dynamic XML Sitemap: ${siteUrl}/sitemap.xml`,
     ``,
-    `## Platform Metadata & Core Pages`,
+    `## How launching works`,
+    `- Free launch: ${FREE_LAUNCH_RULES}`,
+    `- Paid options: ${PAID_OPTIONS}`,
+    `- Link to the maker's site: ${LINK_POLICY}`,
+    ``,
+    `## Core pages`,
     `- [Home Daily Leaderboard](${siteUrl}/)`,
+    `- [Where to launch your product](${siteUrl}/launch-guide)`,
+    `- [Product Hunt alternative](${siteUrl}/product-hunt-alternative)`,
     `- [Top 100 Founders](${siteUrl}/founders)`,
     `- [Submit a Product ($0 Free)](${siteUrl}/submit)`,
     `- [About Platform](${siteUrl}/about)`,

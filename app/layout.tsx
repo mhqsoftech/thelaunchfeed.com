@@ -10,20 +10,20 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://thelaunchfeed.com"),
   // No site-wide canonical: a canonical here is inherited by every page that
   // forgets its own, silently pointing them all at the homepage.
-  title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
+  title: "The Launch Feed: Launch Your Product Free, Every Day",
   description:
-    "Discover the best new tech products, SaaS apps, AI tools, and developer software every day. Real-time community voting, verified founder MRR, and instant launch scheduling.",
+    "Launch your SaaS, AI tool or startup free. New products go live daily at 6:00 AM IST, makers upvote, the top 3 win badges, and every launch gets a permanent page.",
   keywords: [
-    "product launch",
-    "saas leaderboard",
-    "ai tools discovery",
-    "daily tech launches",
-    "indie hacker products",
-    "verified mrr",
+    "launch your product",
+    "free product launch",
     "product hunt alternative",
-    "startup launches",
-    "developer tools",
-    "software directory",
+    "where to launch a startup",
+    "launch saas",
+    "submit ai tool",
+    "startup directory",
+    "daily product leaderboard",
+    "verified mrr",
+    "indie hacker launch",
   ],
   authors: [{ name: "The Launch Feed" }],
   creator: "The Launch Feed",
@@ -32,15 +32,15 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "https://thelaunchfeed.com",
     siteName: "The Launch Feed",
-    title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
+    title: "The Launch Feed: Launch Your Product Free, Every Day",
     description:
-      "Discover the best new tech products, SaaS apps, and AI tools launched today. Real-time voting, verified MRR badges, and permanent maker backlinks.",
+      "A free daily launch board for SaaS, AI tools and startups. Launch at 6:00 AM IST, get upvotes, win badges and keep a permanent product page.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "The Launch Feed - The Daily Software & AI Product Leaderboard",
+    title: "The Launch Feed: Launch Your Product Free, Every Day",
     description:
-      "Discover the best new tech products, SaaS apps, and AI tools launched today with verified revenue badges.",
+      "A free daily launch board for SaaS, AI tools and startups. Launch at 6:00 AM IST, get upvotes and win badges.",
     creator: "@thelaunchfeed",
   },
   robots: {

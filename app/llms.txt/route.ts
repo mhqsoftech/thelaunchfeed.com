@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getDelistedSections, GENUINE_PRODUCT_FILTER } from "@/lib/queries/products";
+import {
+  ANSWER_SUMMARY,
+  FREE_LAUNCH_RULES,
+  LAUNCH_TIME_IST,
+  LAUNCH_TIME_UTC,
+  LINK_POLICY,
+  PAID_OPTIONS,
+  REVENUE_PROVIDERS,
+  SPOTLIGHT_PRICE,
+} from "@/lib/seo/facts";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60; // Revalidate every 60 seconds
@@ -54,39 +64,57 @@ export async function GET() {
       take: 100,
     }),
     prisma.category.findMany({
-      select: { name: true, slug: true, _count: { select: { products: true } } },
+      select: { name: true, slug: true, _count: { select: { products: { where: { status: "LIVE" } } } } },
       orderBy: { name: "asc" },
     }),
   ]);
 
   const lines: string[] = [
-    `# The Launch Feed (thelaunchfeed.com)`,
-    `> The daily software and AI product leaderboard featuring 360-degree technical architecture intelligence, founder manifestos, and verified revenue transparency.`,
+    `# The Launch Feed`,
     ``,
-    `## Platform Overview & Publishing Architecture`,
+    `> ${ANSWER_SUMMARY}`,
+    ``,
+    `## Key facts`,
     `- Website: ${siteUrl}`,
-    `- Daily Release Schedule: Every day at 06:00:00 AM IST (00:30:00 UTC). All queued products launch synchronously worldwide.`,
-    `- Multi-Channel Social Broadcast: Automatic instant publication to 𝕏 (Twitter), Telegram, and WhatsApp broadcast channels upon release.`,
-    `- 360° Product Intelligence Suite: Every product listing documents Executive Pitch, Core Features, Tech Stack, Infrastructure Mesh, OpenAPI Endpoints, Security Standards, Founder Thesis, and Release Milestones.`,
-    `- Complete Raw 360° Specs Knowledge Base: ${siteUrl}/llms-full.txt`,
-    `- Dynamic XML Sitemap: ${siteUrl}/sitemap.xml`,
+    `- What it is: a free daily launch board and leaderboard for software, SaaS, AI tools and startups; often used as a Product Hunt alternative.`,
+    `- Launch time: every day at ${LAUNCH_TIME_IST} (${LAUNCH_TIME_UTC}). Voting runs 24 hours; the top three are frozen into the daily hall of fame.`,
+    `- Boards: daily (home page), weekly, monthly, yearly and all-time.`,
+    `- Free launch: ${FREE_LAUNCH_RULES}`,
+    `- Paid options: ${PAID_OPTIONS}`,
+    `- Link to the maker's site: ${LINK_POLICY}`,
+    `- Verified revenue (optional): read-only connections to ${REVENUE_PROVIDERS.join(", ")}.`,
+    `- Winner badges: the top three of each day, week, month and year earn embeddable badges; every product has a live ranking badge.`,
+    `- Launch announcements: Telegram, WhatsApp and Bluesky.`,
     ``,
-    `## Core Platform Resources & Legal Documentation`,
-    `- [About Platform](${siteUrl}/about): Mission, philosophy, and architectural pillars of The Launch Feed.`,
-    `- [Submit a Product ($0 Free)](${siteUrl}/submit): Launch software with 360° specs and instant AI extraction.`,
-    `- [Top 100 Founders](${siteUrl}/founders): Verified leaderboard of top indie founders and software creators.`,
-    `- [Contact & Support Desks](${siteUrl}/contact): Direct support, feature requests, and partnership desks.`,
-    `- [Privacy Policy](${siteUrl}/privacy): Data protection, AES-256 telemetry encryption, and user rights.`,
-    `- [Terms of Service](${siteUrl}/terms): Platform guidelines, voting integrity standards, and acceptable use.`,
+    `## Guides`,
+    `- [Where to launch your product](${siteUrl}/launch-guide): free launch plan covering launch boards, founder communities, directories and backlinks.`,
+    `- [Product Hunt alternative](${siteUrl}/product-hunt-alternative): how The Launch Feed works as a free Product Hunt alternative, with an FAQ.`,
     ``,
-    `## Software Categories & Ecosystems`,
+    `## Main pages`,
+    `- [Today's launches](${siteUrl}/): the live daily leaderboard.`,
+    `- [Best of the week](${siteUrl}/leaderboard/weekly)`,
+    `- [Best of the month](${siteUrl}/leaderboard/monthly)`,
+    `- [Best of the year](${siteUrl}/leaderboard/yearly)`,
+    `- [All-time hall of fame](${siteUrl}/leaderboard/all-time)`,
+    `- [Submit a product](${siteUrl}/submit): launch free or pick a paid option.`,
+    `- [Book the sidebar Spotlight](${siteUrl}/spotlight/book): ${SPOTLIGHT_PRICE}.`,
+    `- [Winner badges](${siteUrl}/badges)`,
+    `- [Categories](${siteUrl}/categories)`,
+    `- [Top founders](${siteUrl}/founders)`,
+    `- [About](${siteUrl}/about)`,
+    `- [Contact](${siteUrl}/contact)`,
+    `- [Full product details for AI](${siteUrl}/llms-full.txt)`,
+    `- [Sitemap](${siteUrl}/sitemap.xml)`,
+    ``,
+    `## Categories`,
   ];
 
   for (const cat of categories) {
+    if (cat._count.products === 0) continue;
     lines.push(`- [${cat.name}](${siteUrl}/category/${cat.slug}): ${cat._count.products} live products`);
   }
 
-  lines.push(``, `## Top Live Products & Architectural Intelligence`);
+  lines.push(``, `## Top products by upvotes`);
 
   if (products.length === 0) {
     lines.push(`- No products currently published or active in the feed.`);
@@ -101,7 +129,7 @@ export async function GET() {
     }
   }
 
-  lines.push(``, `## Featured Founders & Software Craftsmen`);
+  lines.push(``, `## Founders`);
 
   for (const f of founders) {
     const displayName = f.name || f.username;
@@ -113,7 +141,8 @@ export async function GET() {
     );
   }
 
-  lines.push(``, `## Official Broadcast & Telemetry Channels`);
+  lines.push(``, `## Official channels`);
+  lines.push(`- X: https://x.com/thelaunchfeed`);
   lines.push(`- Bluesky: https://bsky.app/profile/thelaunchfeed.bsky.social`);
   lines.push(`- Telegram: https://t.me/thelaunchfeed`);
   lines.push(`- WhatsApp Community: https://chat.whatsapp.com/HxTenCRhtHa9PIviuQNl9U`);

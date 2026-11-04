@@ -1,6 +1,7 @@
 import { LaunchTime } from "@/components/ui/LaunchTime";
 import { withLaunchTime } from "@/components/ui/withLaunchTime";
 import Link from "next/link";
+import { CORE_FAQS, REVENUE_PROVIDERS, faqPageNode, type Faq } from "@/lib/seo/facts";
 
 const FEATURES = [
   {
@@ -23,8 +24,8 @@ const FEATURES = [
     num: "03",
     tag: "FINANCIAL TRANSPARENCY",
     title: "Live Verified Revenue Badges",
-    desc: "Connect Stripe, Polar, Lemon Squeezy, Paddle, or Dodo Payments via cryptographic OAuth to display tamper-proof MRR & ARR badges directly on your product card.",
-    metrics: "7+ Payment Providers · Cryptographic Proof · Monthly Growth %",
+    desc: "Connect a read-only key from Stripe, Polar, Lemon Squeezy, Paddle, Dodo Payments and more to show verified MRR and ARR on your product page.",
+    metrics: `${REVENUE_PROVIDERS.length} payment providers · Read-only keys · Monthly growth %`,
     badge: "VERIFIED MRR",
   },
   {
@@ -39,7 +40,7 @@ const FEATURES = [
     num: "05",
     tag: "FOUNDER & MAKER ECOSYSTEM",
     title: "Dedicated Founder Portfolios & Dofollow SEO",
-    desc: "Every launched product gains high-authority dofollow backlinks, structured schema.org metadata, rich screenshot carousels, and a dedicated maker profile page.",
+    desc: "Every launched product gets a permanent page with a link to your site (dofollow while our badge stays on it, always on paid launches), schema.org metadata, a screenshot carousel and a maker profile.",
     metrics: "Indexable JSON-LD · Dofollow Backlinks · Maker Threads",
     badge: "SEARCH OPTIMIZED",
   },
@@ -56,7 +57,7 @@ const FEATURES = [
 const COMPARISONS = [
   {
     feature: "Multi-Channel Social Broadcast",
-    theLaunchFeed: "Automated instant multi-channel push across WhatsApp, X, and Telegram",
+    theLaunchFeed: "Automatic launch announcements on Telegram, WhatsApp and Bluesky",
     traditional: "No social push or paywalled promotional add-ons",
   },
   {
@@ -81,7 +82,7 @@ const COMPARISONS = [
   },
   {
     feature: "SEO & Backlink Authority",
-    theLaunchFeed: "Clean semantic HTML, Schema.org JSON-LD, dofollow product URLs",
+    theLaunchFeed: "Schema.org JSON-LD, llms.txt, and a dofollow link to your site (free launches keep it while our badge stays up)",
     traditional: "Cloaked redirect links with nofollow attributes",
   },
 ];
@@ -158,34 +159,11 @@ const DEFAULT_CATEGORIES: CategoryTaxonomyItem[] = [
   { slug: "seo-ai-visibility", name: "SEO & AI Visibility", productCount: 1 },
 ];
 
-const FAQS = [
+const FAQS: Faq[] = [
+  ...CORE_FAQS,
   {
-    q: "How does launching on The Launch Feed work?",
-    a: "Founders submit their product details, screenshots, video demo, and target category. Submissions are scheduled for a chosen 6:00 AM IST daily launch slot or published immediately after verification. During the 24-hour cycle, the community discovers, tests, and upvotes listings on the live leaderboard.",
-  },
-  {
-    q: "How does automated social broadcasting work for my product?",
-    a: "The instant your product goes live at 6:00 AM IST, our broadcast engine dispatches formatted announcements across our verified Bluesky feed (@thelaunchfeed.bsky.social), WhatsApp community, and Telegram VIP channel with your product tagline, maker handles, and direct spec links.",
-  },
-  {
-    q: "How are Top 3 podium winners featured and rewarded?",
-    a: "At the close of each 24-hour cycle (and weekly/monthly cycles), the 1st, 2nd, and 3rd placed products are snapshotted into the hall of fame. Winners receive dedicated celebratory broadcasts on WhatsApp, Bluesky, and Telegram, automated founder email trophies, and unlock bespoke embeddable vector SVG award badges.",
-  },
-  {
-    q: "What makes The Launch Feed different from legacy launch platforms?",
-    a: "The Launch Feed emphasizes algorithmic fairness, automated multi-channel social distribution, direct payment provider revenue verification (Stripe, Polar, Lemon Squeezy, Paddle, Dodo), dynamic vector SVG badges that update live on external websites, and clean search engine indexability with permanent dofollow backlinks.",
-  },
-  {
-    q: "How do verified revenue badges work?",
-    a: "Makers can optionally link their payment provider through read-only OAuth or secure API connections. Our backend queries real-time MRR and verified customer counts, displaying an authoritative green verified revenue badge on your product page.",
-  },
-  {
-    q: "How do I embed a live ranking badge on my website or GitHub README?",
-    a: "Every product receives a dynamic vector SVG badge endpoint at `/api/badge/[slug]` that supports multiple themes (light, dark, signal, minimal). Simply copy the Markdown, HTML, or React snippet from your founder profile into your README or landing page hero.",
-  },
-  {
-    q: "Is it free to submit and launch a product?",
-    a: "Yes! Standard product submissions, automated social distribution, and public leaderboard placements are completely free for all indie founders, startups, and open-source creators.",
+    q: "Where is my launch announced?",
+    a: "When your product goes live at 6:00 AM IST, it is announced on our social channels (Telegram, WhatsApp and Bluesky) with your tagline, maker handle and a link to the product page. The daily top three get a second winner announcement.",
   },
 ];
 
@@ -199,16 +177,7 @@ export function HomeEditorialSection({
   const displayCategories = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES;
   const top = (liveProducts && liveProducts.length > 0 ? liveProducts : DEFAULT_LIVE_PRODUCTS).slice(0, 5);
 
-  const faqSchema = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "@id": "https://thelaunchfeed.com/#faq",
-    mainEntity: FAQS.map((faq) => ({
-      "@type": "Question",
-      name: faq.q,
-      acceptedAnswer: { "@type": "Answer", text: faq.a },
-    })),
-  };
+  const faqSchema = { "@context": "https://schema.org", ...faqPageNode("https://thelaunchfeed.com/", FAQS) };
 
   return (
     <section aria-labelledby="about-heading" className="mt-6 space-y-6 text-ink">
@@ -262,8 +231,11 @@ export function HomeEditorialSection({
           <Link href="/submit" className="inline-flex items-center h-10 px-5 rounded-full bg-signal text-white text-sm font-semibold hover:brightness-110">
             Launch your product free
           </Link>
-          <Link href="/badges" className="inline-flex items-center h-10 px-5 rounded-full border border-hairline text-sm font-medium hover:bg-surface">
-            See winner badges
+          <Link href="/launch-guide" className="inline-flex items-center h-10 px-5 rounded-full border border-hairline text-sm font-medium hover:bg-surface">
+            Read the launch guide
+          </Link>
+          <Link href="/product-hunt-alternative" className="inline-flex items-center h-10 px-5 rounded-full border border-hairline text-sm font-medium hover:bg-surface">
+            Compare with Product Hunt
           </Link>
         </div>
       </div>
@@ -368,7 +340,17 @@ export function HomeEditorialSection({
                   +
                 </span>
               </summary>
-              <p className="pb-4 pr-10 text-sm leading-relaxed text-ink-dim">{withLaunchTime(faq.a)}</p>
+              <p className="pb-4 pr-10 text-sm leading-relaxed text-ink-dim">
+                {withLaunchTime(faq.a)}
+                {faq.link && (
+                  <>
+                    {" "}
+                    <Link href={faq.link.href} className="font-medium text-signal hover:underline">
+                      {faq.link.label}
+                    </Link>
+                  </>
+                )}
+              </p>
             </details>
           ))}
         </div>
