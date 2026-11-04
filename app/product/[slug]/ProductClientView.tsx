@@ -362,6 +362,7 @@ export default function ProductClientView({
     return () => window.removeEventListener("authChanged", handleAuthChange);
   }, [baseProduct.id, baseProduct.name, baseProduct.tagline]);
 
+  const [upvoteLaunch, setUpvoteLaunch] = useState(false);
   const handleUpvote = async () => {
     const session = getStoredSession();
     if (!session) {
@@ -370,6 +371,10 @@ export default function ProductClientView({
     }
     const optimistic = !hasVoted;
     setHasVoted(optimistic);
+    if (optimistic) {
+      setUpvoteLaunch(true);
+      setTimeout(() => setUpvoteLaunch(false), 650);
+    }
     setUpvotes((v) => v + (optimistic ? 1 : -1));
 
     // Update session cache optimistically
@@ -612,24 +617,23 @@ export default function ProductClientView({
               <button
                 onClick={handleUpvote}
                 aria-pressed={hasVoted}
-                className={`tlf-upvote flex-1 sm:flex-none h-9 px-3 border text-xs font-semibold transition-[background-color,border-color,color,box-shadow] cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
+                data-launch={upvoteLaunch || undefined}
+                className={`tlf-upvote flex-1 sm:flex-none h-9 px-3 border text-xs font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-200 cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
                   hasVoted
                     ? "border-signal bg-signal text-white shadow-xs"
                     : "border-hairline bg-void text-ink hover:border-signal hover:bg-signal-dim hover:text-signal hover:shadow-[0_6px_16px_-10px_var(--color-signal)]"
                 }`}
               >
-                <svg
-                  aria-hidden="true"
-                  className="tlf-upvote-arrow w-3.5 h-3.5 shrink-0"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2.5}
-                >
-                  <path strokeLinecap="square" strokeLinejoin="miter" d="M5 15l7-7 7 7" />
-                </svg>
+                <span className="tlf-upvote-icon w-3.5 h-3.5 shrink-0" aria-hidden="true">
+                  <svg className="tlf-upvote-trail w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="square" strokeLinejoin="miter" d="M5 15l7-7 7 7" />
+                  </svg>
+                  <svg className="tlf-upvote-arrow w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="square" strokeLinejoin="miter" d="M5 15l7-7 7 7" />
+                  </svg>
+                </span>
                 <span>{hasVoted ? "Upvoted" : "Upvote"}</span>
-                <span className="font-mono text-xs opacity-90 pl-1 border-l border-current/30">
+                <span key={upvotes} className="tlf-upvote-count font-mono text-xs opacity-90 pl-1 border-l border-current/30">
                   {upvotes.toLocaleString()}
                 </span>
               </button>

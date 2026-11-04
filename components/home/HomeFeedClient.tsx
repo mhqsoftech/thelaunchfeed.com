@@ -38,7 +38,8 @@ function UpvoteButton({ productId, voteCount, emphasis = false }: { productId: s
   const router = useRouter();
   const [voted, setVoted] = useState(false);
   const [currentVotes, setCurrentVotes] = useState(voteCount);
-  const [pulse, setPulse] = useState(false);
+  // Plays the vote "launch" (arrow, ring, count roll) for one beat.
+  const [launch, setLaunch] = useState(false);
 
   useEffect(() => {
     setVoted(isProductUpvoted(productId));
@@ -57,8 +58,8 @@ function UpvoteButton({ productId, voteCount, emphasis = false }: { productId: s
     setVoted(optimistic);
     setCurrentVotes((prev) => (optimistic ? prev + 1 : prev - 1));
     if (optimistic) {
-      setPulse(true);
-      setTimeout(() => setPulse(false), 450);
+      setLaunch(true);
+      setTimeout(() => setLaunch(false), 650);
     }
     try {
       const res = await toggleVote(productId);
@@ -82,18 +83,26 @@ function UpvoteButton({ productId, voteCount, emphasis = false }: { productId: s
       onClick={handleUpvote}
       aria-pressed={voted}
       aria-label={`${voted ? "Remove upvote" : "Upvote"} (${currentVotes} votes)`}
-      className={`tlf-upvote relative z-10 shrink-0 w-14 h-14 sm:w-16 sm:h-16 flex flex-col items-center justify-center gap-0.5 rounded-xl border transition-[background-color,border-color,color,transform,box-shadow] active:scale-95 ${
+      data-launch={launch || undefined}
+      className={`tlf-upvote relative z-10 shrink-0 w-14 h-14 sm:w-16 sm:h-16 flex flex-col items-center justify-center gap-0.5 rounded-xl border transition-[background-color,border-color,color,transform,box-shadow] duration-200 active:scale-95 ${
         voted
           ? "border-signal bg-signal text-white shadow-[0_8px_20px_-10px_var(--color-signal)]"
           : emphasis
           ? "border-signal/40 bg-signal-dim text-signal hover:border-signal hover:shadow-[0_6px_16px_-10px_var(--color-signal)]"
           : "border-hairline bg-card text-ink hover:border-signal hover:bg-signal-dim hover:text-signal hover:shadow-[0_6px_16px_-10px_var(--color-signal)]"
-      } ${pulse ? "scale-110" : ""}`}
+      }`}
     >
-      <svg className="tlf-upvote-arrow w-3.5 h-3.5" viewBox="0 0 24 24" fill={voted ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
-        <path strokeLinejoin="round" d="M12 5.5 20 18H4z" />
-      </svg>
-      <span className="text-[13px] font-mono font-bold leading-none tabular-nums">{currentVotes}</span>
+      <span className="tlf-upvote-icon w-3.5 h-3.5" aria-hidden="true">
+        <svg className="tlf-upvote-trail w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
+          <path strokeLinejoin="round" d="M12 5.5 20 18H4z" />
+        </svg>
+        <svg className="tlf-upvote-arrow w-3.5 h-3.5" viewBox="0 0 24 24" fill={voted ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2.4}>
+          <path strokeLinejoin="round" d="M12 5.5 20 18H4z" />
+        </svg>
+      </span>
+      <span key={currentVotes} className="tlf-upvote-count text-[13px] font-mono font-bold leading-none tabular-nums">
+        {currentVotes}
+      </span>
     </button>
   );
 }
