@@ -371,12 +371,15 @@ export default function HomeFeedClient({
         {/* Board header */}
         <header className="relative overflow-hidden rounded-[calc(var(--radius-card)+4px)] border border-hairline bg-card px-5 py-5 sm:px-7 sm:py-6">
           <div className="tlf-signal-grid absolute inset-0 pointer-events-none" aria-hidden />
-          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          {/* Two rows, each balanced: what the board is (left) with when the
+              next batch lands (right); then a toolbar with the timeframe
+              switch (left) and the ask-AI links (right). */}
+          <div className="relative grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:gap-10 lg:items-start">
             <div className="min-w-0">
               <h1 className="font-display font-black uppercase tracking-wide text-[26px] sm:text-[34px] leading-[1.05] text-ink">
                 {headline[activeTab]}
               </h1>
-              <p className="mt-1.5 text-sm font-medium text-ink">{subtitle[activeTab]}</p>
+              <p className="mt-2 text-sm font-medium text-ink">{subtitle[activeTab]}</p>
               <p className="mt-1 text-sm text-ink-dim max-w-xl">
                 {activeTab === "daily"
                   ? withLaunchTime("New software, SaaS and AI products go live every day at 6:00 AM IST. Upvote the ones you'd actually use.", { showIst: true })
@@ -384,10 +387,15 @@ export default function HomeFeedClient({
                   ? "The most upvoted products ever launched on The Launch Feed."
                   : `The highest-voted launches ${activeTab === "yearly" ? `of ${year}` : `this ${activeTab === "weekly" ? "week" : "month"}`}, grouped by category.`}
               </p>
-              {activeTab === "daily" && <NextLaunchCountdown variant="compact" className="mt-3" />}
-              <AskAiLinks className="mt-4" />
             </div>
-            <nav aria-label="Leaderboard timeframe" className="shrink-0 -mx-1 overflow-x-auto no-scrollbar">
+            {activeTab === "daily" && (
+              <div className="lg:pt-1">
+                <NextLaunchCountdown variant="compact" />
+              </div>
+            )}
+          </div>
+          <div className="relative mt-5 pt-4 border-t border-hairline flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <nav aria-label="Leaderboard timeframe" className="-mx-1 overflow-x-auto no-scrollbar">
               <ul className="flex gap-1 p-1 rounded-full bg-surface border border-hairline w-max">
                 {TABS.map((t) => (
                   <li key={t}>
@@ -405,6 +413,7 @@ export default function HomeFeedClient({
                 ))}
               </ul>
             </nav>
+            <AskAiLinks />
           </div>
         </header>
 
