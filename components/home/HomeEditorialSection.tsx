@@ -5,52 +5,34 @@ import { CORE_FAQS, REVENUE_PROVIDERS, faqPageNode, type Faq } from "@/lib/seo/f
 
 const FEATURES = [
   {
-    num: "01",
-    tag: "DISCOVERY & RANKING",
-    title: "Algorithmic 24-Hour Launch Board",
-    desc: "Every product launches into a transparent 24-hour cycle starting at 6:00 AM IST. Rankings are computed in real-time with verified upvote weighting, historical snapshots, and anti-spam protection.",
-    metrics: "24h cycle · 6:00 AM IST reset · Anti-bot scoring",
-    badge: "CORE ENGINE",
+    tag: "Ranking",
+    title: "A fresh board every day",
+    desc: "Launches go live at 6:00 AM IST and collect upvotes for 24 hours. The day's top three are saved to the hall of fame, and every launch keeps ranking on the weekly, monthly, yearly and all-time boards.",
   },
   {
-    num: "02",
-    tag: "SOCIAL DISTRIBUTION",
-    title: "Automated Multi-Channel Social Broadcast",
-    desc: "Every product launch and Top 3 podium winner (#1, #2, #3) is automatically broadcasted across WhatsApp, Bluesky, and Telegram to active founders, tech operators, and builders.",
-    metrics: "WhatsApp Community · Bluesky Viral Feed · Telegram VIP Telemetry",
-    badge: "SOCIAL NETWORK",
+    tag: "Announcements",
+    title: "Shared on our channels",
+    desc: "Each launch is announced on Telegram, WhatsApp and Bluesky with your tagline and maker handle. The daily top three get a second winner post.",
   },
   {
-    num: "03",
-    tag: "FINANCIAL TRANSPARENCY",
-    title: "Live Verified Revenue Badges",
-    desc: "Connect a read-only key from Stripe, Polar, Lemon Squeezy, Paddle, Dodo Payments and more to show verified MRR and ARR on your product page.",
-    metrics: `${REVENUE_PROVIDERS.length} payment providers · Read-only keys · Monthly growth %`,
-    badge: "VERIFIED MRR",
+    tag: "Revenue",
+    title: "Verified revenue, if you want it",
+    desc: `Connect a read-only key from one of ${REVENUE_PROVIDERS.length} payment providers, including Stripe, Polar, Lemon Squeezy, Paddle and Dodo Payments, to show verified MRR on your product page.`,
   },
   {
-    num: "04",
-    tag: "VIRAL DISTRIBUTION",
-    title: "Bespoke Geometric Vector SVG Badges",
-    desc: "Embed bespoke vector SVG award badges directly into your GitHub README or landing page that automatically reflect your live rank (Daily, Weekly, Monthly, Yearly, All-Time).",
-    metrics: "Custom Geometric Emblems · Real-time SVG · 4 Themes",
-    badge: "AWARD EMBEDS",
+    tag: "Badges",
+    title: "Badges for your site and README",
+    desc: "Embed a live ranking badge that updates as you climb, in light, dark, signal or minimal style. Top three finishers earn winner badges for the day, week, month and year.",
   },
   {
-    num: "05",
-    tag: "FOUNDER & MAKER ECOSYSTEM",
-    title: "Dedicated Founder Portfolios & Dofollow SEO",
-    desc: "Every launched product gets a permanent page with a link to your site (dofollow while our badge stays on it, always on paid launches), schema.org metadata, a screenshot carousel and a maker profile.",
-    metrics: "Indexable JSON-LD · Dofollow Backlinks · Maker Threads",
-    badge: "SEARCH OPTIMIZED",
+    tag: "Your page",
+    title: "A permanent product page",
+    desc: "Screenshots, description, maker profile and a link to your site: dofollow while our badge stays on it, and always on paid launches.",
   },
   {
-    num: "06",
-    tag: "TECH INTELLIGENCE",
-    title: "360° Technical Architecture Specs",
-    desc: "Every product showcases deep engineering specs: frontend frameworks, cloud databases, backend infrastructure, hosting providers, and founder architecture manifestos.",
-    metrics: "Framework Telemetry · Database Specs · Infra Hosting",
-    badge: "TECH SPECS",
+    tag: "Details",
+    title: "How it's built",
+    desc: "Optionally list your tech stack, hosting and the story behind the product, so developers can see what's under the hood.",
   },
 ];
 
@@ -245,11 +227,10 @@ export function HomeEditorialSection({
         <h2 className="text-xl sm:text-2xl font-semibold tracking-tight px-1">What every launch gets</h2>
         <ul className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {FEATURES.map((f) => (
-            <li key={f.num} className="rounded-[var(--radius-card)] border border-hairline bg-card p-5">
+            <li key={f.title} className="rounded-[var(--radius-card)] border border-hairline bg-card p-5">
               <p className="text-xs font-medium text-signal">{f.tag}</p>
               <h3 className="mt-1.5 font-semibold text-ink">{f.title}</h3>
               <p className="mt-1.5 text-sm text-ink-dim leading-relaxed">{withLaunchTime(f.desc)}</p>
-              <p className="mt-3 text-xs font-mono text-ink-faint">{withLaunchTime(f.metrics)}</p>
             </li>
           ))}
         </ul>
