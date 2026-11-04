@@ -611,14 +611,16 @@ export default function ProductClientView({
             <div className="flex flex-row sm:flex-col items-stretch gap-2 shrink-0 w-full sm:w-36">
               <button
                 onClick={handleUpvote}
-                className={`flex-1 sm:flex-none h-9 px-3 border text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 uppercase tracking-wider ${
+                aria-pressed={hasVoted}
+                className={`tlf-upvote flex-1 sm:flex-none h-9 px-3 border text-xs font-semibold transition-[background-color,border-color,color,box-shadow] cursor-pointer flex items-center justify-center gap-1.5 shrink-0 ${
                   hasVoted
-                    ? "border-signal bg-signal text-void shadow-xs"
-                    : "border-hairline hover:border-ink bg-void text-ink hover:bg-surface/50"
+                    ? "border-signal bg-signal text-white shadow-xs"
+                    : "border-hairline bg-void text-ink hover:border-signal hover:bg-signal-dim hover:text-signal hover:shadow-[0_6px_16px_-10px_var(--color-signal)]"
                 }`}
               >
                 <svg
-                  className="w-3.5 h-3.5 shrink-0"
+                  aria-hidden="true"
+                  className="tlf-upvote-arrow w-3.5 h-3.5 shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

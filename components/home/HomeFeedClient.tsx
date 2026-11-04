@@ -12,6 +12,7 @@ import type { BoardRow } from "@/app/api/board/route";
 import { BookmarkButton } from "@/components/ui/BookmarkButton";
 import { HomeEditorialSection, type LiveTopProductItem } from "@/components/home/HomeEditorialSection";
 import { NextLaunchCountdown } from "@/components/ui/NextLaunchCountdown";
+import { AskAiLinks } from "@/components/home/AskAiLinks";
 import { getDailyCycleRange } from "@/lib/schedule";
 import {
   isProductUpvoted,
@@ -81,15 +82,15 @@ function UpvoteButton({ productId, voteCount, emphasis = false }: { productId: s
       onClick={handleUpvote}
       aria-pressed={voted}
       aria-label={`${voted ? "Remove upvote" : "Upvote"} (${currentVotes} votes)`}
-      className={`relative z-10 shrink-0 w-14 h-14 sm:w-16 sm:h-16 flex flex-col items-center justify-center gap-0.5 rounded-xl border transition-[background-color,border-color,color,transform] active:scale-95 ${
+      className={`tlf-upvote relative z-10 shrink-0 w-14 h-14 sm:w-16 sm:h-16 flex flex-col items-center justify-center gap-0.5 rounded-xl border transition-[background-color,border-color,color,transform,box-shadow] active:scale-95 ${
         voted
           ? "border-signal bg-signal text-white shadow-[0_8px_20px_-10px_var(--color-signal)]"
           : emphasis
-          ? "border-signal/40 bg-signal-dim text-signal hover:border-signal"
-          : "border-hairline bg-card text-ink hover:border-signal hover:text-signal"
+          ? "border-signal/40 bg-signal-dim text-signal hover:border-signal hover:shadow-[0_6px_16px_-10px_var(--color-signal)]"
+          : "border-hairline bg-card text-ink hover:border-signal hover:bg-signal-dim hover:text-signal hover:shadow-[0_6px_16px_-10px_var(--color-signal)]"
       } ${pulse ? "scale-110" : ""}`}
     >
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={voted ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
+      <svg className="tlf-upvote-arrow w-3.5 h-3.5" viewBox="0 0 24 24" fill={voted ? "currentColor" : "none"} stroke="currentColor" strokeWidth={2.4} aria-hidden="true">
         <path strokeLinejoin="round" d="M12 5.5 20 18H4z" />
       </svg>
       <span className="text-[13px] font-mono font-bold leading-none tabular-nums">{currentVotes}</span>
@@ -375,6 +376,7 @@ export default function HomeFeedClient({
                   : `The highest-voted launches ${activeTab === "yearly" ? `of ${year}` : `this ${activeTab === "weekly" ? "week" : "month"}`}, grouped by category.`}
               </p>
               {activeTab === "daily" && <NextLaunchCountdown variant="compact" className="mt-3" />}
+              <AskAiLinks className="mt-4" />
             </div>
             <nav aria-label="Leaderboard timeframe" className="shrink-0 -mx-1 overflow-x-auto no-scrollbar">
               <ul className="flex gap-1 p-1 rounded-full bg-surface border border-hairline w-max">

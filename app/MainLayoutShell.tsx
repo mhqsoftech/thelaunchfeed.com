@@ -250,15 +250,6 @@ function LaunchButton() {
   );
 }
 
-/** Countdown pill to the next 6:00 AM IST batch (wide screens). */
-function NextBatchPill() {
-  return (
-    <span className="hidden 2xl:inline-flex">
-      <NextLaunchCountdown variant="compact" />
-    </span>
-  );
-}
-
 /**
  * Off-desktop Spotlight: a single non-scrolling row of logo + name chips.
  * The row holds as many as the screen fits (3 on small phones → 6 on
@@ -1040,7 +1031,6 @@ export default function MainLayoutShell({
             >
               <Icon d={ICONS.search} />
             </button>
-            <NextBatchPill />
             <LaunchButton />
             {userSession ? (
               <Link
