@@ -2504,12 +2504,12 @@ export default function SubmitClientView({
               {queuedSubmission?.launchTier === 5 ? (
                 <div className="p-3.5 border border-signal/40 bg-signal/10 text-signal text-xs font-mono font-bold uppercase flex items-center justify-center gap-2 max-w-md mx-auto">
                   <span className="w-2 h-2 rounded-full bg-signal animate-pulse" />
-                  <span>$5 Featured Launch Confirmed · Header Floating Placement Active for 30 Days Upon Launch</span>
+                  <span>$5 Featured Launch Confirmed · Featured Ticker Placement Live Now for 30 Days</span>
                 </div>
               ) : queuedSubmission?.launchTier === 10 ? (
                 <div className="p-3.5 border border-[#38BDF8]/40 bg-[#38BDF8]/10 text-[#38BDF8] text-xs font-mono font-bold uppercase flex items-center justify-center gap-2 max-w-md mx-auto">
                   <span className="w-2 h-2 rounded-full bg-[#38BDF8] animate-pulse" />
-                  <span>$10 Spotlight Placement Confirmed · Alternating 15s Spotlight Active for 30 Days Upon Launch</span>
+                  <span>$10 Spotlight Placement Confirmed · Featured + Spotlight Placement Live Now for 30 Days</span>
                 </div>
               ) : (
                 <div className="p-3 border border-hairline bg-void text-ink-dim text-xs font-mono uppercase flex items-center justify-center gap-2 max-w-md mx-auto">
@@ -3712,9 +3712,9 @@ export default function SubmitClientView({
                   {isEditMode
                     ? "Update and save your live product details instantly."
                     : launchTier === 10
-                    ? "After checkout your product is scheduled and, from launch, shown for 30 days in BOTH the Featured ticker and the Spotlight rail."
+                    ? "Your product appears in BOTH the Featured ticker and the Spotlight rail as soon as checkout completes, linking to your website, for 30 days."
                     : launchTier === 5
-                    ? "After checkout your product is scheduled and, from launch, shown for 30 days in the Featured ticker on every page."
+                    ? "Your product appears in the Featured ticker on every page as soon as checkout completes, linking to your website, for 30 days."
                     : withLaunchTime("Free launch: once your badge is verified and you've upvoted 3 launches, your product joins the daily free release queue (6:00 AM IST).")}
                 </p>
                 

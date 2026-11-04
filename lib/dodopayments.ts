@@ -39,6 +39,18 @@ function isLiveMode() {
   );
 }
 
+/** The maker's website as an absolute http(s) URL, or null if it isn't one. */
+export function normalizeMakerUrl(raw: string | null | undefined): string | null {
+  const v = raw?.trim();
+  if (!v) return null;
+  try {
+    const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Purchases whose Dodo session couldn't be created keep this placeholder id. */
 const SANDBOX_SESSION_PREFIX = "dodo_sess_";
 
@@ -287,8 +299,9 @@ export async function activatePlacementSlot({
   if (productId) {
     const product = await prisma.product.findUnique({ where: { id: productId } });
     if (product) {
-      const isProductLive = product.status === "LIVE";
-      let startsAt = isProductLive ? now : (product.launchedAt > now ? product.launchedAt : now);
+      // A paid placement goes live the moment payment is confirmed and runs
+      // for the full paid period from then on.
+      let startsAt = now;
       let endsAt = new Date(startsAt.getTime() + thirtyDaysMs);
 
       // Check existing active slot to stack / extend
@@ -301,12 +314,13 @@ export async function activatePlacementSlot({
       });
 
       if (existingSlot && existingSlot.endsAt && existingSlot.endsAt > now) {
-        startsAt = existingSlot.startsAt;
+        startsAt = existingSlot.startsAt < now ? existingSlot.startsAt : now;
         endsAt = new Date(existingSlot.endsAt.getTime() + thirtyDaysMs);
 
         const updatedSlot = await prisma.featuredSlot.update({
           where: { id: existingSlot.id },
           data: {
+            startsAt,
             endsAt,
             kind: "PAID",
             purchaseId: purchase?.id ?? existingSlot.purchaseId,
@@ -384,9 +398,13 @@ export async function activatePlacementSlot({
         await emit("submission.created", { submissionId: sub.id }, { dedupeKey: `submission.created:paid:${sub.id}` });
       }
 
-      // Compute slot window starting at scheduled release time
-      const startsAt = scheduledFor > now ? scheduledFor : now;
+      // The placement is shown immediately (not at the launch batch) and runs
+      // for the full paid period from the moment of payment. It links to the
+      // maker's own website; the ?ref=thelaunchfeed tag is added where the
+      // link is rendered (formatProductWebsiteUrl) and on the /go redirect.
+      const startsAt = now;
       const endsAt = new Date(startsAt.getTime() + thirtyDaysMs);
+      const makerSite = normalizeMakerUrl(sub.websiteUrl);
 
       const lastSlot = await prisma.featuredSlot.findFirst({
         where: { position: config.slotPosition },
@@ -405,7 +423,7 @@ export async function activatePlacementSlot({
             customName: sub.name,
             customTagline: sub.tagline,
             customLogoUrl: sub.logoUrl,
-            customUrl: `/product/${slugify(sub.name)}`,
+            customUrl: makerSite ?? `/product/${slugify(sub.name)}`,
             startsAt,
             endsAt,
             purchaseId: purchase?.id,

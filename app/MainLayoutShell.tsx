@@ -10,6 +10,7 @@ import { NextLaunchCountdown } from "@/components/ui/NextLaunchCountdown";
 import { useLocalLaunchTime } from "@/components/ui/LaunchTime";
 import { OutboundLink } from "@/components/ui/OutboundLink";
 import { goHref } from "@/lib/outbound/links";
+import { RAIL_ROTATE_MS, RAIL_VISIBLE_SLOTS } from "@/lib/rail-spotlight-shared";
 import {
   slugify,
   formatProductWebsiteUrl,
@@ -58,6 +59,8 @@ type LayoutCategory = { id?: string; slug: string; name: string; productCount?: 
 type LayoutCache = {
   featured: LayoutSlot[];
   rotating: LayoutSlot[];
+  /** Sidebar Spotlight bookings that are live right now (max 4). */
+  rail?: LayoutSlot[];
   weeklyProducts: LayoutProduct[];
   monthlyProducts: LayoutProduct[];
   topFounders: LayoutFounder[];
@@ -77,6 +80,7 @@ function readLayoutCache(): LayoutCache | null {
     memoryLayoutCache = {
       featured: parsed.featured ?? [],
       rotating: parsed.rotating ?? [],
+      rail: parsed.rail ?? [],
       weeklyProducts: parsed.weeklyProducts ?? [],
       monthlyProducts: parsed.monthlyProducts ?? [],
       topFounders: parsed.topFounders ?? [],
@@ -165,6 +169,12 @@ function SlotLink({
 }
 
 /* ─────────────────────────── small pieces ─────────────────────────── */
+
+/** Spotlight lists (sidebar + right rail): one hairline container, rows
+ *  divided by rules, no per-row cards. */
+const SPOT_LIST = "rounded-xl border border-hairline bg-card divide-y divide-hairline overflow-hidden";
+const SPOT_ROW =
+  "group flex items-center gap-2.5 h-12 px-3 hover:bg-surface focus-visible:bg-surface focus-visible:outline-offset-[-2px] transition-colors";
 
 function Avatar({
   src,
@@ -294,11 +304,11 @@ function MobileSpotlight({ slots }: { slots: LayoutSlot[] }) {
   return (
     <section aria-label="Spotlight (sponsored)" className="xl:hidden mb-5">
       <div className="flex items-center justify-between mb-1.5 px-0.5">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-ink-faint">Spotlight · Sponsored</span>
+        <span className="text-xs text-ink-faint">Sponsored spotlight</span>
         {pages > 1 && (
           <span className="flex items-center gap-1" aria-hidden>
             {Array.from({ length: pages }, (_, i) => (
-              <span key={i} className={`h-1 rounded-full transition-all ${i === page ? "w-3 bg-signal" : "w-1 bg-hairline"}`} />
+              <span key={i} className={`w-1.5 h-1.5 rounded-full transition-colors ${i === page ? "bg-signal" : "bg-hairline"}`} />
             ))}
           </span>
         )}
@@ -375,6 +385,7 @@ export default function MainLayoutShell({
   const [isLoadingLayout, setIsLoadingLayout] = useState(true);
   const [featured, setFeatured] = useState<LayoutSlot[]>([]);
   const [rotating, setRotating] = useState<LayoutSlot[]>([]);
+  const [rail, setRail] = useState<LayoutSlot[]>([]);
   const [weeklyProducts, setWeeklyProducts] = useState<LayoutProduct[]>([]);
   const [monthlyProducts, setMonthlyProducts] = useState<LayoutProduct[]>([]);
   const [categories, setCategories] = useState<LayoutCategory[]>(DEFAULT_CATEGORIES);
@@ -411,6 +422,7 @@ export default function MainLayoutShell({
     if (cached) {
       setFeatured(cached.featured);
       setRotating(cached.rotating);
+      setRail(cached.rail ?? []);
       setWeeklyProducts(cached.weeklyProducts);
       setMonthlyProducts(cached.monthlyProducts);
       if (cached.topFounders.length) setTopFounders(cached.topFounders);
@@ -430,6 +442,7 @@ export default function MainLayoutShell({
         const next: LayoutCache = {
           featured: data.featured ?? [],
           rotating: data.rotating ?? [],
+          rail: data.rail ?? [],
           weeklyProducts: weekly,
           monthlyProducts: monthly,
           topFounders: data.topFounders ?? [],
@@ -441,6 +454,7 @@ export default function MainLayoutShell({
         } catch {}
         setFeatured(next.featured);
         setRotating(next.rotating);
+        setRail(next.rail ?? []);
         setWeeklyProducts(weekly);
         setMonthlyProducts(monthly);
         if (next.topFounders.length) setTopFounders(next.topFounders);
@@ -494,6 +508,31 @@ export default function MainLayoutShell({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  // Sidebar Spotlight: 4 visible bookings; with more, the set advances every
+  // 15s (paused while the pointer or keyboard focus is inside it).
+  const [railPage, setRailPage] = useState(0);
+  const [railFading, setRailFading] = useState(false);
+  const [railPaused, setRailPaused] = useState(false);
+  const railPages = Math.max(1, Math.ceil(rail.length / RAIL_VISIBLE_SLOTS));
+  useEffect(() => {
+    setRailPage((p) => p % railPages);
+  }, [railPages]);
+  useEffect(() => {
+    if (railPages <= 1 || railPaused) return;
+    let swap: ReturnType<typeof setTimeout> | undefined;
+    const id = setInterval(() => {
+      setRailFading(true);
+      swap = setTimeout(() => {
+        setRailPage((p) => (p + 1) % railPages);
+        setRailFading(false);
+      }, 250);
+    }, RAIL_ROTATE_MS);
+    return () => {
+      clearInterval(id);
+      if (swap) clearTimeout(swap);
+    };
+  }, [railPages, railPaused]);
 
   // Spotlight rotation: 4 visible paid slots, advance every 10s.
   useEffect(() => {
@@ -590,12 +629,9 @@ export default function MainLayoutShell({
   const searchView = (
     <section aria-labelledby="search-heading" className="space-y-6">
       <div className="flex items-end justify-between gap-3 border-b border-hairline pb-3">
-        <div className="min-w-0">
-          <p className="text-xs font-mono uppercase tracking-wider text-ink-faint">Search</p>
-          <h1 id="search-heading" className="text-xl sm:text-2xl font-semibold tracking-tight text-ink truncate">
-            “{searchQuery.trim()}”
-          </h1>
-        </div>
+        <h1 id="search-heading" className="min-w-0 text-xl sm:text-2xl font-semibold tracking-tight text-ink truncate">
+          Results for “{searchQuery.trim()}”
+        </h1>
         <button
           type="button"
           onClick={clearSearch}
@@ -615,8 +651,8 @@ export default function MainLayoutShell({
 
       {!isSearching && searchResults.products.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">
-            Products · {searchResults.products.length}
+          <h2 className="flex items-baseline gap-2 text-sm font-semibold text-ink">
+            Products <span className="font-mono text-xs font-normal text-ink-faint tabular-nums">{searchResults.products.length}</span>
           </h2>
           <ul className="space-y-2">
             {searchResults.products.map((p) => (
@@ -624,7 +660,7 @@ export default function MainLayoutShell({
                 <Link
                   href={`/product/${p.slug || slugify(p.name)}`}
                   onClick={clearSearch}
-                  className="flex items-center gap-3.5 p-3 rounded-[var(--radius-card)] border border-hairline bg-card hover:border-ink-faint hover:shadow-[var(--shadow-lift)] transition-all"
+                  className="flex items-center gap-3.5 p-3 rounded-[var(--radius-card)] border border-hairline bg-card hover:border-ink-faint hover:shadow-[var(--shadow-lift)] transition-[border-color,box-shadow]"
                 >
                   <Avatar src={p.logoUrl} name={p.name} size={44} />
                   <div className="min-w-0 flex-1">
@@ -642,8 +678,8 @@ export default function MainLayoutShell({
 
       {!isSearching && searchResults.founders.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">
-            Founders · {searchResults.founders.length}
+          <h2 className="flex items-baseline gap-2 text-sm font-semibold text-ink">
+            Founders <span className="font-mono text-xs font-normal text-ink-faint tabular-nums">{searchResults.founders.length}</span>
           </h2>
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {searchResults.founders.map((f) => (
@@ -656,8 +692,10 @@ export default function MainLayoutShell({
                   <Avatar src={f.image} name={f.name || f.username} size={40} round />
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-ink truncate">{f.name}</div>
-                    <div className="text-xs text-ink-dim truncate">
-                      @{f.username} · {f.productsCount} shipped · {f.totalVotes} votes
+                    <div className="flex gap-x-3 text-xs text-ink-dim truncate">
+                      <span className="truncate">@{f.username}</span>
+                      <span className="shrink-0 tabular-nums">{f.productsCount} shipped</span>
+                      <span className="shrink-0 tabular-nums">{f.totalVotes} votes</span>
                     </div>
                   </div>
                 </Link>
@@ -672,7 +710,7 @@ export default function MainLayoutShell({
           <p className="font-semibold text-ink">No matches for “{searchQuery.trim()}”</p>
           <p className="mt-1 text-sm text-ink-dim">Try a product name, a maker&apos;s @handle, or browse by category.</p>
           <Link href="/categories" onClick={clearSearch} className="inline-block mt-4 text-sm font-semibold text-signal hover:underline">
-            Browse all categories →
+            Browse all categories
           </Link>
         </div>
       )}
@@ -680,10 +718,76 @@ export default function MainLayoutShell({
   );
 
   /* ─────────── rails ─────────── */
+  /* Sidebar Spotlight above "Top by category": four sponsored slots sold at
+     $1 per 3 days (/spotlight/book). Live bookings fill the first slots; every
+     open slot is a link to book it. */
+  // Wrap around so a partly filled last page still shows a full set.
+  const railVisible =
+    rail.length > RAIL_VISIBLE_SLOTS
+      ? Array.from({ length: RAIL_VISIBLE_SLOTS }, (_, i) => rail[(railPage * RAIL_VISIBLE_SLOTS + i) % rail.length])
+      : rail;
+  const railOpen = Math.max(0, RAIL_VISIBLE_SLOTS - railVisible.length);
+  const sponsoredSlots = (
+    <section
+      aria-labelledby="sponsored-slots-heading"
+      className="space-y-2.5"
+      onMouseEnter={() => setRailPaused(true)}
+      onMouseLeave={() => setRailPaused(false)}
+      onFocus={() => setRailPaused(true)}
+      onBlur={() => setRailPaused(false)}
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 id="sponsored-slots-heading" className="text-sm font-semibold text-ink">
+          Spotlight
+        </h2>
+        <span className="text-xs text-ink-faint tabular-nums">
+          {railPages > 1 ? `Sponsored, ${railPage + 1} of ${railPages}` : "Sponsored"}
+        </span>
+      </div>
+      <ul
+        className={`${SPOT_LIST} transition-opacity duration-200 motion-reduce:transition-none ${railFading ? "opacity-0" : "opacity-100"}`}
+      >
+        {railVisible.map((p, i) => (
+          <li key={`${p.id}-${i}`}>
+            <SlotLink slot={p} src="spotlight" className={SPOT_ROW}>
+              <Avatar src={p.logoUrl} name={p.name} size={28} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-medium text-ink truncate group-hover:text-signal transition-colors">{p.name}</span>
+                <span className="block text-xs text-ink-faint truncate">{p.tagline}</span>
+              </span>
+            </SlotLink>
+          </li>
+        ))}
+        {Array.from({ length: railOpen }, (_, i) => (
+          <li key={`open-${i}`}>
+            <Link href="/spotlight/book" className={SPOT_ROW}>
+              <span className="w-7 h-7 shrink-0 rounded-md bg-surface" aria-hidden />
+              <span className="flex-1 text-[13px] text-ink-faint group-hover:text-ink transition-colors">Available</span>
+              <span className="text-xs text-ink-dim group-hover:text-signal transition-colors">$1 for 3 days</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {/* All visible rows booked: bookings keep rotating in every 15s, so
+          the slot stays buyable. */}
+      {railOpen === 0 && (
+        <Link
+          href="/spotlight/book"
+          className="flex items-center justify-between w-full h-9 px-3 rounded-lg border border-hairline text-xs font-medium text-ink hover:border-signal hover:text-signal transition-colors"
+        >
+          Reserve a spot
+          <span className="text-ink-dim">$1 for 3 days</span>
+        </Link>
+      )}
+    </section>
+  );
+
   const leftRail = leftSidebar ?? (
+    <div className="space-y-7">
+    {sponsoredSlots}
     <nav aria-label="Top products by category" className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xs font-mono uppercase tracking-wider text-ink-faint">Top by category</h2>
+        <h2 className="text-sm font-semibold text-ink">Top by category</h2>
         <div role="tablist" aria-label="Timeframe" className="flex p-0.5 rounded-full bg-surface border border-hairline text-[11px] font-medium">
           {(["weekly", "monthly"] as const).map((t) => (
             <button
@@ -736,37 +840,34 @@ export default function MainLayoutShell({
         <div className="p-4 rounded-[var(--radius-card)] border border-dashed border-hairline text-center space-y-2">
           <p className="text-sm font-medium text-ink">No launches this {railTab === "weekly" ? "week" : "month"} yet</p>
           <Link href="/submit" className="inline-block text-xs font-semibold text-signal hover:underline">
-            Be the first to launch →
+            Be the first to launch
           </Link>
         </div>
       )}
     </nav>
+    </div>
   );
 
   const spotlightBlock =
     spotlight.length > 0 ? (
       <section aria-labelledby="spotlight-heading" className="space-y-2">
         <div className="flex items-center justify-between">
-          <h2 id="spotlight-heading" className="text-xs font-mono uppercase tracking-wider text-ink-faint">
+          <h2 id="spotlight-heading" className="text-sm font-semibold text-ink">
             Spotlight
           </h2>
-          <Link href="/submit" className="text-[11px] text-ink-faint hover:text-signal">
-            Sponsored · Get yours
+          <Link href="/submit" className="text-xs text-ink-faint hover:text-signal">
+            Sponsored, get yours
           </Link>
         </div>
-        <ul className={`space-y-1.5 transition-opacity duration-300 ${isFading ? "opacity-0" : "opacity-100"}`}>
+        <ul className={`${SPOT_LIST} transition-opacity duration-300 motion-reduce:transition-none ${isFading ? "opacity-0" : "opacity-100"}`}>
           {spotlight.map((p, i) => (
             <li key={`${p.id}-${i}`}>
-              <SlotLink
-                slot={p}
-                src="spotlight"
-                className="flex items-center gap-3 p-2.5 rounded-xl border border-hairline bg-card hover:border-signal/50 hover:shadow-[var(--shadow-lift)] transition-all"
-              >
-                <Avatar src={p.logoUrl} name={p.name} size={36} />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-ink truncate">{p.name}</div>
-                  <div className="text-xs text-ink-dim truncate">{p.tagline}</div>
-                </div>
+              <SlotLink slot={p} src="spotlight" className={SPOT_ROW}>
+                <Avatar src={p.logoUrl} name={p.name} size={28} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-medium text-ink truncate group-hover:text-signal transition-colors">{p.name}</span>
+                  <span className="block text-xs text-ink-faint truncate">{p.tagline}</span>
+                </span>
               </SlotLink>
             </li>
           ))}
@@ -811,7 +912,7 @@ export default function MainLayoutShell({
             ))}
             <li>
               <Link href="/categories" className="block px-2.5 py-2 text-xs font-semibold text-signal hover:underline">
-                All categories →
+                All categories
               </Link>
             </li>
           </ul>
@@ -836,7 +937,7 @@ export default function MainLayoutShell({
                 ))}
             <li>
               <Link href="/founders" className="block px-2.5 py-2 text-xs font-semibold text-signal hover:underline">
-                Top 100 founders →
+                Top 100 founders
               </Link>
             </li>
           </ol>
@@ -855,10 +956,9 @@ export default function MainLayoutShell({
         <div className="tlf-ticker relative h-10 overflow-hidden" aria-label="Featured products">
           <div className="flex items-stretch h-full">
             {/* "On air" tab */}
-            <span className="tlf-ticker-tab relative z-10 shrink-0 flex items-center gap-2 pl-3 sm:pl-4 pr-6 font-mono text-[10px] font-bold uppercase tracking-[0.18em]">
-              <span className="tlf-live-dot w-1.5 h-1.5 rounded-full bg-white" aria-hidden />
-              <span className="hidden sm:inline">Featured</span>
-              <span className="sm:hidden">Live</span>
+            <span className="tlf-ticker-tab relative z-10 shrink-0 flex items-center gap-2 pl-3 sm:pl-4 pr-6 text-xs font-semibold">
+              <SignalMatrix size={11} />
+              Featured
             </span>
             <div className="tlf-ticker-viewport marquee-container flex overflow-hidden flex-1 -ml-3">
               {[0, 1].map((track) => (
@@ -879,7 +979,7 @@ export default function MainLayoutShell({
                         className="tlf-ticker-item group flex w-max items-center gap-2.5 h-10 px-4 whitespace-nowrap"
                       >
                         <Avatar src={p.logoUrl} name={p.name} size={20} />
-                        <span className="tlf-ticker-name font-display font-black text-[13px] uppercase tracking-wider">{p.name}</span>
+                        <span className="tlf-ticker-name text-[13px] font-semibold">{p.name}</span>
                         {p.tagline && <span className="tlf-ticker-tagline text-xs">{p.tagline}</span>}
                         <svg className="tlf-ticker-arrow w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} aria-hidden="true">
                           <path strokeLinecap="square" d="M7 17 17 7M9 7h8v8" />
@@ -984,7 +1084,9 @@ export default function MainLayoutShell({
 
             <main id="main" className="tlf-main min-w-0 pt-5 sm:pt-6 pb-10 tlf-safe-bottom xl:pb-14">
               {/* Mobile / tablet spotlight — one fixed row, rotates every 15s. */}
-              {!searching && rotating.length > 0 && <MobileSpotlight slots={rotating} />}
+              {!searching && rail.length + rotating.length > 0 && (
+                <MobileSpotlight slots={[...rail, ...rotating.filter((r) => !rail.some((x) => x.name === r.name))]} />
+              )}
               {searching ? searchView : children}
             </main>
 
@@ -1004,9 +1106,7 @@ export default function MainLayoutShell({
         <div className="mx-auto max-w-[1600px] px-4 lg:px-6 pt-10 pb-12 space-y-10">
           {/* Launch call-to-action */}
           <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-card shadow-card px-5 py-6 sm:px-8 sm:py-7 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
-            <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 w-48 h-48 rounded-full bg-signal/10 blur-3xl" />
             <div className="relative space-y-1.5 max-w-2xl">
-              <p className="text-[11px] font-mono font-semibold uppercase tracking-[0.14em] text-signal">Launching something?</p>
               <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-ink">
                 Put it in front of makers at the next 6:00 AM IST batch.
               </h2>
@@ -1158,7 +1258,7 @@ export default function MainLayoutShell({
               className="tlf-launch tlf-launch-fab -mt-5 flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl ring-4 ring-void"
             >
               <SignalMatrix size={18} />
-              <span className="text-[10px] font-bold uppercase tracking-wide leading-none">Launch</span>
+              <span className="text-[11px] font-semibold leading-none">Launch</span>
             </Link>
           </li>
           <li>
@@ -1199,7 +1299,7 @@ function FooterColumn({
   const cls = "text-ink-dim hover:text-signal transition-colors";
   return (
     <nav aria-label={title} className="space-y-3.5">
-      <h2 className="text-[11px] font-mono font-semibold uppercase tracking-[0.14em] text-ink">{title}</h2>
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
       <ul className="space-y-2.5 text-sm">
         {links.map((l) => (
           <li key={l.href}>

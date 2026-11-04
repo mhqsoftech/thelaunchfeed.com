@@ -81,7 +81,7 @@ function UpvoteButton({ productId, voteCount, emphasis = false }: { productId: s
       onClick={handleUpvote}
       aria-pressed={voted}
       aria-label={`${voted ? "Remove upvote" : "Upvote"} (${currentVotes} votes)`}
-      className={`relative z-10 shrink-0 w-14 h-14 sm:w-16 sm:h-16 flex flex-col items-center justify-center gap-0.5 rounded-xl border transition-all active:scale-95 ${
+      className={`relative z-10 shrink-0 w-14 h-14 sm:w-16 sm:h-16 flex flex-col items-center justify-center gap-0.5 rounded-xl border transition-[background-color,border-color,color,transform] active:scale-95 ${
         voted
           ? "border-signal bg-signal text-white shadow-[0_8px_20px_-10px_var(--color-signal)]"
           : emphasis
@@ -145,7 +145,7 @@ function ProductRow({
   const href = `/product/${prod.slug || slugify(prod.name)}`;
   return (
     <li
-      className={`group relative flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-[var(--radius-card)] border bg-card transition-all hover:-translate-y-px hover:shadow-[var(--shadow-lift)] ${
+      className={`group relative flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-[var(--radius-card)] border bg-card transition-[transform,box-shadow,border-color] hover:-translate-y-px hover:shadow-[var(--shadow-lift)] motion-reduce:hover:translate-y-0 ${
         rank === 1 ? "border-signal/40" : "border-hairline hover:border-ink-faint"
       }`}
     >
@@ -171,7 +171,7 @@ function ProductRow({
           </h3>
           {podium && (
             <span
-              className={`hidden sm:inline-block shrink-0 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${
+              className={`hidden sm:inline-block shrink-0 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                 rank === 1 ? "bg-signal text-white" : "bg-surface text-ink-dim border border-hairline"
               }`}
             >
@@ -239,7 +239,7 @@ export default function HomeFeedClient({
   const year = format(now, "yyyy");
   const subtitle: Record<FeedTab, string> = {
     daily: format(now, "EEEE, d MMMM yyyy"),
-    weekly: `Week ${getWeek(now)} · ${year}`,
+    weekly: `Week ${getWeek(now)}, ${year}`,
     monthly: format(now, "MMMM yyyy"),
     yearly: year,
     alltime: "Since launch",
@@ -363,14 +363,11 @@ export default function HomeFeedClient({
           <div className="tlf-signal-grid absolute inset-0 pointer-events-none" aria-hidden />
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="min-w-0">
-              <p className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-ink-faint">
-                {activeTab === "daily" && <span className="tlf-live-dot w-1.5 h-1.5 rounded-full bg-signal-bright" aria-hidden />}
-                {subtitle[activeTab]}
-              </p>
-              <h1 className="mt-1.5 font-display font-black uppercase tracking-wide text-[26px] sm:text-[34px] leading-[1.05] text-ink">
+              <h1 className="font-display font-black uppercase tracking-wide text-[26px] sm:text-[34px] leading-[1.05] text-ink">
                 {headline[activeTab]}
               </h1>
-              <p className="mt-2 text-sm text-ink-dim max-w-xl">
+              <p className="mt-1.5 text-sm font-medium text-ink">{subtitle[activeTab]}</p>
+              <p className="mt-1 text-sm text-ink-dim max-w-xl">
                 {activeTab === "daily"
                   ? withLaunchTime("New software, SaaS and AI products go live every day at 6:00 AM IST. Upvote the ones you'd actually use.", { showIst: true })
                   : activeTab === "alltime"
@@ -388,7 +385,7 @@ export default function HomeFeedClient({
                       onClick={(e) => handleTabChange(t, e)}
                       aria-current={activeTab === t ? "page" : undefined}
                       className={`block px-3.5 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                        activeTab === t ? "bg-card text-ink shadow-[var(--shadow-card)]" : "text-ink-dim hover:text-ink"
+                        activeTab === t ? "bg-ink text-void" : "text-ink-dim hover:text-ink"
                       }`}
                     >
                       {tabLabel[t]}
@@ -419,7 +416,7 @@ export default function HomeFeedClient({
                       </span>
                     </h2>
                     <Link href={group.href} className="shrink-0 text-xs font-semibold text-signal hover:underline">
-                      View category →
+                      View category
                     </Link>
                   </div>
                   <ol className="space-y-1">
@@ -476,10 +473,10 @@ export default function HomeFeedClient({
               disabled={currentPage <= 1 || loading}
               className="h-10 px-4 rounded-full border border-hairline bg-card text-sm font-medium text-ink disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface"
             >
-              ← Previous
+              Previous
             </button>
             <span className="text-xs text-ink-dim tabular-nums">
-              Page <strong className="text-ink">{currentPage}</strong> of {feedData.totalPages} · {feedData.totalCount} products
+              Page <strong className="text-ink">{currentPage}</strong> of {feedData.totalPages}, {feedData.totalCount} products
             </span>
             <button
               type="button"
@@ -490,7 +487,7 @@ export default function HomeFeedClient({
               disabled={currentPage >= feedData.totalPages || loading}
               className="h-10 px-4 rounded-full bg-ink text-void text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
             >
-              Next →
+              Next
             </button>
           </nav>
         )}

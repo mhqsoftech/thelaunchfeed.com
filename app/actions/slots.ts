@@ -10,7 +10,7 @@ import { uploadToNeonStorage, parseDataUri } from "@/lib/storage";
 export type UISlot = {
   id: string;
   kind: "PAID" | "CUSTOM";
-  position: "FEATURED" | "ROTATING";
+  position: "FEATURED" | "ROTATING" | "RAIL";
   order: number;
   name: string;
   tagline: string;
@@ -31,8 +31,9 @@ export async function listSlots(position: SlotPosition): Promise<UISlot[]> {
     },
   });
 
-  // If no slots exist yet in this position, automatically initialize with top active live products
-  if (rows.length === 0) {
+  // If no slots exist yet in this position, automatically initialize with top active live products.
+  // Never for the sidebar Spotlight (RAIL): it only ever shows paid bookings.
+  if (rows.length === 0 && position !== "RAIL") {
     const prods = await prisma.product.findMany({
       where: { status: "LIVE" },
       orderBy: [{ voteCount: "desc" }, { launchedAt: "desc" }],

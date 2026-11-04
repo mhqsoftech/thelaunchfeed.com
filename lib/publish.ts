@@ -191,25 +191,25 @@ export async function publishSubmission(
     throw err;
   }
 
-  // Purchased spotlight slot → attach to the live product, start 30-day window.
+  // Purchased placement → attach it to the live product (so clicks are counted
+  // through /go). The paid window already started at payment and is kept as
+  // is; only a legacy slot still waiting on a future start is moved to now.
   try {
     const purchaseId = details.purchaseId as string | undefined;
     const slot = await prisma.featuredSlot.findFirst({
-      where: {
-        OR: [
-          ...(purchaseId ? [{ purchaseId }] : []),
-          { customUrl: `/product/${product.slug}` },
-          { customName: sub.name },
-        ],
-      },
+      where: purchaseId
+        ? { purchaseId }
+        : { kind: "PAID", productId: null, OR: [{ customUrl: `/product/${product.slug}` }, { customName: sub.name }] },
     });
     if (slot) {
+      const notStarted = slot.startsAt > now;
       await prisma.featuredSlot.update({
         where: { id: slot.id },
         data: {
           productId: product.id,
-          startsAt: now,
-          endsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+          ...(notStarted
+            ? { startsAt: now, endsAt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }
+            : {}),
         },
       });
       const { invalidateSlotsCache } = await import("@/lib/queries/slots");

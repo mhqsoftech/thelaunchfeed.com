@@ -1184,7 +1184,7 @@ export default function ProfileClientView({
                       {submitNotice === "draft"
                         ? "Draft saved. You can finish and submit it anytime from My Drafts below."
                         : submitNotice === "paid"
-                          ? "Payment confirmed — your product is queued for launch with its 30-day placement."
+                          ? "Payment confirmed — your 30-day placement is live now and your product is queued for launch."
                           : submitNotice === "unpaid"
                             ? "Payment wasn't completed, so your launch is not in the queue yet. It's saved in My Drafts — finish checkout from there, or switch it to the free launch (embed our badge + upvote 3 launches). If you did pay, it moves to the queue as soon as the payment confirms."
                             : "Submitted! Your product is queued for launch and listed below."}
@@ -1880,6 +1880,14 @@ export default function ProfileClientView({
                                 )}
                               </div>
 
+                              {slot.position === "RAIL" ? (
+                                <Link
+                                  href="/spotlight/book"
+                                  className="px-3 py-1.5 text-xs font-semibold border border-signal text-signal hover:bg-signal hover:text-white transition-colors shrink-0 rounded-lg"
+                                >
+                                  Book more days
+                                </Link>
+                              ) : (
                               <button
                                 onClick={() => triggerDodoCheckout(slot.product?.id || "", slot.tier)}
                                 disabled={isUpgradingProduct === `${slot.product?.id}-${slot.tier}`}
@@ -1889,6 +1897,7 @@ export default function ProfileClientView({
                                   ? "Loading Dodo..."
                                   : `Renew +30 Days (${slot.priceFormatted}) →`}
                               </button>
+                              )}
                             </div>
                           </div>
                         );

@@ -1,7 +1,8 @@
 /**
  * Shared class names for the admin dashboard, so every tab uses the same
  * card / control / table look as the redesigned shell (rounded cards on
- * `bg-card`, sans body text, small uppercase labels, rounded-md controls).
+ * `bg-card`, sans body text, sentence-case labels, rounded-md controls).
+ * Mono is reserved for figures and code.
  */
 
 export const cx = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(" ");
@@ -14,8 +15,8 @@ export const cardList = `${card} overflow-hidden`;
 /** Inset well inside a card (code, previews, nested settings). */
 export const well = "rounded-lg border border-hairline bg-surface/60";
 
-/** Tiny uppercase field / column label. */
-export const label = "block text-[10px] uppercase tracking-wider text-ink-faint font-bold";
+/** Field / column label: the body face, a step smaller, sentence case. */
+export const label = "block text-xs font-medium text-ink-dim";
 /** Explanatory paragraph under a heading. */
 export const help = "font-sans text-sm text-ink-dim leading-relaxed";
 export const emptyState = "px-4 py-10 text-center font-sans text-sm text-ink-dim";
@@ -29,9 +30,9 @@ export const checkbox = "w-4 h-4 rounded border-hairline accent-[var(--color-sig
 
 /** Buttons. `btnSm` for in-row actions, `btn` for section actions. */
 const btnBase =
-  "inline-flex items-center justify-center gap-1.5 rounded-md font-bold uppercase whitespace-nowrap transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40";
+  "inline-flex items-center justify-center gap-1.5 rounded-md font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40";
 export const btn = `${btnBase} h-9 px-3.5 text-xs`;
-export const btnSm = `${btnBase} h-7 px-2.5 text-[11px]`;
+export const btnSm = `${btnBase} h-7 px-2.5 text-xs`;
 export const primary = "bg-signal text-white hover:opacity-90";
 export const secondary = "border border-hairline bg-card text-ink hover:border-ink/60";
 export const ghost = "text-ink-dim hover:text-ink hover:bg-raised/60";
@@ -42,7 +43,7 @@ export const success = "border border-verified/40 text-verified hover:bg-verifie
 export const segment = "inline-flex p-0.5 rounded-lg border border-hairline bg-surface/60";
 export const segmentItem = (active: boolean) =>
   cx(
-    "h-7 px-3 rounded-md text-[11px] font-bold uppercase whitespace-nowrap transition-colors cursor-pointer",
+    "h-7 px-3 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer",
     active ? "bg-card text-ink shadow-card ring-1 ring-hairline" : "text-ink-dim hover:text-ink"
   );
 
@@ -50,7 +51,7 @@ export const segmentItem = (active: boolean) =>
 export type Tone = "neutral" | "signal" | "good" | "warn" | "bad" | "info";
 export const pill = (tone: Tone = "neutral") =>
   cx(
-    "inline-flex items-center gap-1 h-5 px-2 rounded-full text-[10px] font-bold uppercase tracking-wide whitespace-nowrap",
+    "inline-flex items-center gap-1 h-5 px-2 rounded-full text-[11px] font-semibold whitespace-nowrap",
     tone === "neutral" && "bg-raised text-ink-dim",
     tone === "signal" && "bg-signal-dim text-signal",
     tone === "good" && "bg-verified/10 text-verified",
@@ -63,7 +64,7 @@ export const pill = (tone: Tone = "neutral") =>
 export const tableWrap = `${card} overflow-auto`;
 export const table = "w-full font-sans text-sm";
 export const thead = "sticky top-0 z-10 bg-surface/95 backdrop-blur";
-export const th = "px-3 py-2.5 text-left text-[10px] uppercase tracking-wider text-ink-faint font-bold border-b border-hairline whitespace-nowrap";
+export const th = "px-3 py-2.5 text-left text-xs font-medium text-ink-dim border-b border-hairline whitespace-nowrap";
 export const tr = "border-t border-hairline first:border-t-0 hover:bg-surface/50 transition-colors";
 export const td = "px-3 py-2.5 align-middle";
 

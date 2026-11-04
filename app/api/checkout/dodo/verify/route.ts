@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { activatePlacementSlot, confirmPlacementPayment, PlacementTier } from "@/lib/dodopayments";
+import { activateRailSlot } from "@/lib/rail-spotlight";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,26 @@ export async function POST(req: Request) {
     }
     if (purchase.userId !== user.id) {
       return NextResponse.json({ error: "FORBIDDEN" }, { status: 403 });
+    }
+
+    // Sidebar Spotlight purchases carry their own placement and duration.
+    if (purchase.position === "RAIL") {
+      const payment = await confirmPlacementPayment(purchase, paymentId || undefined);
+      if (!payment.paid) {
+        return NextResponse.json(
+          { error: "PAYMENT_NOT_COMPLETED", message: "Payment was not completed." },
+          { status: 402 }
+        );
+      }
+      const slot = await activateRailSlot(purchase.id, payment.paymentId || paymentId || undefined);
+      if (!slot) {
+        return NextResponse.json({ error: "ACTIVATION_FAILED", message: "Paid, but the slot could not be created. Contact us and we'll sort it out." }, { status: 500 });
+      }
+      return NextResponse.json({
+        success: true,
+        placement: "RAIL",
+        slot: { id: slot.id, startsAt: slot.startsAt, endsAt: slot.endsAt },
+      });
     }
 
     // Tier is derived from the amount stored when we created the checkout —

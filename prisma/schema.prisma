@@ -496,6 +496,8 @@ enum SlotKind {
 enum SlotPosition {
   FEATURED
   ROTATING
+  // Sidebar Spotlight above "Top by category": 4 slots, sold at $1 per 3 days.
+  RAIL
 }
 
 model FeaturedPurchase {
@@ -507,6 +509,13 @@ model FeaturedPurchase {
   currency              String         @default("usd")
   status                PurchaseStatus @default(PENDING)
   createdAt             DateTime       @default(now())
+
+  // Set for sidebar Spotlight (RAIL) purchases, whose price varies with the
+  // number of days, so the amount alone can't identify what was bought.
+  position     SlotPosition?
+  days         Int?
+  productId    String?
+  submissionId String?
 
   user  User           @relation(fields: [userId], references: [id])
   slots FeaturedSlot[]

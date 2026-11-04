@@ -80,13 +80,20 @@ export async function GET() {
       const elapsedMs = Math.max(0, now.getTime() - startsAt.getTime());
       const percentElapsed = totalMs > 0 ? Math.min(100, Math.round((elapsedMs / totalMs) * 100)) : 100;
 
+      const isRail = s.position === "RAIL";
       const tierKey = s.position === "FEATURED" ? 5 : 10;
-      const tierInfo = PLACEMENT_TIERS[tierKey];
+      const tierInfo = isRail
+        ? {
+            name: "Sidebar Spotlight",
+            headline: "Sponsored slot above Top by category, $1 per 3 days",
+            priceFormatted: `$${Math.round((s.purchase?.amountCents ?? 0) / 100)}`,
+          }
+        : PLACEMENT_TIERS[tierKey];
 
       return {
         id: s.id,
-        position: s.position, // "FEATURED" or "ROTATING"
-        tier: tierKey,
+        position: s.position, // "FEATURED" | "ROTATING" | "RAIL"
+        tier: isRail ? 0 : tierKey,
         tierName: tierInfo.name,
         headline: tierInfo.headline,
         priceFormatted: tierInfo.priceFormatted,

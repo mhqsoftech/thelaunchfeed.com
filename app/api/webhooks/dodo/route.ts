@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { activatePlacementSlot, PlacementTier } from "@/lib/dodopayments";
 import { prisma } from "@/lib/db";
+import { activateRailSlot } from "@/lib/rail-spotlight";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,6 +84,12 @@ export async function POST(req: Request) {
       const purchase = await prisma.featuredPurchase.findUnique({ where: { id: purchaseId } });
       if (!purchase) {
         return NextResponse.json({ received: true, activated: false, reason: "unknown purchase" });
+      }
+
+      // Sidebar Spotlight: duration and target are stored on the purchase.
+      if (purchase.position === "RAIL") {
+        const slot = await activateRailSlot(purchase.id, paymentId);
+        return NextResponse.json({ received: true, activated: !!slot });
       }
 
       // amountCents on the purchase row was set when we created the checkout

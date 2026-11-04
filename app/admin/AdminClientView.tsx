@@ -402,7 +402,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
     return (
       <FullBleed>
         <GateCard
-          title="ADMIN_EMAIL NOT CONFIGURED"
+          title="Admin email isn't configured"
           body="Set ADMIN_EMAIL in your environment and restart the server to enable the admin console."
         />
       </FullBleed>
@@ -413,14 +413,14 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
     return (
       <FullBleed>
         <GateCard
-          title="AUTHENTICATION REQUIRED"
+          title="Sign in required"
           body="You must be signed in with the configured admin account to access this area."
           action={
             <Link
               href="/handler/sign-in?after_auth_return_to=/admin"
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono uppercase font-bold border border-hairline bg-surface text-ink hover:bg-ink hover:text-surface transition-colors"
+              className="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-semibold bg-signal text-white hover:opacity-90 transition-opacity"
             >
-              → Go to sign in
+              Go to sign in
             </Link>
           }
         />
@@ -432,7 +432,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
     return (
       <FullBleed>
         <GateCard
-          title="ACCESS DENIED"
+          title="Access denied"
           body={`Signed in as ${session.email}. This console is restricted to the configured admin account.`}
           action={
             <button
@@ -443,9 +443,9 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
                 logoutSession();
                 window.location.href = "/";
               }}
-              className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-mono uppercase font-bold border border-hairline bg-surface text-ink hover:bg-ink hover:text-surface transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 h-9 px-4 rounded-md text-sm font-semibold border border-hairline bg-surface text-ink hover:bg-raised transition-colors cursor-pointer"
             >
-              → Sign out & switch account
+              Sign out and switch account
             </button>
           }
         />
@@ -463,7 +463,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
   ];
 
   return (
-    <div className="h-screen bg-surface text-ink font-mono flex flex-col overflow-hidden">
+    <div className="h-screen bg-surface text-ink font-sans flex flex-col overflow-hidden">
       {/* Top Header */}
       <header className="h-14 shrink-0 bg-surface flex items-center sticky top-0 z-30 border-b border-hairline">
         {/* Left header column */}
@@ -480,7 +480,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
                 <span className="hidden sm:inline font-display font-black text-[13px] tracking-wide text-ink uppercase leading-none whitespace-nowrap">
                   The Launch <span className="text-signal">Feed</span>
                 </span>
-                <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded-sm bg-ink text-void leading-none">Admin</span>
+                <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-ink text-void leading-none">Admin</span>
               </>
             )}
           </Link>
@@ -519,17 +519,17 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
               href="/submit"
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 px-3 border border-signal bg-signal text-surface hover:opacity-90 transition-opacity text-xs uppercase font-bold font-mono flex items-center gap-1 rounded-md shrink-0"
+              className="h-8 px-3 border border-signal bg-signal text-white hover:opacity-90 transition-opacity text-xs font-semibold flex items-center gap-1 rounded-md shrink-0"
             >
-              + Submit
+              Submit
             </Link>
             <Link
               href="/"
               target="_blank"
               rel="noopener noreferrer"
-              className="h-8 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs uppercase font-bold font-mono flex items-center gap-1 transition-colors rounded-md shrink-0"
+              className="h-8 px-3 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-semibold flex items-center gap-1 transition-colors rounded-md shrink-0"
             >
-              ↗ Public site
+              Public site
             </Link>
           </div>
 
@@ -537,10 +537,9 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
           <button
             onClick={cycleTheme}
             title={`Theme: ${themeMode}`}
-            className="h-8 px-2.5 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-bold font-mono transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 rounded-md"
+            className="h-8 px-2.5 border border-hairline bg-surface hover:bg-raised text-ink text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 rounded-md"
           >
-            <span className="text-xs">{themeMode === "light" ? "☀" : themeMode === "void" ? "◐" : "◉"}</span>
-            <span className="hidden sm:inline uppercase text-[11px] font-bold">{themeMode}</span>
+            <span className="capitalize">{themeMode}</span>
           </button>
 
           {/* Profile Avatar & Name Pill */}
@@ -562,7 +561,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
                 session.avatar
               )}
             </div>
-            <span className="hidden sm:inline-block text-xs font-bold font-mono text-ink max-w-[100px] truncate">
+            <span className="hidden sm:inline-block text-xs font-semibold text-ink max-w-[100px] truncate">
               {session.name}
             </span>
           </Link>
@@ -580,7 +579,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
               logoutSession();
               window.location.href = "/";
             }}
-            className="hidden sm:inline-flex h-8 px-3 border border-hairline bg-surface hover:bg-signal hover:text-surface hover:border-signal text-xs uppercase font-bold font-mono transition-colors cursor-pointer items-center justify-center rounded-md shrink-0"
+            className="hidden sm:inline-flex h-8 px-3 border border-hairline bg-surface hover:bg-raised text-xs font-semibold text-ink-dim hover:text-ink transition-colors cursor-pointer items-center justify-center rounded-md shrink-0"
           >
             Sign out
           </button>
@@ -631,7 +630,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
           <div className="flex items-center justify-between p-3.5 border-b border-hairline md:hidden bg-surface/50">
             <div className="flex items-center gap-2">
               <LaunchFeedLogo size={18} />
-              <span className="text-xs font-bold uppercase font-mono tracking-wider">Console Tabs</span>
+              <span className="text-sm font-semibold">Admin</span>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -645,7 +644,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
             {groups.map((g) => (
               <div key={g} className="mb-4">
                 {!sidebarCollapsed ? (
-                  <div className="px-4 pb-1.5 text-[10px] uppercase text-ink-faint font-bold tracking-[0.12em]">
+                  <div className="px-4 pb-1.5 text-xs font-medium text-ink-faint">
                     {GROUP_LABEL[g]}
                   </div>
                 ) : (
@@ -662,7 +661,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
                           title={t.label}
                           aria-current={active ? "page" : undefined}
                           className={[
-                            "relative w-full h-9 flex items-center gap-2.5 rounded-md text-[12px] font-semibold transition-colors cursor-pointer",
+                            "relative w-full h-9 flex items-center gap-2.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer",
                             sidebarCollapsed ? "px-0 justify-center" : "px-2.5",
                             active
                               ? "bg-void text-ink shadow-card ring-1 ring-hairline"
@@ -695,7 +694,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
               target="_blank"
               className="w-full px-3 py-1.5 border border-hairline text-xs font-bold flex items-center justify-between text-ink hover:bg-raised"
             >
-              <span>↗ Public Site</span>
+              <span>Public site</span>
               <span className="text-[10px] text-ink-faint">thelaunchfeed.com</span>
             </Link>
             <button
@@ -719,15 +718,10 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
         <main className="flex-1 min-w-0 p-3 sm:p-6 lg:px-8 flex flex-col overflow-y-auto md:overflow-hidden bg-void">
           <div className="mb-5 pb-4 border-b border-hairline flex items-end justify-between gap-4 flex-wrap shrink-0">
             <div className="min-w-0">
-              <div className="text-[10px] uppercase text-ink-faint font-bold tracking-[0.12em]">
-                Admin / {GROUP_LABEL[activeTab.group]}
-              </div>
-              <h1 className="font-sans text-2xl font-bold tracking-tight mt-1 text-ink">{activeTab.label}</h1>
-              <p className="font-sans text-sm text-ink-dim mt-1 max-w-2xl">{activeTab.desc}</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-ink">{activeTab.label}</h1>
+              <p className="text-sm text-ink-dim mt-1 max-w-2xl">{activeTab.desc}</p>
             </div>
-            <div className="text-[11px] text-ink-faint tabular-nums">
-              {new Date().toISOString().replace("T", " ").slice(0, 16)} UTC
-            </div>
+            <div className="text-xs text-ink-faint">{GROUP_LABEL[activeTab.group]}</div>
           </div>
 
           <div
@@ -764,7 +758,7 @@ export default function AdminClientView({ adminEmail }: { adminEmail: string }) 
 
 function FullBleed({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-surface text-ink font-mono flex items-center justify-center p-6">
+    <div className="min-h-screen bg-surface text-ink font-sans flex items-center justify-center p-6">
       {children}
     </div>
   );
@@ -781,10 +775,7 @@ function GateCard({
 }) {
   return (
     <div className="border border-hairline rounded-xl bg-card shadow-card p-6 max-w-xl w-full">
-      <div className="flex items-center gap-2 text-xs uppercase font-bold text-signal mb-3">
-        <span className="w-1.5 h-1.5 rounded-full bg-signal" />
-        {title}
-      </div>
+      <h1 className="text-base font-semibold text-ink mb-2">{title}</h1>
       <p className="text-sm text-ink-dim leading-relaxed mb-4">{body}</p>
       {action}
     </div>
@@ -804,8 +795,8 @@ function Stat({
 }) {
   return (
     <div className={`rounded-xl border p-4 bg-card shadow-card ${accent ? "border-signal/40" : "border-hairline"}`}>
-      <div className="text-[10px] uppercase tracking-wider text-ink-faint font-bold">{label}</div>
-      <div className={`font-sans text-[28px] leading-none font-bold mt-2 tabular-nums ${accent ? "text-signal" : "text-ink"}`}>{value}</div>
+      <div className="text-xs font-medium text-ink-dim">{label}</div>
+      <div className={`font-mono text-[28px] leading-none font-semibold mt-2 tabular-nums ${accent ? "text-signal" : "text-ink"}`}>{value}</div>
       {hint ? <div className="font-sans text-xs text-ink-dim mt-1.5 truncate">{hint}</div> : null}
     </div>
   );
@@ -814,7 +805,7 @@ function Stat({
 function SectionTitle({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
     <div className="px-4 py-3 border-b border-hairline flex items-center justify-between gap-2">
-      <span className="text-[11px] uppercase tracking-wider text-ink-dim font-bold">{children}</span>
+      <h2 className="text-sm font-semibold text-ink">{children}</h2>
       {action}
     </div>
   );
@@ -861,6 +852,7 @@ function TabLoader({ label = "Loading data..." }: { label?: string }) {
 function OverviewTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
   const featured = useAsync(() => listSlots("FEATURED"), []);
   const rotating = useAsync(() => listSlots("ROTATING"), []);
+  const rail = useAsync(() => listSlots("RAIL"), []);
   const cats = useAsync(() => listCategories(), []);
   const subs = useAsync(() => listSubmissions(), []);
   const [products, setProducts] = useState<AdminProduct[]>([]);
@@ -880,7 +872,7 @@ function OverviewTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
       .finally(() => setSummaryLoading(false));
   }, []);
 
-  if (featured.loading || rotating.loading || cats.loading || subs.loading || summaryLoading) {
+  if (featured.loading || rotating.loading || rail.loading || cats.loading || subs.loading || summaryLoading) {
     return <TabLoader label="Loading dashboard metrics..." />;
   }
 
@@ -895,38 +887,56 @@ function OverviewTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
       {queue.length > 0 && (
         <div className="rounded-xl border border-signal/40 bg-signal-dim px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <span className="w-2 h-2 rounded-full bg-signal shrink-0 animate-pulse" />
-            <span className="font-sans text-sm text-ink">
+            <span className="text-sm text-ink">
               <b>{queue.length} submission{queue.length === 1 ? "" : "s"}</b> waiting for review. The next one goes live{" "}
               {new Date(queue[0].scheduledFor).toLocaleString()} unless rejected.
             </span>
           </div>
           <button
             onClick={() => onNavigate("submissions")}
-            className="h-8 px-3 text-xs uppercase font-bold rounded-md bg-signal text-white hover:opacity-90 cursor-pointer shrink-0"
+            className="h-8 px-3 text-xs font-semibold rounded-md bg-signal text-white hover:opacity-90 cursor-pointer shrink-0"
           >
-            Review queue →
+            Review queue
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Stat label="Pending review" value={queue.length} hint="scheduled submissions" accent={queue.length > 0} />
-        <Stat label="Live products" value={products.length} hint="in the catalog" />
-        <Stat label="Users" value={users.length} hint="registered accounts" />
-        <Stat label="Total votes" value={totalVotes.toLocaleString()} hint="all-time" />
-        <Stat label="Featured slots" value={featured.data?.length ?? "—"} hint="paid + custom" />
-        <Stat label="Rotating slots" value={rotating.data?.length ?? "—"} hint="paid + custom" />
-        <Stat label="Categories" value={cats.data?.length ?? "—"} hint="taxonomy nodes" />
-        <Stat label="Top product" value={top[0]?.votes ?? 0} hint={top[0] ? `${top[0].name} · votes` : "no products yet"} />
-      </div>
+      {/* The four platform figures in one strip, then placements as a quieter row. */}
+      <dl className="grid grid-cols-2 lg:grid-cols-4 rounded-xl border border-hairline bg-card shadow-card divide-y lg:divide-y-0 divide-hairline [&>div]:border-hairline [&>div:nth-child(odd)]:border-r lg:[&>div]:border-r lg:[&>div:last-child]:border-r-0">
+        {[
+          { k: "Pending review", v: queue.length, hint: "scheduled submissions", accent: queue.length > 0 },
+          { k: "Live products", v: products.length, hint: "in the catalog" },
+          { k: "Users", v: users.length, hint: "registered accounts" },
+          { k: "Total votes", v: totalVotes.toLocaleString(), hint: "all time" },
+        ].map((f) => (
+          <div key={f.k} className="p-4 sm:p-5">
+            <dt className="text-xs font-medium text-ink-dim">{f.k}</dt>
+            <dd className={`mt-2 font-mono text-[32px] leading-none font-semibold tabular-nums ${f.accent ? "text-signal" : "text-ink"}`}>{f.v}</dd>
+            <dd className="mt-1.5 text-xs text-ink-faint">{f.hint}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <dl className="flex flex-wrap gap-x-8 gap-y-2 px-1 text-sm">
+        {[
+          { k: "Featured ticker", v: featured.data?.length ?? 0 },
+          { k: "Rotating spotlight", v: rotating.data?.length ?? 0 },
+          { k: "Sidebar spotlight", v: (rail.data ?? []).filter((s) => !s.subscription?.expiresAt || new Date(s.subscription.expiresAt) > new Date()).length },
+          { k: "Categories", v: cats.data?.length ?? 0 },
+        ].map((f) => (
+          <div key={f.k} className="flex items-baseline gap-2">
+            <dt className="text-ink-dim">{f.k}</dt>
+            <dd className="font-mono font-semibold text-ink tabular-nums">{f.v}</dd>
+          </div>
+        ))}
+      </dl>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
           <SectionTitle
             action={
-              <button onClick={() => onNavigate("submissions")} className="text-[11px] font-bold text-signal hover:underline cursor-pointer">
-                Open queue →
+              <button onClick={() => onNavigate("submissions")} className="text-xs font-semibold text-signal hover:underline cursor-pointer">
+                Open queue
               </button>
             }
           >
@@ -945,7 +955,7 @@ function OverviewTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
                   <SubmissionTimer target={s.scheduledFor.toString()} compact />
                   <button
                     onClick={() => setPreviewId(s.id)}
-                    className="h-7 px-2.5 text-[11px] uppercase font-bold rounded-md border border-hairline hover:border-ink text-ink cursor-pointer shrink-0"
+                    className="h-7 px-2.5 text-xs font-semibold rounded-md border border-hairline hover:border-ink text-ink cursor-pointer shrink-0"
                   >
                     Preview
                   </button>
@@ -968,7 +978,7 @@ function OverviewTab({ onNavigate }: { onNavigate: (t: Tab) => void }) {
                     <div className="min-w-0 flex-1">
                       <div className="font-sans text-sm font-semibold text-ink truncate">{p.name}</div>
                     </div>
-                    <span className="text-xs font-bold tabular-nums text-ink">▲ {p.votes}</span>
+                    <span className="font-mono text-xs font-semibold tabular-nums text-ink">{p.votes.toLocaleString()} votes</span>
                   </div>
                   <div className="ml-8 mt-1.5 h-1 rounded-full bg-raised overflow-hidden">
                     <div className="h-full rounded-full bg-signal/70" style={{ width: `${Math.max(4, (p.votes / maxVotes) * 100)}%` }} />
@@ -2476,7 +2486,7 @@ function SlotEditor({
     setEditTagline(s.tagline || "");
     setEditUrl(s.url === "#" ? "" : s.url);
     setEditLogoUrl(s.logoUrl || "");
-    setEditPosition(s.position);
+    setEditPosition(s.position === "RAIL" ? position : s.position);
   };
 
   const cancelEditing = () => {
@@ -2967,12 +2977,14 @@ function SlotEditor({
 function FeaturedTab() {
   const [featured, setFeatured] = useState<UISlot[]>([]);
   const [rotating, setRotating] = useState<UISlot[]>([]);
+  const [rail, setRail] = useState<UISlot[]>([]);
   const [loading, setLoading] = useState(true);
   const refresh = React.useCallback(async () => {
     try {
-      const [f, r] = await Promise.all([listSlots("FEATURED"), listSlots("ROTATING")]);
+      const [f, r, s] = await Promise.all([listSlots("FEATURED"), listSlots("ROTATING"), listSlots("RAIL")]);
       setFeatured(f);
       setRotating(r);
+      setRail(s);
     } finally {
       setLoading(false);
     }
@@ -2985,11 +2997,10 @@ function FeaturedTab() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-ink-dim leading-relaxed">
-        Paid placements are pulled automatically from active FeaturedPurchase rows —{" "}
-        <span className="text-ink font-bold">FEATURED</span> position fills the top slots,{" "}
-        <span className="text-ink font-bold">ROTATING</span> fills the strip. Custom entries are stored in
-        the FeaturedSlot table with an external URL for partners or house ads.
+      <p className="text-sm text-ink-dim leading-relaxed max-w-3xl">
+        Paid placements come in automatically when a payment is confirmed: $5 buys the Featured ticker, $10 buys
+        the ticker and the rotating Spotlight, and sidebar Spotlight bookings are $1 per 3 days. Custom entries
+        here are for partners or house ads.
       </p>
       <SlotEditor
         title="Top featured"
@@ -3005,7 +3016,53 @@ function FeaturedTab() {
         slots={rotating}
         refresh={refresh}
       />
+      <RailBookings slots={rail} />
     </div>
+  );
+}
+
+/** Sidebar Spotlight bookings ($1 per 3 days). Read only: they are created
+ *  by payments, shown 4 at a time and rotated every 15s when there are more. */
+function RailBookings({ slots }: { slots: UISlot[] }) {
+  const now = Date.now();
+  const rows = [...slots].sort(
+    (a, b) => new Date(b.subscription?.expiresAt ?? 0).getTime() - new Date(a.subscription?.expiresAt ?? 0).getTime()
+  );
+  const live = rows.filter((s) => s.subscription?.expiresAt && new Date(s.subscription.expiresAt).getTime() > now);
+  return (
+    <section className="rounded-xl border border-hairline bg-card shadow-card overflow-hidden">
+      <SectionTitle action={<span className="text-xs text-ink-faint">{live.length} live, 4 shown at a time</span>}>
+        Sidebar spotlight
+      </SectionTitle>
+      {rows.length === 0 ? (
+        <div className="px-4 py-10 text-center text-sm text-ink-dim">No bookings yet. Makers book at /spotlight/book for $1 per 3 days.</div>
+      ) : (
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-ink-dim">Product</th>
+              <th className="px-4 py-2.5 text-left text-xs font-medium text-ink-dim">Booked by</th>
+              <th className="px-4 py-2.5 text-right text-xs font-medium text-ink-dim">Paid</th>
+              <th className="px-4 py-2.5 text-right text-xs font-medium text-ink-dim">Ends</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((s) => {
+              const ends = s.subscription?.expiresAt ? new Date(s.subscription.expiresAt) : null;
+              const ended = !ends || ends.getTime() <= now;
+              return (
+                <tr key={s.id} className={`border-t border-hairline ${ended ? "text-ink-faint" : "text-ink"}`}>
+                  <td className="px-4 py-2.5 font-medium truncate max-w-[220px]">{s.name}</td>
+                  <td className="px-4 py-2.5 text-ink-dim truncate max-w-[180px]">{s.subscription?.userName ?? ""}</td>
+                  <td className="px-4 py-2.5 text-right font-mono tabular-nums">${s.subscription?.price ?? 0}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums">{ends ? (ended ? "Ended" : ends.toLocaleDateString()) : ""}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </section>
   );
 }
 

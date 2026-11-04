@@ -216,8 +216,7 @@ export function HomeEditorialSection({
 
       {/* Answer-first summary — the paragraph search & AI engines quote. */}
       <div className="rounded-[calc(var(--radius-card)+4px)] border border-hairline bg-card p-6 sm:p-8">
-        <p className="text-xs font-mono uppercase tracking-wider text-signal">About the board</p>
-        <h2 id="about-heading" className="mt-2 text-2xl sm:text-3xl font-semibold tracking-tight max-w-3xl">
+        <h2 id="about-heading" className="text-2xl sm:text-3xl font-semibold tracking-tight max-w-3xl">
           What is The Launch Feed?
         </h2>
         <p className="mt-3 text-[15px] leading-relaxed text-ink-dim max-w-3xl">
@@ -232,11 +231,11 @@ export function HomeEditorialSection({
           {[
             { k: "Launch time", v: <><LaunchTime /> daily</> },
             { k: "Cost to launch", v: "Free" },
-            { k: "Leaderboards", v: "Day · Week · Month · Year" },
+            { k: "Leaderboards", v: "Day, week, month, year" },
             { k: "Revenue proof", v: "Stripe, Polar, Lemon Squeezy, Dodo" },
           ].map((f) => (
             <div key={f.k} className="rounded-xl bg-surface px-4 py-3">
-              <dt className="text-[11px] font-mono uppercase tracking-wider text-ink-faint">{f.k}</dt>
+              <dt className="text-xs text-ink-faint">{f.k}</dt>
               <dd className="mt-1 text-sm font-semibold text-ink">{f.v}</dd>
             </div>
           ))}
@@ -248,7 +247,7 @@ export function HomeEditorialSection({
         <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">How launching works</h2>
         <ol className="mt-5 grid gap-4 md:grid-cols-3">
           {[
-            { t: "Submit in minutes", d: "Paste your URL — autofill pulls your name, tagline, logo and screenshots. Pick a launch day." },
+            { t: "Submit in minutes", d: "Paste your URL and autofill pulls your name, tagline, logo and screenshots. Pick a launch day." },
             { t: "Go live at 6:00 AM IST", d: "Your product joins the daily board and is announced to our Telegram, WhatsApp and Bluesky channels." },
             { t: "Rank, win, embed", d: "Top 3 finishers earn podium badges and winner emails. Embed your live rank badge anywhere." },
           ].map((step, i) => (
@@ -261,7 +260,7 @@ export function HomeEditorialSection({
         </ol>
         <div className="mt-6 flex flex-wrap gap-2">
           <Link href="/submit" className="inline-flex items-center h-10 px-5 rounded-full bg-signal text-white text-sm font-semibold hover:brightness-110">
-            Launch your product — free
+            Launch your product free
           </Link>
           <Link href="/badges" className="inline-flex items-center h-10 px-5 rounded-full border border-hairline text-sm font-medium hover:bg-surface">
             See winner badges
@@ -275,7 +274,7 @@ export function HomeEditorialSection({
         <ul className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
           {FEATURES.map((f) => (
             <li key={f.num} className="rounded-[var(--radius-card)] border border-hairline bg-card p-5">
-              <p className="text-[11px] font-mono uppercase tracking-wider text-signal">{f.tag}</p>
+              <p className="text-xs font-medium text-signal">{f.tag}</p>
               <h3 className="mt-1.5 font-semibold text-ink">{f.title}</h3>
               <p className="mt-1.5 text-sm text-ink-dim leading-relaxed">{withLaunchTime(f.desc)}</p>
               <p className="mt-3 text-xs font-mono text-ink-faint">{withLaunchTime(f.metrics)}</p>
@@ -289,7 +288,7 @@ export function HomeEditorialSection({
         <div className="flex items-end justify-between gap-3">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">Most upvoted of all time</h2>
           <Link href="/leaderboard/all-time" className="shrink-0 text-sm font-semibold text-signal hover:underline">
-            Hall of fame →
+            Hall of fame
           </Link>
         </div>
         <ol className="mt-4 divide-y divide-hairline">
@@ -315,7 +314,7 @@ export function HomeEditorialSection({
         <div className="mt-4 -mx-2 overflow-x-auto">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
-              <tr className="text-left text-xs font-mono uppercase tracking-wider text-ink-faint">
+              <tr className="text-left text-xs text-ink-faint">
                 <th scope="col" className="px-2 py-2 font-medium">Feature</th>
                 <th scope="col" className="px-2 py-2 font-medium text-signal">The Launch Feed</th>
                 <th scope="col" className="px-2 py-2 font-medium">Typical platforms</th>
@@ -339,7 +338,7 @@ export function HomeEditorialSection({
         <div className="flex items-end justify-between gap-3">
           <h2 className="text-xl sm:text-2xl font-semibold tracking-tight">Explore by category</h2>
           <Link href="/categories" className="shrink-0 text-sm font-semibold text-signal hover:underline">
-            All categories →
+            All categories
           </Link>
         </div>
         <ul className="mt-4 flex flex-wrap gap-2">

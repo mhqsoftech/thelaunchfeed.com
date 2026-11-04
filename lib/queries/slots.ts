@@ -41,9 +41,17 @@ type SlotCacheEntry = {
 
 const slotsServerCache = new Map<string, SlotCacheEntry>();
 const SLOTS_CACHE_TTL_MS = 60_000; // 60 seconds
+let slotsVersion = 0;
 
 export function invalidateSlotsCache() {
   slotsServerCache.clear();
+  slotsVersion++;
+}
+
+/** Bumped on every invalidation, so caches built on top of the slots (the
+ *  /api/layout-data response) can tell a new paid placement just landed. */
+export function getSlotsCacheVersion() {
+  return slotsVersion;
 }
 
 /**
@@ -72,8 +80,15 @@ export async function getPublicSlots(position: SlotPosition): Promise<PublicSlot
       ...(position === "FEATURED"
         ? { OR: [{ position: "FEATURED" as const }, { position: "ROTATING" as const, kind: "PAID" as const }] }
         : { position }),
-      startsAt: { lte: now },
       AND: [
+        // Paid placements show from the moment payment is confirmed; a future
+        // startsAt on a PAID row only ever came from the old "start at the
+        // launch batch" rule, so it never holds a paid slot back.
+        // Sidebar (RAIL) bookings can be queued for later, so they always wait
+        // for their own start.
+        position === "RAIL"
+          ? { startsAt: { lte: now } }
+          : { OR: [{ kind: "PAID" as const }, { startsAt: { lte: now } }] },
         {
           OR: [{ endsAt: null }, { endsAt: { gte: now } }],
         },
@@ -101,11 +116,34 @@ export async function getPublicSlots(position: SlotPosition): Promise<PublicSlot
         },
       ],
     },
-    orderBy: [{ kind: "asc" }, { order: "asc" }],
+    orderBy: [{ kind: "asc" }, { order: "asc" }, { startsAt: "asc" }],
     include: {
       product: { select: { slug: true, name: true, tagline: true, logoUrl: true, websiteUrl: true } },
     },
   });
+
+  // Paid slots bought for a launch that isn't published yet have no product,
+  // and older ones point at our own /product page. Send those to the maker's
+  // site from the submission the purchase paid for.
+  const pending = rows.filter(
+    (s) => s.kind === "PAID" && !s.product && s.purchaseId && !/^https?:\/\//i.test(s.customUrl?.trim() ?? "")
+  );
+  const siteByPurchase = new Map<string, string>();
+  if (pending.length > 0) {
+    const subs = await prisma.submission.findMany({
+      where: { OR: pending.map((s) => ({ details: { path: ["purchaseId"], equals: s.purchaseId! } })) },
+      select: { websiteUrl: true, details: true },
+    });
+    for (const sub of subs) {
+      const pid = (sub.details as Record<string, unknown> | null)?.purchaseId;
+      const site = sub.websiteUrl?.trim();
+      if (typeof pid === "string" && site) siteByPurchase.set(pid, /^https?:\/\//i.test(site) ? site : `https://${site}`);
+    }
+  }
+  const slotUrl = (s: (typeof rows)[number]) => {
+    const site = s.purchaseId ? siteByPurchase.get(s.purchaseId) : undefined;
+    return resolveSlotUrl(site ?? s.customUrl, s.product);
+  };
 
   const data = rows.map((s): PublicSlot => {
     if (s.kind === "PAID") {
@@ -114,7 +152,7 @@ export async function getPublicSlots(position: SlotPosition): Promise<PublicSlot
         kind: "PAID",
         name: s.customName || s.product?.name || "",
         tagline: s.customTagline ?? s.product?.tagline ?? "",
-        ...resolveSlotUrl(s.customUrl, s.product),
+        ...slotUrl(s),
         logoUrl: s.customLogoUrl || s.product?.logoUrl || null,
         productSlug: s.product?.slug ?? null,
         slotId: s.id,

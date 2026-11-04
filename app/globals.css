@@ -1,3 +1,6 @@
+/* Hallmark · v2.0.0 · redesign: polish · built: the project · theme: brand (The Launch Feed: signal orange #FF4F00, obsidian, Geist + Doto) · genre: modern-minimal · scope: site + app (admin) */
+/* Hallmark · critique: labels were tracked mono capitals everywhere and links carried glued arrows; now sentence case in Geist, figures stay mono */
+/* Hallmark · waive 67 on the wordmark "The Launch Feed" · it is the brand lockup (BRAND_IDENTITY.md), set in Doto capitals */
 @import "tailwindcss";
 
 @font-face {
@@ -27,6 +30,11 @@
   --color-signal-bright: #FF4F00;
   --color-signal-dim: #FFEFE6;
   --color-verified: #00875A;
+  /* Text on a signal-orange fill, the inner highlight on filled buttons,
+     and the opaque stop used by fade masks (masks read alpha only). */
+  --color-on-signal: #FFFFFF;
+  --color-highlight: rgb(255 255 255 / 0.22);
+  --color-mask: #000000;
 
   /* Featured ticker — follows the theme's surfaces */
   --ticker-bg: var(--color-surface);
@@ -99,6 +107,8 @@
   --color-signal: #38BDF8;
   --color-signal-bright: #38BDF8;
   --color-signal-dim: #0C4A6E;
+  /* Light blue signal: dark text on it keeps contrast. */
+  --color-on-signal: #050B14;
   --color-verified: #00D97E;
   --shadow-card: 0 1px 0 rgb(255 255 255 / 0.03) inset;
   --shadow-lift: 0 16px 40px -16px rgb(0 0 0 / 0.7);
@@ -122,6 +132,19 @@
   display: block !important;
 }
 
+/* Thermal swaps the orange signal for blue, so its lockup does too. */
+.tlf-brand-logo-thermal {
+  display: none !important;
+}
+:root[data-theme="thermal"] .tlf-brand-logo-thermal,
+[data-theme="thermal"] .tlf-brand-logo-thermal {
+  display: block !important;
+}
+:root[data-theme="thermal"] .tlf-brand-logo-dark,
+[data-theme="thermal"] .tlf-brand-logo-dark {
+  display: none !important;
+}
+
 * {
   border-color: var(--color-hairline);
 }
@@ -133,9 +156,11 @@
 html {
   scroll-padding-top: calc(var(--tlf-header-h) + 12px);
   -webkit-text-size-adjust: 100%;
+  overflow-x: clip;
 }
 
 body {
+  overflow-x: clip;
   background: var(--color-void);
   color: var(--color-ink);
   font-family: var(--font-sans);
@@ -189,16 +214,16 @@ body {
 .tlf-launch {
   --launch-bg: var(--color-signal);
   position: relative;
-  color: #fff;
+  color: var(--color-on-signal);
   background: var(--launch-bg);
   box-shadow:
-    inset 0 0 0 1px color-mix(in oklab, var(--launch-bg) 70%, #000),
-    inset 0 1px 0 rgb(255 255 255 / 0.22);
+    inset 0 0 0 1px color-mix(in oklab, var(--launch-bg) 70%, var(--color-mask)),
+    inset 0 1px 0 var(--color-highlight);
   overflow: hidden;
   transition: transform 160ms ease, background-color 160ms ease;
 }
 .tlf-launch:hover {
-  --launch-bg: color-mix(in oklab, var(--color-signal) 88%, #fff);
+  --launch-bg: color-mix(in oklab, var(--color-signal) 88%, var(--color-on-signal));
 }
 .tlf-launch:active {
   transform: translateY(1px);
@@ -208,7 +233,7 @@ body {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  background: linear-gradient(90deg, transparent, var(--color-highlight), transparent);
   transform: translateX(-110%);
   pointer-events: none;
 }
@@ -329,13 +354,13 @@ body {
   border-bottom: 1px solid var(--ticker-line);
 }
 .tlf-ticker-tab {
-  color: #fff;
-  background: var(--color-signal-bright);
+  color: var(--color-on-signal);
+  background: var(--color-signal);
   clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
 }
 .tlf-ticker-viewport {
-  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 64px), transparent 100%);
-  mask-image: linear-gradient(90deg, transparent 0, #000 40px, #000 calc(100% - 64px), transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, var(--color-mask) 40px, var(--color-mask) calc(100% - 64px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, var(--color-mask) 40px, var(--color-mask) calc(100% - 64px), transparent 100%);
 }
 .tlf-ticker-name {
   color: var(--ticker-fg);
@@ -349,10 +374,8 @@ body {
   background: var(--ticker-line);
 }
 .tlf-ticker-arrow {
-  color: var(--color-signal);
-  opacity: 0;
-  transform: translate(-4px, 4px);
-  transition: opacity 160ms ease, transform 160ms ease;
+  color: var(--ticker-dim);
+  transition: color 160ms ease, transform 160ms ease;
 }
 .tlf-ticker-item {
   position: relative;
@@ -379,8 +402,8 @@ body {
 }
 .tlf-ticker-item:hover .tlf-ticker-arrow,
 .tlf-ticker-item:focus-visible .tlf-ticker-arrow {
-  opacity: 1;
-  transform: none;
+  color: var(--color-signal);
+  transform: translate(2px, -2px);
 }
 .tlf-ticker-item:hover::after {
   transform: scaleX(1);
@@ -392,7 +415,7 @@ body {
     linear-gradient(to right, color-mix(in oklab, var(--color-hairline) 70%, transparent) 1px, transparent 1px),
     linear-gradient(to bottom, color-mix(in oklab, var(--color-hairline) 70%, transparent) 1px, transparent 1px);
   background-size: 24px 24px;
-  mask-image: radial-gradient(ellipse at top left, #000 0%, transparent 70%);
+  mask-image: radial-gradient(ellipse at top left, var(--color-mask) 0%, transparent 70%);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -508,315 +531,7 @@ html[data-theme-transitioning] * {
 /* Selection */
 ::selection {
   background: var(--color-signal);
-  color: #FFFFFF;
-}
-
-/* --- Airflow Sweep Animation — Pseudo-element approach --- */
-@keyframes airflowPulse {
-  0%, 100% {
-    opacity: 0.35;
-    transform: translateX(-30%);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(30%);
-  }
-}
-
-/* Base styles for all airflow cards */
-.airflow-daily-1, .airflow-daily-2, .airflow-daily-3,
-.airflow-weekly-1, .airflow-weekly-2, .airflow-weekly-3,
-.airflow-monthly-1, .airflow-monthly-2, .airflow-monthly-3,
-.airflow-yearly-1, .airflow-yearly-2, .airflow-yearly-3,
-.airflow-alltime-1, .airflow-alltime-2, .airflow-alltime-3 {
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-.airflow-daily-1::before, .airflow-daily-2::before, .airflow-daily-3::before,
-.airflow-weekly-1::before, .airflow-weekly-2::before, .airflow-weekly-3::before,
-.airflow-monthly-1::before, .airflow-monthly-2::before, .airflow-monthly-3::before,
-.airflow-yearly-1::before, .airflow-yearly-2::before, .airflow-yearly-3::before,
-.airflow-alltime-1::before, .airflow-alltime-2::before, .airflow-alltime-3::before {
-  content: "" !important;
-  position: absolute !important;
-  inset: 0 !important;
-  width: 200% !important;
-  pointer-events: none !important;
-  z-index: 0 !important;
-}
-
-/* Ensure card contents sit above the airflow glow */
-.airflow-daily-1 > *, .airflow-daily-2 > *, .airflow-daily-3 > *,
-.airflow-weekly-1 > *, .airflow-weekly-2 > *, .airflow-weekly-3 > *,
-.airflow-monthly-1 > *, .airflow-monthly-2 > *, .airflow-monthly-3 > *,
-.airflow-yearly-1 > *, .airflow-yearly-2 > *, .airflow-yearly-3 > *,
-.airflow-alltime-1 > *, .airflow-alltime-2 > *, .airflow-alltime-3 > * {
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-/* --- DAILY (Signal Red) --- */
-.airflow-daily-1::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(214, 0, 42, 0.18) 30%, rgba(214, 0, 42, 0.35) 50%, rgba(214, 0, 42, 0.18) 70%, transparent 100%) !important;
-  animation: airflowPulse 4s ease-in-out infinite !important;
-}
-.airflow-daily-2::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(214, 0, 42, 0.12) 30%, rgba(214, 0, 42, 0.22) 50%, rgba(214, 0, 42, 0.12) 70%, transparent 100%) !important;
-  animation: airflowPulse 5s ease-in-out infinite !important;
-}
-.airflow-daily-3::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(214, 0, 42, 0.08) 30%, rgba(214, 0, 42, 0.15) 50%, rgba(214, 0, 42, 0.08) 70%, transparent 100%) !important;
-  animation: airflowPulse 6s ease-in-out infinite !important;
-}
-
-/* --- Unique Dynamic Keyframes for Top Weekly & Monthly Shifting Gradients --- */
-@keyframes airflowShiftWeekly1 {
-  0%, 100% {
-    opacity: 0.45;
-    transform: translateX(-35%) scaleY(1);
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    opacity: 0.90;
-    transform: translateX(35%) scaleY(1.05);
-    filter: hue-rotate(25deg);
-  }
-}
-
-@keyframes airflowShiftWeekly2 {
-  0%, 100% {
-    opacity: 0.40;
-    transform: translateX(35%) scaleY(1);
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    opacity: 0.85;
-    transform: translateX(-35%) scaleY(1.05);
-    filter: hue-rotate(-20deg);
-  }
-}
-
-@keyframes airflowShiftWeekly3 {
-  0%, 100% {
-    opacity: 0.35;
-    transform: translateX(-25%) scaleY(1);
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    opacity: 0.80;
-    transform: translateX(25%) scaleY(1.05);
-    filter: hue-rotate(30deg);
-  }
-}
-
-@keyframes airflowShiftMonthly1 {
-  0%, 100% {
-    opacity: 0.50;
-    transform: translateX(-35%) scaleY(1);
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    opacity: 0.95;
-    transform: translateX(35%) scaleY(1.05);
-    filter: hue-rotate(35deg);
-  }
-}
-
-@keyframes airflowShiftMonthly2 {
-  0%, 100% {
-    opacity: 0.40;
-    transform: translateX(35%) scaleY(1);
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    opacity: 0.85;
-    transform: translateX(-35%) scaleY(1.05);
-    filter: hue-rotate(-25deg);
-  }
-}
-
-@keyframes airflowShiftMonthly3 {
-  0%, 100% {
-    opacity: 0.35;
-    transform: translateX(-25%) scaleY(1);
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    opacity: 0.80;
-    transform: translateX(25%) scaleY(1.05);
-    filter: hue-rotate(20deg);
-  }
-}
-
-/* --- WEEKLY TOP 3 — Unique Dynamic Gradients --- */
-/* Weekly #1: Electric Cyan & Neon Emerald Shift */
-.airflow-weekly-1::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(14, 165, 233, 0.25) 20%, rgba(16, 185, 129, 0.48) 50%, rgba(56, 189, 248, 0.25) 80%, transparent 100%) !important;
-  animation: airflowShiftWeekly1 4.5s ease-in-out infinite !important;
-}
-
-/* Weekly #2: Magenta Orchid & Hot Crimson Shift */
-.airflow-weekly-2::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(217, 70, 239, 0.22) 20%, rgba(244, 63, 94, 0.42) 50%, rgba(236, 72, 153, 0.22) 80%, transparent 100%) !important;
-  animation: airflowShiftWeekly2 5.5s ease-in-out infinite !important;
-}
-
-/* Weekly #3: Solar Amber & Sunburst Gold Shift */
-.airflow-weekly-3::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.22) 20%, rgba(251, 191, 36, 0.45) 50%, rgba(249, 115, 22, 0.22) 80%, transparent 100%) !important;
-  animation: airflowShiftWeekly3 6.5s ease-in-out infinite !important;
-}
-
-/* --- MONTHLY TOP 3 — Unique Dynamic Gradients --- */
-/* Monthly #1: Deep Cosmic Violet & Sapphire Indigo Shift */
-.airflow-monthly-1::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.28) 20%, rgba(99, 102, 241, 0.52) 50%, rgba(192, 132, 252, 0.28) 80%, transparent 100%) !important;
-  animation: airflowShiftMonthly1 4.2s ease-in-out infinite !important;
-}
-
-/* Monthly #2: Plasma Teal & Luminous Mint Shift */
-.airflow-monthly-2::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(20, 184, 166, 0.24) 20%, rgba(52, 211, 153, 0.46) 50%, rgba(45, 212, 191, 0.24) 80%, transparent 100%) !important;
-  animation: airflowShiftMonthly2 5.2s ease-in-out infinite !important;
-}
-
-/* Monthly #3: Flame Orange & Radiant Coral Shift */
-.airflow-monthly-3::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(249, 115, 22, 0.25) 20%, rgba(239, 68, 68, 0.48) 50%, rgba(251, 146, 60, 0.25) 80%, transparent 100%) !important;
-  animation: airflowShiftMonthly3 6.2s ease-in-out infinite !important;
-}
-
-/* --- YEARLY (Radiant Gold/Amber) --- */
-.airflow-yearly-1::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.24) 30%, rgba(245, 158, 11, 0.45) 50%, rgba(245, 158, 11, 0.24) 70%, transparent 100%) !important;
-  animation: airflowPulse 4s ease-in-out infinite !important;
-}
-.airflow-yearly-2::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.15) 30%, rgba(245, 158, 11, 0.30) 50%, rgba(245, 158, 11, 0.15) 70%, transparent 100%) !important;
-  animation: airflowPulse 5s ease-in-out infinite !important;
-}
-.airflow-yearly-3::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.09) 30%, rgba(245, 158, 11, 0.20) 50%, rgba(245, 158, 11, 0.09) 70%, transparent 100%) !important;
-  animation: airflowPulse 6s ease-in-out infinite !important;
-}
-
-/* --- ALL-TIME (Prestige Flame Rose) --- */
-.airflow-alltime-1::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.26) 30%, rgba(244, 63, 94, 0.50) 50%, rgba(244, 63, 94, 0.26) 70%, transparent 100%) !important;
-  animation: airflowPulse 3.5s ease-in-out infinite !important;
-}
-.airflow-alltime-2::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.16) 30%, rgba(244, 63, 94, 0.32) 50%, rgba(244, 63, 94, 0.16) 70%, transparent 100%) !important;
-  animation: airflowPulse 4.5s ease-in-out infinite !important;
-}
-.airflow-alltime-3::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.10) 30%, rgba(244, 63, 94, 0.22) 50%, rgba(244, 63, 94, 0.10) 70%, transparent 100%) !important;
-  animation: airflowPulse 5.5s ease-in-out infinite !important;
-}
-
-/* ============================================= */
-/* 12 Unique Product Gradient Color Palette      */
-/* ============================================= */
-
-.product-gradient-0, .product-gradient-1, .product-gradient-2,
-.product-gradient-3, .product-gradient-4, .product-gradient-5,
-.product-gradient-6, .product-gradient-7, .product-gradient-8,
-.product-gradient-9, .product-gradient-10, .product-gradient-11 {
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-.product-gradient-0::before, .product-gradient-1::before, .product-gradient-2::before,
-.product-gradient-3::before, .product-gradient-4::before, .product-gradient-5::before,
-.product-gradient-6::before, .product-gradient-7::before, .product-gradient-8::before,
-.product-gradient-9::before, .product-gradient-10::before, .product-gradient-11::before {
-  content: "" !important;
-  position: absolute !important;
-  inset: 0 !important;
-  width: 200% !important;
-  pointer-events: none !important;
-  z-index: 0 !important;
-}
-
-.product-gradient-0 > *, .product-gradient-1 > *, .product-gradient-2 > *,
-.product-gradient-3 > *, .product-gradient-4 > *, .product-gradient-5 > *,
-.product-gradient-6 > *, .product-gradient-7 > *, .product-gradient-8 > *,
-.product-gradient-9 > *, .product-gradient-10 > *, .product-gradient-11 > * {
-  position: relative !important;
-  z-index: 1 !important;
-}
-
-/* 0: Signal Crimson Red */
-.product-gradient-0::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(244, 63, 94, 0.18) 30%, rgba(225, 29, 72, 0.42) 50%, rgba(244, 63, 94, 0.18) 70%, transparent 100%) !important;
-  animation: airflowPulse 4s ease-in-out infinite !important;
-}
-
-/* 1: Electric Sky Cyan */
-.product-gradient-1::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(14, 165, 233, 0.20) 30%, rgba(56, 189, 248, 0.45) 50%, rgba(14, 165, 233, 0.20) 70%, transparent 100%) !important;
-  animation: airflowPulse 5s ease-in-out infinite !important;
-}
-
-/* 2: Ultra Violet & Electric Indigo */
-.product-gradient-2::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.20) 30%, rgba(192, 132, 252, 0.45) 50%, rgba(168, 85, 247, 0.20) 70%, transparent 100%) !important;
-  animation: airflowPulse 4.5s ease-in-out infinite !important;
-}
-
-/* 3: Golden Amber & Solar Gold */
-.product-gradient-3::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(245, 158, 11, 0.22) 30%, rgba(251, 191, 36, 0.48) 50%, rgba(245, 158, 11, 0.22) 70%, transparent 100%) !important;
-  animation: airflowPulse 5.5s ease-in-out infinite !important;
-}
-
-/* 4: Emerald Matrix Green */
-.product-gradient-4::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(16, 185, 129, 0.20) 30%, rgba(52, 211, 153, 0.45) 50%, rgba(16, 185, 129, 0.20) 70%, transparent 100%) !important;
-  animation: airflowPulse 4.2s ease-in-out infinite !important;
-}
-
-/* 5: Hot Coral Sunset */
-.product-gradient-5::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(249, 115, 22, 0.22) 30%, rgba(251, 146, 60, 0.48) 50%, rgba(249, 115, 22, 0.22) 70%, transparent 100%) !important;
-  animation: airflowPulse 5.2s ease-in-out infinite !important;
-}
-
-/* 6: Deep Sapphire Blue */
-.product-gradient-6::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(59, 130, 246, 0.22) 30%, rgba(96, 165, 250, 0.48) 50%, rgba(59, 130, 246, 0.22) 70%, transparent 100%) !important;
-  animation: airflowPulse 4.8s ease-in-out infinite !important;
-}
-
-/* 7: Magenta Orchid */
-.product-gradient-7::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(217, 70, 239, 0.20) 30%, rgba(240, 171, 252, 0.45) 50%, rgba(217, 70, 239, 0.20) 70%, transparent 100%) !important;
-  animation: airflowPulse 5.4s ease-in-out infinite !important;
-}
-
-/* 8: Teal Plasma */
-.product-gradient-8::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(20, 184, 166, 0.22) 30%, rgba(45, 212, 191, 0.48) 50%, rgba(20, 184, 166, 0.22) 70%, transparent 100%) !important;
-  animation: airflowPulse 4.4s ease-in-out infinite !important;
-}
-
-/* 9: Lime Pulse */
-.product-gradient-9::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(132, 204, 22, 0.22) 30%, rgba(163, 230, 53, 0.48) 50%, rgba(132, 204, 22, 0.22) 70%, transparent 100%) !important;
-  animation: airflowPulse 5.1s ease-in-out infinite !important;
-}
-
-/* 10: Rose Quartz */
-.product-gradient-10::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(244, 114, 182, 0.22) 30%, rgba(251, 113, 133, 0.48) 50%, rgba(244, 114, 182, 0.22) 70%, transparent 100%) !important;
-  animation: airflowPulse 4.6s ease-in-out infinite !important;
-}
-
-/* 11: Electric Laser Violet */
-.product-gradient-11::before {
-  background: linear-gradient(90deg, transparent 0%, rgba(139, 92, 246, 0.22) 30%, rgba(167, 139, 250, 0.48) 50%, rgba(139, 92, 246, 0.22) 70%, transparent 100%) !important;
-  animation: airflowPulse 5.3s ease-in-out infinite !important;
+  color: var(--color-on-signal);
 }
 
 /* Seamless instant view transitions & rendering optimizations */
@@ -896,7 +611,7 @@ html {
     filter: drop-shadow(0 0 0px transparent);
   }
   65%, 82% {
-    filter: drop-shadow(0 0 4px var(--signal, #ff4f00));
+    filter: drop-shadow(0 0 4px var(--color-signal-bright));
   }
   92%, 100% {
     filter: drop-shadow(0 0 0px transparent);
@@ -927,6 +642,18 @@ html {
   animation: lfAssemblePulse 1.8s cubic-bezier(0.16, 1, 0.3, 1) infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .lf-assemble-sq1, .lf-assemble-sq2, .lf-assemble-sq3, .lf-assemble-sq4, .lf-assemble-glow {
+    animation: none;
+  }
+  .tlf-ticker-item::after,
+  .tlf-ticker-arrow,
+  .tlf-launch,
+  .tlf-launch .tlf-matrix {
+    transition: none;
+  }
+}
+
 
 /*
  * Product pages read at a larger scale: every text-xs / text-sm inside
@@ -938,4 +665,10 @@ html {
   --text-xs--line-height: 1.5;
   --text-sm: 0.9375rem; /* 15px */
   --text-sm--line-height: 1.6;
+}
+
+/* Thermal's signal is a light blue: white text on it fails contrast, so
+   filled signal buttons switch to the theme's dark on-signal text. */
+:root[data-theme="thermal"] .bg-signal.text-white {
+  color: var(--color-on-signal);
 }

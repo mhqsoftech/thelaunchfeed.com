@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { prisma } from "@/lib/db";
-import { getPublicSlots } from "@/lib/queries/slots";
+import { getPublicSlots, getSlotsCacheVersion } from "@/lib/queries/slots";
 import { getTopFounders } from "@/lib/queries/founders";
 
 import { getCategoriesWithCounts } from "@/lib/queries/categories";
@@ -13,6 +13,7 @@ export const maxDuration = 60;
 
 let layoutServerCache: {
   timestamp: number;
+  slotsVersion: number;
   data: any;
 } | null = null;
 const LAYOUT_CACHE_TTL_MS = 30_000; // 30 seconds
@@ -28,7 +29,11 @@ export async function GET() {
   after(() => heartbeat("traffic").catch((err) => console.error("[jobs] heartbeat failed:", err)));
 
   try {
-    if (layoutServerCache && Date.now() - layoutServerCache.timestamp < LAYOUT_CACHE_TTL_MS) {
+    if (
+      layoutServerCache &&
+      layoutServerCache.slotsVersion === getSlotsCacheVersion() &&
+      Date.now() - layoutServerCache.timestamp < LAYOUT_CACHE_TTL_MS
+    ) {
       return NextResponse.json(layoutServerCache.data, {
         headers: {
           "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
@@ -36,6 +41,7 @@ export async function GET() {
       });
     }
 
+    const slotsVersionAtStart = getSlotsCacheVersion();
     const now = new Date();
     const weekStart = new Date(Date.now() - 7 * 86400 * 1000);
     const monthStart = new Date(Date.now() - 30 * 86400 * 1000);
@@ -43,6 +49,7 @@ export async function GET() {
     const [
       featured,
       rotating,
+      rail,
       weeklyProducts,
       monthlyProducts,
       categories,
@@ -51,6 +58,7 @@ export async function GET() {
     ] = await Promise.all([
       getPublicSlots("FEATURED").catch(() => []),
       getPublicSlots("ROTATING").catch(() => []),
+      getPublicSlots("RAIL").catch(() => []),
       // Top products this week (left rail)
       prisma.product
         .findMany({
@@ -153,6 +161,9 @@ export async function GET() {
     const responseData = {
       featured: finalFeatured,
       rotating: finalRotating,
+      // Sidebar Spotlight: only real bookings, never filled with fallbacks.
+      // The shell shows 4 at a time and rotates through the rest.
+      rail,
       topProducts: weeklyProducts.map(shapeProduct),
       weeklyProducts: weeklyProducts.map(shapeProduct),
       monthlyProducts: monthlyProducts.map(shapeProduct),
@@ -161,7 +172,7 @@ export async function GET() {
       directoryEmbeds,
     };
 
-    layoutServerCache = { timestamp: Date.now(), data: responseData };
+    layoutServerCache = { timestamp: Date.now(), slotsVersion: slotsVersionAtStart, data: responseData };
 
     return NextResponse.json(responseData, {
       headers: {
@@ -174,6 +185,7 @@ export async function GET() {
       {
         featured: [],
         rotating: [],
+        rail: [],
         topProducts: [],
         weeklyProducts: [],
         monthlyProducts: [],

@@ -40,7 +40,7 @@ export function LaunchFeedLoader({
             y="0.5"
             width="6.5"
             height="6.5"
-            fill="var(--signal, #ff4f00)"
+            fill="var(--color-signal-bright)"
           />
 
           {/* Square 2: Top Right (Assembles 2nd) */}
@@ -50,7 +50,7 @@ export function LaunchFeedLoader({
             y="0.5"
             width="6.5"
             height="6.5"
-            fill="var(--signal, #ff4f00)"
+            fill="var(--color-signal-bright)"
             opacity="0.85"
           />
 
@@ -61,7 +61,7 @@ export function LaunchFeedLoader({
             y="9"
             width="6.5"
             height="6.5"
-            fill="var(--signal, #ff4f00)"
+            fill="var(--color-signal-bright)"
             opacity="0.65"
           />
 
@@ -72,7 +72,7 @@ export function LaunchFeedLoader({
             y="9"
             width="6.5"
             height="6.5"
-            fill="var(--signal, #ff4f00)"
+            fill="var(--color-signal-bright)"
             opacity="0.35"
           />
         </svg>
