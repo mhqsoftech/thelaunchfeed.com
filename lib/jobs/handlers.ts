@@ -380,8 +380,20 @@ export const registry: JobRegistry = {
     priority: 10,
     run: async ({ urls, type }) => {
       if (!urls?.length) return { skipped: true };
-      const { submitBatch } = await import("@/lib/indexing");
-      return submitBatch(urls, { type });
+      const { submitBatch, getIndexingConfig, planDueUrls } = await import("@/lib/indexing");
+      const config = await getIndexingConfig();
+      if (config.paused) return { skipped: "paused" };
+      if (type === "URL_DELETED") return submitBatch(urls, { type });
+      // Only pages each engine hasn't successfully received yet (or that are
+      // past the re-send window): a launch must not re-send the homepage and
+      // category every day.
+      const [google, indexNow] = await Promise.all([
+        planDueUrls("GOOGLE", urls, config.resubmitDays),
+        planDueUrls("INDEXNOW", urls, config.resubmitDays),
+      ]);
+      const g = google.length ? await submitBatch(google, { type, engines: ["GOOGLE"] }) : null;
+      const n = indexNow.length ? await submitBatch(indexNow, { type, engines: ["INDEXNOW"] }) : null;
+      return { google: g?.googleSubmitted ?? 0, indexNow: n?.indexNowSubmitted ?? 0 };
     },
   },
 
@@ -501,14 +513,14 @@ export const registry: JobRegistry = {
     },
   },
 
-  /* ── scheduled: web indexing sync (every 6 h) ── */
+  /* ── scheduled: web indexing sync (every 6 h; skipped while paused) ── */
   "cron.indexing-sync": {
     priority: 0,
     leaseMs: 10 * 60_000,
     maxAttempts: 2,
     run: async () => {
-      const { syncDeployUrls } = await import("@/lib/indexing");
-      return syncDeployUrls(200);
+      const { runIndexingSync } = await import("@/lib/indexing");
+      return runIndexingSync({ source: "schedule", respectPause: true });
     },
   },
 

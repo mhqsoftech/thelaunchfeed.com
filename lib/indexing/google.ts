@@ -108,7 +108,7 @@ export async function publishGoogleUrlNotification(
   type: IndexingNotificationType = "URL_UPDATED"
 ): Promise<GoogleIndexingResult> {
   // Ensure production domain is used
-  let cleanUrl = url.trim().replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com");
+  const cleanUrl = url.trim().replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com");
   const apiKey = process.env.WEB_INDEXING_API_KEY?.trim();
 
   if (!apiKey) {
@@ -192,7 +192,7 @@ export async function publishGoogleUrlNotification(
  * Queries Google Web Search Indexing API metadata for a specific URL
  */
 export async function getGoogleUrlMetadata(url: string): Promise<any> {
-  let cleanUrl = url.trim().replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com");
+  const cleanUrl = url.trim().replace(/^http:\/\/localhost(:\d+)?/, "https://thelaunchfeed.com");
   const apiKey = process.env.WEB_INDEXING_API_KEY?.trim();
 
   if (!apiKey) {

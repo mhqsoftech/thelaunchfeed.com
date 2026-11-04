@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { syncDeployUrls, getDailyQuotaStatus } from "@/lib/indexing";
+import { runIndexingSync, getDailyQuotaStatus } from "@/lib/indexing";
 import { authClient } from "@/lib/auth-client";
 import { headers } from "next/headers";
 import { auth } from "@/lib/better-auth";
@@ -33,8 +33,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
     }
 
+    // An external pinger is automatic: it respects Pause and sends only due URLs.
     const quota = await getDailyQuotaStatus();
-    const summary = await syncDeployUrls(200);
+    const summary = await runIndexingSync({ source: "endpoint", respectPause: true });
 
     return NextResponse.json({
       success: true,

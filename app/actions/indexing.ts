@@ -5,10 +5,14 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/auth";
 import {
   getDailyQuotaStatus,
-  syncDeployUrls,
+  runIndexingSync,
+  getIndexingConfig,
+  updateIndexingConfig,
+  countDueUrls,
   submitUrl,
   submitBatch,
   DAILY_GOOGLE_QUOTA,
+  type IndexingRunSummary,
 } from "@/lib/indexing";
 
 export interface IndexingLogEntry {
@@ -43,6 +47,20 @@ export interface IndexingOverviewData {
     quotaSkippedSubmissions: number;
   };
   recentLogs: IndexingLogEntry[];
+  /** The automatic sync: pause switch, re-send window, last run and what's due. */
+  automation: {
+    paused: boolean;
+    resubmitDays: number;
+    lastRun: IndexingRunSummary | null;
+    nextRunAt: string;
+    due: { total: number; google: number; indexNow: number };
+  };
+}
+
+/** The 6-hourly sync runs at 00/06/12/18 UTC (lib/jobs/cron.ts). */
+function nextSyncSlot(now = new Date()) {
+  const every = 6 * 3_600_000;
+  return new Date(Math.floor(now.getTime() / every) * every + every).toISOString();
 }
 
 /**
@@ -51,7 +69,11 @@ export interface IndexingOverviewData {
 export async function getIndexingOverviewAction(): Promise<IndexingOverviewData> {
   await requireAdmin();
 
-  const quota = await getDailyQuotaStatus();
+  const [quota, config, due] = await Promise.all([
+    getDailyQuotaStatus(),
+    getIndexingConfig(),
+    countDueUrls().catch(() => ({ total: 0, google: 0, indexNow: 0 })),
+  ]);
 
   const hasApiKey = Boolean(process.env.WEB_INDEXING_API_KEY?.trim());
   const hasIndexNow = Boolean(process.env.WEB_INDEXING_API_KEY?.trim() || process.env.INDEXNOW_KEY?.trim());
@@ -117,15 +139,40 @@ export async function getIndexingOverviewAction(): Promise<IndexingOverviewData>
       responseBody: l.responseBody ?? null,
       submittedAt: l.submittedAt ? new Date(l.submittedAt).toISOString() : new Date().toISOString(),
     })),
+    automation: {
+      paused: config.paused,
+      resubmitDays: config.resubmitDays,
+      lastRun: config.lastRun,
+      nextRunAt: nextSyncSlot(),
+      due,
+    },
   };
 }
 
+/** Pause or resume every automatic submission (schedule, endpoint, launches). */
+export async function setIndexingPausedAction(paused: boolean) {
+  await requireAdmin();
+  const config = await updateIndexingConfig({ paused });
+  revalidatePath("/admin");
+  return { paused: config.paused };
+}
+
+/** How long before a page that was already submitted is sent again (0 = never). */
+export async function setIndexingResubmitDaysAction(days: number) {
+  await requireAdmin();
+  const allowed = [0, 30, 60, 90];
+  const config = await updateIndexingConfig({ resubmitDays: allowed.includes(days) ? days : 0 });
+  revalidatePath("/admin");
+  return { resubmitDays: config.resubmitDays };
+}
+
 /**
- * Triggers deploy sync of latest edited links (max 200)
+ * "Sync now": sends the pages that are due (never submitted, or past the
+ * re-send window). An explicit admin action, so it runs even while paused.
  */
 export async function syncDeployIndexingAction() {
   await requireAdmin();
-  const result = await syncDeployUrls(DAILY_GOOGLE_QUOTA);
+  const result = await runIndexingSync({ source: "manual", respectPause: false });
   revalidatePath("/admin");
   return result;
 }
@@ -205,13 +252,15 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
       .toLowerCase();
 
   // 1. Fetch all submission logs to map submission status by normalized URL
-  let logMap = new Map<
+  const logMap = new Map<
     string,
     {
       count: number;
       lastStatus: "SUCCESS" | "FAILED" | "SKIPPED_QUOTA" | "NEVER";
       lastSubmittedAt: string;
       lastEngine: string;
+      /** At least one successful submission to any engine. */
+      succeeded: boolean;
     }
   >();
 
@@ -235,9 +284,12 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
             lastStatus: (log.status as any) || "SUCCESS",
             lastSubmittedAt: log.submittedAt.toISOString(),
             lastEngine: log.engine,
+            succeeded: log.status === "SUCCESS",
           });
         } else {
-          logMap.get(norm)!.count++;
+          const entry = logMap.get(norm)!;
+          entry.count++;
+          if (log.status === "SUCCESS") entry.succeeded = true;
         }
       }
     }
@@ -269,7 +321,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
       subtitle: p.subtitle,
       type: "STATIC",
       updatedAt: new Date().toISOString(),
-      isSubmitted: Boolean(logInfo),
+      isSubmitted: Boolean(logInfo?.succeeded),
       submissionCount: logInfo?.count ?? 0,
       lastStatus: logInfo?.lastStatus ?? "NEVER",
       lastSubmittedAt: logInfo?.lastSubmittedAt ?? null,
@@ -296,7 +348,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
         subtitle: `Category archive feed (/category/${c.slug})`,
         type: "CATEGORY",
         updatedAt: (c.createdAt || new Date()).toISOString(),
-        isSubmitted: Boolean(logInfo),
+        isSubmitted: Boolean(logInfo?.succeeded),
         submissionCount: logInfo?.count ?? 0,
         lastStatus: logInfo?.lastStatus ?? "NEVER",
         lastSubmittedAt: logInfo?.lastSubmittedAt ?? null,
@@ -335,7 +387,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
         subtitle: p.tagline || (p.category?.name ? `${p.category.name} · /product/${p.slug}` : `Product launch page (/product/${p.slug})`),
         type: "PRODUCT",
         updatedAt: (p.updatedAt || p.launchedAt || new Date()).toISOString(),
-        isSubmitted: Boolean(logInfo),
+        isSubmitted: Boolean(logInfo?.succeeded),
         submissionCount: logInfo?.count ?? 0,
         lastStatus: logInfo?.lastStatus ?? "NEVER",
         lastSubmittedAt: logInfo?.lastSubmittedAt ?? null,
@@ -367,7 +419,7 @@ export async function getPlatformUrlsAction(): Promise<PlatformUrlsData> {
         subtitle: u.title || u.bio || `Founder profile (/founder/${cleanUsername})`,
         type: "FOUNDER",
         updatedAt: (u.updatedAt || u.createdAt || new Date()).toISOString(),
-        isSubmitted: Boolean(logInfo),
+        isSubmitted: Boolean(logInfo?.succeeded),
         submissionCount: logInfo?.count ?? 0,
         lastStatus: logInfo?.lastStatus ?? "NEVER",
         lastSubmittedAt: logInfo?.lastSubmittedAt ?? null,
@@ -486,6 +538,7 @@ export async function autoDiscoverAndIndexLiveProductsAction(
   // 2. Fetch logged URLs
   const existingLogs = await prisma.webIndexingLog
     .findMany({
+      where: { status: "SUCCESS" },
       select: { url: true },
     })
     .catch(() => []);

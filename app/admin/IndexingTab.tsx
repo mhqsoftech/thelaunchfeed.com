@@ -9,6 +9,8 @@ import {
   submitSelectedUrlsAction,
   submitAllUnsubmittedUrlsAction,
   autoDiscoverAndIndexLiveProductsAction,
+  setIndexingPausedAction,
+  setIndexingResubmitDaysAction,
   type IndexingOverviewData,
   type IndexingLogEntry,
   type PlatformUrlEntry,
@@ -313,14 +315,47 @@ export default function IndexingTab() {
         setError(null);
         setSuccessMsg(null);
         const res = await syncDeployIndexingAction();
+        const sent = (res?.googleSubmitted ?? 0) + (res?.indexNowSubmitted ?? 0);
         setSuccessMsg(
-          `Sync complete: ${res?.googleSubmitted ?? 0} Google submissions, ${res?.indexNowSubmitted ?? 0} IndexNow submissions (${res?.googleSkippedQuota ?? 0} skipped for quota).`
+          sent === 0 && (res?.googleDeferred ?? 0) === 0
+            ? "Nothing to send: every page has already been submitted."
+            : `Sent ${res?.googleSubmitted ?? 0} to Google and ${res?.indexNowSubmitted ?? 0} to IndexNow.${
+                res?.googleDeferred ? ` ${res.googleDeferred} more wait for Google's quota to reset.` : ""
+              }`
         );
         await loadData();
       } catch (err: any) {
         setError(err?.message || "Deploy sync failed");
       }
     });
+  };
+
+  const [savingAutomation, setSavingAutomation] = useState(false);
+  const togglePaused = async () => {
+    if (!data) return;
+    setSavingAutomation(true);
+    setError(null);
+    try {
+      const res = await setIndexingPausedAction(!data.automation.paused);
+      setData({ ...data, automation: { ...data.automation, paused: res.paused } });
+      setSuccessMsg(res.paused ? "Automatic indexing is paused." : "Automatic indexing is back on.");
+    } catch (err: any) {
+      setError(err?.message || "Couldn't change the automatic sync");
+    } finally {
+      setSavingAutomation(false);
+    }
+  };
+  const changeResubmitDays = async (days: number) => {
+    setSavingAutomation(true);
+    setError(null);
+    try {
+      await setIndexingResubmitDaysAction(days);
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || "Couldn't save the re-send setting");
+    } finally {
+      setSavingAutomation(false);
+    }
   };
 
   const handleCustomSubmit = async (e: React.FormEvent) => {
@@ -428,6 +463,7 @@ export default function IndexingTab() {
   }
 
   const quota = data?.quota || { usedToday: 0, limit: 200, remaining: 200, resetAt: "" };
+  const automation = data?.automation;
   const auth = data?.authStatus || {
     hasGoogleCredentials: false,
     hasWebIndexingApiKey: false,
@@ -493,14 +529,53 @@ export default function IndexingTab() {
           <div className="w-9 h-9 rounded-lg bg-signal-dim text-signal flex items-center justify-center shrink-0">
             <IconGlobe className="w-4.5 h-4.5 text-signal" />
           </div>
-          <div className="min-w-0">
-            <span className={ui.pill("signal")}>
-              <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
-              Live sync
-            </span>
-            <p className="text-sm text-ink-dim mt-1 leading-relaxed">
-              Automated link dispatch to Google Indexing API &amp; IndexNow (max 200 latest/day).
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={ui.pill(automation?.paused ? "warn" : "good")}>
+                {automation?.paused ? "Automatic sync paused" : "Automatic sync on"}
+              </span>
+              <button
+                type="button"
+                onClick={togglePaused}
+                disabled={!automation || savingAutomation}
+                className={ui.cx(ui.btnSm, automation?.paused ? ui.primary : ui.secondary)}
+              >
+                {automation?.paused ? "Resume" : "Pause"}
+              </button>
+            </div>
+            <p className="text-sm text-ink-dim leading-relaxed">
+              {automation?.paused
+                ? "Nothing is sent automatically: not on the 6-hour schedule, not on new launches. The buttons here still work."
+                : "Every 6 hours, and when a product launches, only pages that haven't been submitted yet are sent. Pages already submitted are skipped."}
             </p>
+            {automation && (
+              <p className="text-xs text-ink-faint">
+                Due now: {automation.due.google} for Google, {automation.due.indexNow} for IndexNow, of {automation.due.total} pages.
+                {!automation.paused && ` Next automatic run ${new Date(automation.nextRunAt).toLocaleString()}.`}
+                {automation.lastRun &&
+                  ` Last run ${new Date(automation.lastRun.at).toLocaleString()}: ${
+                    automation.lastRun.paused
+                      ? "skipped, paused"
+                      : `${automation.lastRun.googleSubmitted} to Google, ${automation.lastRun.indexNowSubmitted} to IndexNow`
+                  }.`}
+              </p>
+            )}
+            {automation && (
+              <label className="flex items-center gap-2 text-xs text-ink-dim">
+                Re-send submitted pages
+                <select
+                  value={automation.resubmitDays}
+                  onChange={(e) => changeResubmitDays(Number(e.target.value))}
+                  disabled={savingAutomation}
+                  className={ui.cx(ui.input, "h-7 text-xs cursor-pointer")}
+                >
+                  <option value={0}>Never</option>
+                  <option value={30}>After 30 days</option>
+                  <option value={60}>After 60 days</option>
+                  <option value={90}>After 90 days</option>
+                </select>
+              </label>
+            )}
           </div>
         </div>
 
@@ -545,7 +620,7 @@ export default function IndexingTab() {
             ) : (
               <>
                 <IconRocket className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">Sync Latest Links</span>
+                <span className="truncate">Sync new pages now</span>
               </>
             )}
           </button>

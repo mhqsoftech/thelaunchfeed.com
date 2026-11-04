@@ -288,61 +288,210 @@ export async function submitBatch(
   };
 }
 
-/**
- * Collects the latest edited/created URLs across the entire platform up to max limit (default 200)
+/* ───────────────────────── automatic sync: settings, planning, runs ─────────────────────────
+ *
+ * Automatic sources (the 6-hourly cron, POST /api/indexing/sync with a token,
+ * and the on-launch trigger) go through runIndexingSync / isIndexingPaused:
+ *   • a Pause switch stops all of them (manual admin buttons still work);
+ *   • only due URLs are sent: never successfully submitted to that engine,
+ *     or (optionally) last sent more than `resubmitDays` ago. Product
+ *     `updatedAt` can't mean "content changed" here: votes and the 5-minute
+ *     rank sync touch it constantly, which is why the old "latest updated"
+ *     list re-sent the same pages every day;
+ *   • Google gets at most the remaining daily quota, and URLs over it simply
+ *     wait for the next run instead of being logged as SKIPPED_QUOTA.
+ * Settings live in AppSetting["web_indexing_config"], so no schema change.
  */
-export async function collectDeployAndRecentUrls(limit = DAILY_GOOGLE_QUOTA): Promise<string[]> {
-  const urls: string[] = [];
 
-  // 1. Core static pages
-  const staticPaths = ["/", "/founders", "/submit", "/about", "/contact", "/privacy", "/terms"];
-  for (const p of staticPaths) {
-    urls.push(`${APP_URL}${p}`);
+const CONFIG_KEY = "web_indexing_config";
+const INDEXNOW_MAX_PER_RUN = 500;
+
+export type IndexingEngine = "GOOGLE" | "INDEXNOW";
+
+export interface IndexingRunSummary {
+  at: string;
+  source: "schedule" | "endpoint" | "manual";
+  paused: boolean;
+  due: { google: number; indexNow: number };
+  googleSubmitted: number;
+  googleFailed: number;
+  /** Due for Google but over today's quota: left for the next run. */
+  googleDeferred: number;
+  indexNowSubmitted: number;
+}
+
+export interface IndexingConfig {
+  paused: boolean;
+  /** Re-send a page this many days after its last successful submission; 0 = never. */
+  resubmitDays: number;
+  lastRun: IndexingRunSummary | null;
+}
+
+const DEFAULT_CONFIG: IndexingConfig = { paused: false, resubmitDays: 0, lastRun: null };
+
+export async function getIndexingConfig(): Promise<IndexingConfig> {
+  try {
+    const row = await prisma.appSetting.findUnique({ where: { key: CONFIG_KEY } });
+    const v = (row?.value ?? {}) as Partial<IndexingConfig>;
+    return {
+      paused: v.paused === true,
+      resubmitDays: Number.isFinite(v.resubmitDays) ? Math.max(0, Math.floor(v.resubmitDays as number)) : 0,
+      lastRun: (v.lastRun as IndexingRunSummary) ?? null,
+    };
+  } catch {
+    return DEFAULT_CONFIG;
   }
+}
 
-  // 2. Categories
-  const categories = await prisma.category.findMany({
-    select: { slug: true },
-    orderBy: { createdAt: "desc" },
-    take: 30,
+export async function updateIndexingConfig(patch: Partial<IndexingConfig>): Promise<IndexingConfig> {
+  const next = { ...(await getIndexingConfig()), ...patch };
+  await prisma.appSetting.upsert({
+    where: { key: CONFIG_KEY },
+    create: { key: CONFIG_KEY, value: next as object },
+    update: { value: next as object },
   });
-  for (const c of categories) {
-    urls.push(`${APP_URL}/category/${encodeURIComponent(c.slug)}`);
-  }
+  return next;
+}
 
-  const remainingSlots = Math.max(10, limit - urls.length);
-  const productSlots = Math.floor(remainingSlots * 0.65);
-  const founderSlots = remainingSlots - productSlots;
+export async function isIndexingPaused(): Promise<boolean> {
+  return (await getIndexingConfig()).paused;
+}
 
-  // 3. Latest modified/launched Products (ordered by updatedAt desc)
-  const products = await prisma.product.findMany({
-    where: { status: "LIVE" },
-    select: { slug: true },
-    orderBy: [{ updatedAt: "desc" }, { launchedAt: "desc" }],
-    take: productSlots,
-  });
-  for (const p of products) {
-    urls.push(`${APP_URL}/product/${encodeURIComponent(p.slug)}`);
-  }
+const urlKey = (u: string) => normalizeUrl(u).replace(/\/+$/, "").toLowerCase();
 
-  // 4. Latest modified public Founders (ordered by updatedAt desc)
-  const users = await prisma.user.findMany({
-    where: { isProfilePublic: true, username: { not: "" } },
-    select: { username: true },
-    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-    take: founderSlots,
-  });
-  for (const u of users) {
-    urls.push(`${APP_URL}/founder/${encodeURIComponent(u.username.replace(/^@/, "").trim())}`);
-  }
-
-  return Array.from(new Set(urls)).slice(0, limit);
+/**
+ * Every public page worth indexing: core pages, boards, categories, live
+ * products, and founders who have at least one live product (empty profiles
+ * are thin pages). Newest products first.
+ */
+export async function collectPlatformUrls(): Promise<string[]> {
+  const staticPaths = [
+    "/",
+    "/leaderboard/weekly",
+    "/leaderboard/monthly",
+    "/leaderboard/yearly",
+    "/leaderboard/all-time",
+    "/categories",
+    "/founders",
+    "/badges",
+    "/submit",
+    "/about",
+    "/contact",
+    "/privacy",
+    "/terms",
+  ];
+  const [categories, products, founders] = await Promise.all([
+    prisma.category.findMany({ select: { slug: true }, orderBy: { createdAt: "desc" } }),
+    prisma.product.findMany({ where: { status: "LIVE" }, select: { slug: true }, orderBy: { launchedAt: "desc" } }),
+    prisma.user.findMany({
+      where: { isProfilePublic: true, username: { not: "" }, products: { some: { status: "LIVE" } } },
+      select: { username: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+  const urls = [
+    ...staticPaths.map((p) => `${APP_URL}${p}`),
+    ...products.map((p) => `${APP_URL}/product/${encodeURIComponent(p.slug)}`),
+    ...categories.map((c) => `${APP_URL}/category/${encodeURIComponent(c.slug)}`),
+    ...founders.map((u) => `${APP_URL}/founder/${encodeURIComponent(u.username.replace(/^@/, "").trim())}`),
+  ];
+  return Array.from(new Set(urls));
 }
 
 /**
- * Runs the production deploy sync: collects latest edited links (max 200) and submits them
+ * URLs due for one engine, in submission order: never successfully sent
+ * first (in collection order), then the longest-ago re-sends.
  */
-export async function syncDeployUrls(limit = DAILY_GOOGLE_QUOTA) {
-  const urls = await collectDeployAndRecentUrls(limit);
-  return await submitBatch(urls, { type: "URL_UPDATED" });
+export async function planDueUrls(
+  engine: IndexingEngine,
+  candidates: string[],
+  resubmitDays: number,
+  now = new Date()
+): Promise<string[]> {
+  const sent = await prisma.webIndexingLog.groupBy({
+    by: ["url"],
+    where: { engine, status: "SUCCESS" },
+    _max: { submittedAt: true },
+  });
+  const lastSent = new Map<string, number>();
+  for (const s of sent) {
+    const t = s._max.submittedAt?.getTime() ?? 0;
+    const k = urlKey(s.url);
+    if (t > (lastSent.get(k) ?? 0)) lastSent.set(k, t);
+  }
+  const cutoff = resubmitDays > 0 ? now.getTime() - resubmitDays * 86_400_000 : -Infinity;
+  const fresh: string[] = [];
+  const stale: Array<{ url: string; at: number }> = [];
+  for (const url of candidates) {
+    const at = lastSent.get(urlKey(url));
+    if (at === undefined) fresh.push(url);
+    else if (at < cutoff) stale.push({ url, at });
+  }
+  stale.sort((a, b) => a.at - b.at);
+  return [...fresh, ...stale.map((s) => s.url)];
+}
+
+/** How many URLs each engine would get on the next run. */
+export async function countDueUrls() {
+  const config = await getIndexingConfig();
+  const candidates = await collectPlatformUrls();
+  const [google, indexNow] = await Promise.all([
+    planDueUrls("GOOGLE", candidates, config.resubmitDays),
+    planDueUrls("INDEXNOW", candidates, config.resubmitDays),
+  ]);
+  return { total: candidates.length, google: google.length, indexNow: indexNow.length };
+}
+
+/**
+ * One sync pass. Automatic sources pass respectPause; the admin's own
+ * "Sync now" button does not (it is an explicit request), but it still only
+ * sends due URLs.
+ */
+export async function runIndexingSync({
+  source,
+  respectPause,
+}: {
+  source: IndexingRunSummary["source"];
+  respectPause: boolean;
+}): Promise<IndexingRunSummary> {
+  const config = await getIndexingConfig();
+  const at = new Date().toISOString();
+  if (respectPause && config.paused) {
+    return {
+      at,
+      source,
+      paused: true,
+      due: { google: 0, indexNow: 0 },
+      googleSubmitted: 0,
+      googleFailed: 0,
+      googleDeferred: 0,
+      indexNowSubmitted: 0,
+    };
+  }
+
+  const candidates = await collectPlatformUrls();
+  const [googleDue, indexNowDue] = await Promise.all([
+    planDueUrls("GOOGLE", candidates, config.resubmitDays),
+    planDueUrls("INDEXNOW", candidates, config.resubmitDays),
+  ]);
+  const quota = await getDailyQuotaStatus();
+  const googleNow = googleDue.slice(0, quota.remaining);
+  const indexNowNow = indexNowDue.slice(0, INDEXNOW_MAX_PER_RUN);
+
+  const g = googleNow.length ? await submitBatch(googleNow, { type: "URL_UPDATED", engines: ["GOOGLE"] }) : null;
+  const n = indexNowNow.length ? await submitBatch(indexNowNow, { type: "URL_UPDATED", engines: ["INDEXNOW"] }) : null;
+
+  const summary: IndexingRunSummary = {
+    at,
+    source,
+    paused: false,
+    due: { google: googleDue.length, indexNow: indexNowDue.length },
+    googleSubmitted: g?.googleSubmitted ?? 0,
+    googleFailed: g?.googleFailed ?? 0,
+    googleDeferred: Math.max(0, googleDue.length - googleNow.length),
+    indexNowSubmitted: n?.indexNowSubmitted ?? 0,
+  };
+  // Re-read so a Pause clicked during the run isn't overwritten.
+  await updateIndexingConfig({ lastRun: summary }).catch((e) => console.warn("[web-indexing] lastRun save failed:", e));
+  return summary;
 }
