@@ -597,7 +597,7 @@ export default function MainLayoutShell({
 
   /* ─────────── search field (shared by desktop + mobile) ─────────── */
   const searchField = (ref: React.RefObject<HTMLInputElement | null>, autoFocus = false) => (
-    <div className="relative flex items-center h-10 w-full rounded-full border border-hairline bg-card focus-within:border-ink-faint focus-within:shadow-[var(--shadow-card)] transition-colors">
+    <div className="relative flex items-center h-10 w-full rounded-full border border-hairline bg-card focus-within:border-signal focus-within:ring-2 focus-within:ring-signal/15 transition-[border-color,box-shadow]">
       <Icon d={ICONS.search} className="w-4 h-4 ml-3.5 text-ink-faint shrink-0" />
       <input
         ref={ref}
@@ -613,7 +613,7 @@ export default function MainLayoutShell({
           }
         }}
         placeholder="Search products, makers, categories…"
-        className="flex-1 min-w-0 bg-transparent px-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none [&::-webkit-search-cancel-button]:hidden"
+        className="tlf-field-input flex-1 min-w-0 bg-transparent px-2.5 text-sm text-ink placeholder:text-ink-faint focus:outline-none [&::-webkit-search-cancel-button]:hidden"
       />
       {searchQuery ? (
         <button type="button" onClick={clearSearch} className="mr-2 p-1 rounded-full text-ink-faint hover:text-ink" aria-label="Clear search">

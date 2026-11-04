@@ -145,8 +145,15 @@
   display: none !important;
 }
 
-* {
-  border-color: var(--color-hairline);
+/* Default border colour. In the base layer so border-* colour utilities
+   (border-signal, hover:border-…, focus-within:border-…) can override it;
+   unlayered, it silently beat every one of them. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-hairline);
+  }
 }
 
 :root {
@@ -169,10 +176,16 @@ body {
 }
 
 /* Visible, consistent keyboard focus everywhere. */
-:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+:where(a, button, input, select, textarea, summary, [tabindex]):not(.tlf-field-input):focus-visible {
   outline: 2px solid var(--color-signal);
   outline-offset: 2px;
   border-radius: 4px;
+}
+/* A bare input inside a styled field (the header search pill): the field
+   shows focus with :focus-within, so the input itself draws no outline. */
+.tlf-field-input:focus,
+.tlf-field-input:focus-visible {
+  outline: none;
 }
 
 /* Page title bars written for the old inner-scroll shell ("sticky -top-4")
