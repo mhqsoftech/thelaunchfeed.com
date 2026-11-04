@@ -61,6 +61,7 @@ export async function GET() {
           select: {
             id: true,
             amountCents: true,
+            details: true,
             currency: true,
             status: true,
             createdAt: true,
@@ -86,7 +87,12 @@ export async function GET() {
         ? {
             name: "Sidebar Spotlight",
             headline: "Sponsored slot above Top by category, $1 per 3 days",
-            priceFormatted: `$${Math.round((s.purchase?.amountCents ?? 0) / 100)}`,
+            // One payment can cover several products: show this slot's share.
+            priceFormatted: `$${Math.round(
+              (s.purchase?.amountCents ?? 0) /
+                100 /
+                Math.max(1, ((s.purchase?.details as { items?: unknown[] } | null)?.items ?? []).length || 1)
+            )}`,
           }
         : PLACEMENT_TIERS[tierKey];
 
@@ -103,7 +109,16 @@ export async function GET() {
         isActive,
         daysRemaining: isActive ? daysRemaining : 0,
         percentElapsed,
-        product: s.product,
+        // A sponsored product that isn't listed here (sidebar Spotlight
+        // custom booking) has no Product row: describe it from the slot.
+        product:
+          s.product ??
+          (s.customName
+            ? { id: null, name: s.customName, slug: null, tagline: s.customTagline ?? "", logoUrl: s.customLogoUrl, status: "SPONSORED" }
+            : null),
+        isSponsoredProduct: !s.product && !!s.customName && /^https?:\/\//i.test(s.customUrl ?? ""),
+        siteUrl: !s.product && /^https?:\/\//i.test(s.customUrl ?? "") ? s.customUrl : null,
+        durationDays: Math.max(1, Math.round(totalMs / 86_400_000)),
         purchase: s.purchase,
       };
     });

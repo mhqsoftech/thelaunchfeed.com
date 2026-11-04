@@ -84,7 +84,12 @@ export async function listSlots(position: SlotPosition): Promise<UISlot[]> {
         logoUrl: s.customLogoUrl || s.product?.logoUrl || null,
         subscription: {
           userName: s.purchase?.user.name ?? s.purchase?.user.username ?? "—",
-          price: Math.round((s.purchase?.amountCents ?? 0) / 100),
+          // A multi-product sidebar booking pays once for several slots.
+          price: Math.round(
+            (s.purchase?.amountCents ?? 0) /
+                100 /
+                Math.max(1, ((s.purchase?.details as { items?: unknown[] } | null)?.items ?? []).length || 1)
+          ),
           expiresAt: s.endsAt?.toISOString() ?? null,
         },
       };

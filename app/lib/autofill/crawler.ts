@@ -420,6 +420,37 @@ function homepageIsSufficient(page: CrawledPage): boolean {
   return hasTitle && hasDescription && hasBody && mentionsPricing && mentionsFeatures;
 }
 
+/**
+ * One page's metadata for a quick preview: title, description and the best
+ * icon. No sitemap crawl and no AI step, so it returns in a second or two.
+ * Same SSRF-guarded fetch as crawlSite.
+ */
+export async function fetchSiteMeta(url: string): Promise<{
+  title: string;
+  description: string;
+  siteName: string;
+  icon: string | null;
+} | null> {
+  const res = await fetchTextWithHeaders(url, 512_000);
+  if (!res) return null;
+  const page = parsePage(url, res.text);
+  // The name the site gives itself, when it declares one.
+  let siteName = "";
+  for (const tag of res.text.match(/<meta\b[^>]*>/gi) ?? []) {
+    const key = (attr(tag, "property") || attr(tag, "name") || "").toLowerCase();
+    if (key === "og:site_name" || key === "application-name" || key === "apple-mobile-web-app-title") {
+      siteName = stripTags(attr(tag, "content") ?? "").slice(0, 80);
+      if (key === "og:site_name" && siteName) break;
+    }
+  }
+  return {
+    title: page.title,
+    description: page.description,
+    siteName,
+    icon: page.appleTouchIcon || page.favicon || null,
+  };
+}
+
 export async function crawlSite(inputUrl: string): Promise<CrawlResult> {
   const parsed = new URL(inputUrl);
   const origin = parsed.origin;

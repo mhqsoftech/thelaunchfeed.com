@@ -88,8 +88,8 @@ export async function POST(req: Request) {
 
       // Sidebar Spotlight: duration and target are stored on the purchase.
       if (purchase.position === "RAIL") {
-        const slot = await activateRailSlot(purchase.id, paymentId);
-        return NextResponse.json({ received: true, activated: !!slot });
+        const slots = await activateRailSlot(purchase.id, paymentId);
+        return NextResponse.json({ received: true, activated: slots.length > 0 });
       }
 
       // amountCents on the purchase row was set when we created the checkout

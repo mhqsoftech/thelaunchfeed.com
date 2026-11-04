@@ -59,7 +59,8 @@ export async function POST(req: Request) {
           { status: 402 }
         );
       }
-      const slot = await activateRailSlot(purchase.id, payment.paymentId || paymentId || undefined);
+      const slots = await activateRailSlot(purchase.id, payment.paymentId || paymentId || undefined);
+      const slot = slots[0];
       if (!slot) {
         return NextResponse.json({ error: "ACTIVATION_FAILED", message: "Paid, but the slot could not be created. Contact us and we'll sort it out." }, { status: 500 });
       }
@@ -67,6 +68,7 @@ export async function POST(req: Request) {
         success: true,
         placement: "RAIL",
         slot: { id: slot.id, startsAt: slot.startsAt, endsAt: slot.endsAt },
+        products: slots.length,
       });
     }
 

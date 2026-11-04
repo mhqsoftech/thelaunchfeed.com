@@ -479,10 +479,13 @@ model FeaturedSlot {
 
   purchaseId String?
   purchase   FeaturedPurchase? @relation(fields: [purchaseId], references: [id])
+  // Which product of a multi-product purchase this slot is (0 for every
+  // single-product purchase), so one payment can create several slots.
+  purchaseItem Int @default(0)
 
   createdAt DateTime @default(now())
 
-  @@unique([purchaseId])
+  @@unique([purchaseId, purchaseItem])
   @@index([position, order])
   @@index([kind, position])
   @@index([startsAt, endsAt])
@@ -516,6 +519,10 @@ model FeaturedPurchase {
   days         Int?
   productId    String?
   submissionId String?
+  // Sidebar Spotlight items: { items: [{ type: "product", productId }
+  // | { type: "submission", submissionId } | { type: "custom", url, name,
+  // tagline, logoUrl }] }, one slot per item.
+  details      Json?
 
   user  User           @relation(fields: [userId], references: [id])
   slots FeaturedSlot[]

@@ -23,13 +23,13 @@ export default async function BookSpotlightPage() {
       prisma.product.findMany({
         where: { status: "LIVE", OR: [{ ownerId: user.id }, { makers: { some: { userId: user.id } } }] },
         orderBy: { launchedAt: "desc" },
-        select: { id: true, name: true, tagline: true, logoUrl: true },
+        select: { id: true, name: true, tagline: true, logoUrl: true, websiteUrl: true },
         take: 50,
       }),
       prisma.submission.findMany({
         where: { ownerId: user.id, status: "SCHEDULED" },
         orderBy: { scheduledFor: "asc" },
-        select: { id: true, name: true, tagline: true, logoUrl: true },
+        select: { id: true, name: true, tagline: true, logoUrl: true, websiteUrl: true },
         take: 20,
       }),
     ]);

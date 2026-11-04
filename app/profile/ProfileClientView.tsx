@@ -1807,6 +1807,11 @@ export default function ProfileClientView({
                                     <span className={`text-[10px] font-mono px-2 py-0.5 border font-bold uppercase ${tierColor} rounded-lg`}>
                                       {slot.headline}
                                     </span>
+                                    {slot.isSponsoredProduct && (
+                                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-surface border border-hairline text-ink-dim">
+                                        Sponsored by you
+                                      </span>
+                                    )}
                                   </div>
                                   <p className="font-mono text-xs text-ink-dim break-words">
                                     {slot.product?.tagline || "Product launch placement"}
@@ -1836,7 +1841,7 @@ export default function ProfileClientView({
                                   ) : (
                                     <span>Placement Period Ended</span>
                                   )}
-                                  <span className="text-ink-faint"> (30-day duration)</span>
+                                  <span className="text-ink-faint"> ({slot.durationDays ?? 30}-day duration)</span>
                                 </span>
                                 <span className="font-bold text-ink">
                                   {slot.priceFormatted} Paid Placement
@@ -1868,6 +1873,17 @@ export default function ProfileClientView({
                                   <span>View Live on Board</span>
                                   <span>↗</span>
                                 </Link>
+                                {slot.siteUrl && (
+                                  <a
+                                    href={slot.siteUrl}
+                                    target="_blank"
+                                    rel="noopener"
+                                    className="text-ink-dim hover:text-ink transition-colors flex items-center gap-1"
+                                  >
+                                    <span>Visit site</span>
+                                    <span>↗</span>
+                                  </a>
+                                )}
                                 {slot.product?.slug && (
                                   <Link
                                     href={`/product/${slot.product.slug}`}
