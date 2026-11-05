@@ -240,7 +240,7 @@ function LaunchButton() {
   return (
     <Link
       href="/submit"
-      className="tlf-launch group hidden sm:inline-flex items-center gap-2.5 h-10 pl-4 pr-5 rounded-full text-sm font-semibold whitespace-nowrap"
+      className="tlf-launch group hidden sm:inline-flex items-center gap-2.5 h-10 pl-4 pr-5 rounded-full text-sm font-semibold whitespace-nowrap min-[1440px]:h-11 min-[1440px]:pl-5 min-[1440px]:pr-6 min-[1440px]:text-[15px]"
       title={`Submit your product — next batch goes live at ${local?.label ?? "6:00 AM IST"}`}
     >
       <span className="tlf-launch-main absolute inset-0 rounded-full" aria-hidden />
@@ -988,10 +988,10 @@ export default function MainLayoutShell({
 
       {/* Site header */}
       <header className="relative h-[60px] border-b border-hairline bg-void/85 backdrop-blur-xl supports-[backdrop-filter]:bg-void/75">
-        <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3 lg:gap-6">
-          <Link href="/" className="flex items-center gap-2 shrink-0" aria-label="The Launch Feed — home">
+        <div className="mx-auto h-full max-w-[1600px] px-4 lg:px-6 flex items-center gap-3 lg:gap-6 min-[1440px]:gap-7">
+          <Link href="/" className="flex items-center gap-2 min-[1440px]:gap-2.5 shrink-0 min-[1440px]:[&>svg]:w-[26px] min-[1440px]:[&>svg]:h-[26px]" aria-label="The Launch Feed — home">
             <LaunchFeedLogo size={22} />
-            <span className="font-display font-black text-[15px] sm:text-[17px] tracking-wide text-ink uppercase leading-none whitespace-nowrap">
+            <span className="font-display font-black text-[15px] sm:text-[17px] min-[1440px]:text-[20px] tracking-wide text-ink uppercase leading-none whitespace-nowrap">
               The Launch <span className="text-signal">Feed</span>
             </span>
           </Link>
@@ -1004,7 +1004,7 @@ export default function MainLayoutShell({
                   key={item.href}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${
+                  className={`px-3 py-2 rounded-full text-sm min-[1440px]:text-[15px] 2xl:px-3.5 font-medium transition-colors ${
                     active ? "text-ink bg-surface" : "text-ink-dim hover:text-ink hover:bg-surface/70"
                   }`}
                 >
@@ -1016,7 +1016,7 @@ export default function MainLayoutShell({
 
           {/* Full search box from xl; below that the icon opens the search sheet so the
               nav, Submit and profile buttons never get pushed off-screen. */}
-          <div className="hidden xl:block flex-1 min-w-0 max-w-md ml-auto">{searchField(inputRef)}</div>
+          <div className="hidden xl:block flex-1 min-w-0 max-w-md 2xl:max-w-xl ml-auto">{searchField(inputRef)}</div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 ml-auto xl:ml-0 shrink-0">
             <button
@@ -1037,7 +1037,7 @@ export default function MainLayoutShell({
                 href="/profile"
                 // A centred circle around the avatar; it only widens into a
                 // pill on 2xl screens, where the handle is shown beside it.
-                className="hidden sm:flex items-center justify-center w-10 h-10 2xl:w-auto 2xl:justify-start 2xl:gap-2 2xl:pl-[3px] 2xl:pr-3 rounded-full border border-hairline bg-card hover:border-signal/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 transition-colors"
+                className="hidden sm:flex items-center justify-center w-10 h-10 min-[1440px]:w-11 min-[1440px]:h-11 2xl:w-auto 2xl:justify-start 2xl:gap-2 2xl:pl-[3px] 2xl:pr-3 rounded-full border border-hairline bg-card hover:border-signal/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal/40 transition-colors"
                 title={`${userSession.name}'s dashboard`}
                 aria-label="Your dashboard"
               >
@@ -1047,7 +1047,7 @@ export default function MainLayoutShell({
             ) : (
               <Link
                 href="/login"
-                className="hidden sm:inline-flex items-center h-10 px-4 rounded-full border border-hairline text-sm font-medium text-ink hover:bg-surface transition-colors"
+                className="hidden sm:inline-flex items-center h-10 px-4 rounded-full border border-hairline text-sm font-medium text-ink hover:bg-surface transition-colors min-[1440px]:h-11 min-[1440px]:px-5 min-[1440px]:text-[15px]"
               >
                 Log in
               </Link>
@@ -1093,11 +1093,11 @@ export default function MainLayoutShell({
 
       {/* Footer */}
       <footer className="border-t border-hairline bg-surface/40 tlf-safe-bottom">
-        <div className="mx-auto max-w-[1600px] px-4 lg:px-6 pt-10 pb-12 space-y-10">
+        <div className="mx-auto max-w-[1600px] px-4 lg:px-6 pt-10 pb-8 space-y-10">
           {/* Launch call-to-action */}
           <div className="relative overflow-hidden rounded-[var(--radius-card)] border border-hairline bg-card shadow-card px-5 py-6 sm:px-8 sm:py-7 flex flex-col xl:flex-row xl:items-center justify-between gap-5">
             <div className="relative space-y-1.5 max-w-2xl">
-              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-ink">
+              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-ink text-balance">
                 Put it in front of makers at the next 6:00 AM IST batch.
               </h2>
               <p className="text-sm text-ink-dim leading-relaxed">
@@ -1107,7 +1107,7 @@ export default function MainLayoutShell({
             </div>
             <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 shrink-0">
               <NextLaunchCountdown variant="compact" />
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Link
                   href="/submit"
                   className="inline-flex items-center gap-2 h-10 px-5 rounded-full bg-signal text-white text-sm font-semibold hover:opacity-90 transition-opacity"
@@ -1205,6 +1205,13 @@ export default function MainLayoutShell({
           </div>
 
           <FeaturedOnFooterBar />
+
+          {/* Closing wordmark, sized to the footer's width (the links above carry the semantics). */}
+          <div aria-hidden="true" className="[container-type:inline-size] select-none">
+            <p className="font-display font-black uppercase leading-[0.85] whitespace-nowrap text-center text-ink/[0.08] text-[11cqw]">
+              The Launch <span className="text-signal/25">Feed</span>
+            </p>
+          </div>
 
           <div className="flex flex-col-reverse sm:flex-row items-center justify-between gap-4 pt-6 border-t border-hairline text-xs text-ink-faint">
             <p>© {new Date().getFullYear()} The Launch Feed. All rights reserved.</p>

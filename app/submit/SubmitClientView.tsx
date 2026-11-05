@@ -5,6 +5,7 @@ import { withLaunchTime } from "@/components/ui/withLaunchTime";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import MainLayoutShell from "../MainLayoutShell";
+import { AutofillStart, AutofillStartRail, normalizeProductUrl } from "./AutofillStart";
 import { slugify, getStoredSession, saveSession } from "../data";
 import {
   createSubmission,
@@ -514,6 +515,8 @@ export default function SubmitClientView({
   footer?: React.ReactNode;
 } = {}) {
   const [autofillUrl, setAutofillUrl] = useState("");
+  // The visitor chose (or was sent) past the URL-first start screen to the full form.
+  const [manualEntry, setManualEntry] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isExecutingSdk, setIsExecutingSdk] = useState(false);
   const [sdkLog, setSdkLog] = useState("");
@@ -1362,6 +1365,7 @@ export default function SubmitClientView({
     setAutofillUrl("");
     setAutofillError("");
     setAutofillMeta(null);
+    setManualEntry(false);
     setEnableRevenueSdk(false);
     setSdkLog("");
     setLaunchTier(10);
@@ -1392,7 +1396,12 @@ export default function SubmitClientView({
   // AI Autofill Handler — real crawler + GPT-4o-mini extraction
   const handleAiAutofill = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!autofillUrl.trim()) return;
+    const url = normalizeProductUrl(autofillUrl);
+    if (!url) {
+      setAutofillError("Enter a link like yourproduct.com or github.com/you/repo.");
+      return;
+    }
+    setAutofillUrl(url);
     setAutofillError("");
     setAutofillMeta(null);
     setIsExtracting(true);
@@ -1407,12 +1416,12 @@ export default function SubmitClientView({
         fetch("/api/autofill", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url: autofillUrl.trim() }),
+          body: JSON.stringify({ url }),
         }),
         fetch("/api/architecture", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ url: autofillUrl.trim() }),
+          body: JSON.stringify({ url }),
         }).catch(() => null),
       ]);
       const json = await aiRes.json().catch(() => null);
@@ -1488,7 +1497,7 @@ export default function SubmitClientView({
           category: d.category || prev.category,
           makerName: d.makerName || prev.makerName,
           makerHandle: d.makerHandle || prev.makerHandle,
-          websiteUrl: d.websiteUrl || autofillUrl,
+          websiteUrl: d.websiteUrl || url,
           videoUrl: normalizeVideoUrl(autofillVideo),
           githubUrl: d.githubUrl || prev.githubUrl,
           revenue: d.revenue || prev.revenue,
@@ -1524,6 +1533,8 @@ export default function SubmitClientView({
       setPricingTiers(tiers);
       setFaqs(faqPairs);
       setAutofillMeta(json.meta ?? null);
+      setManualEntry(true);
+      window.scrollTo({ top: 0 });
 
       // Auto-fetch the logo/favicon and convert to AVIF for the thumbnail slot.
       if (Array.isArray(d?.logoCandidates) && d.logoCandidates.length > 0) {
@@ -1549,6 +1560,11 @@ export default function SubmitClientView({
     } catch (err) {
       // Only messages our API chose to show; network / parse errors get the generic note.
       setAutofillError(err instanceof AutofillNotice ? err.message : AUTOFILL_MANUAL_NOTICE);
+      // Don't strand them: open the form with the link they already gave us.
+      const urlField = /^https?:\/\/(www\.)?github\.com\//i.test(url) ? "githubUrl" : "websiteUrl";
+      setFormData((prev) => (prev[urlField] ? prev : { ...prev, [urlField]: url }));
+      setManualEntry(true);
+      window.scrollTo({ top: 0 });
     } finally {
       setIsExtracting(false);
     }
@@ -1989,6 +2005,38 @@ export default function SubmitClientView({
     { id: "section-07", step: 7, title: "07. FAQ & Support", sub: "FAQ pairs, support info", optional: false },
   ];
 
+  const formHasContent =
+    Object.entries(formData).some(([k, v]) =>
+      k === "revenueVerified" ? v === true : typeof v === "string" && v.trim().length > 0,
+    ) ||
+    features.some((f) => f.trim().length > 0) ||
+    pricingTiers.some((t) => t.specs.trim().length > 0 || t.price.trim().length > 0) ||
+    faqs.some((f) => f.q.trim().length > 0 || f.a.trim().length > 0) ||
+    thumbnailAvif.length > 0 ||
+    galleryAvif.length > 0;
+
+  // A new visitor with nothing filled in gets the URL-first start screen instead
+  // of the seven-section form. Drafts, edits and post-sign-in or post-checkout
+  // returns all go straight to the form.
+  const isFreshVisit =
+    !isEmbeddedMode &&
+    !isEditMode &&
+    !initialProductData &&
+    !isAutoSubmitting &&
+    !autoSaveDraftParam &&
+    !searchParams?.get("checkout") &&
+    !submitted &&
+    !manualEntry &&
+    !formHasContent;
+
+  const fieldTotals = STEP_DEFINITIONS.reduce(
+    (sum, def) => {
+      const { filled, total } = stepFieldProgress(def.step);
+      return { filled: sum.filled + filled, total: sum.total + total };
+    },
+    { filled: 0, total: 0 },
+  );
+
   const progressSidebar = (
     <>
       {/* Breadcrumb — in edit mode we route back to the profile so the
@@ -2169,8 +2217,26 @@ export default function SubmitClientView({
 
   const formContent = (
     <div className="space-y-6 pb-16 font-mono text-ink">
+        {isFreshVisit && (
+          <AutofillStart
+            url={autofillUrl}
+            onUrlChange={(value) => {
+              setAutofillUrl(value);
+              if (autofillError) setAutofillError("");
+            }}
+            onSubmit={handleAiAutofill}
+            onManual={() => {
+              setAutofillError("");
+              setManualEntry(true);
+              window.scrollTo({ top: 0 });
+            }}
+            isExtracting={isExtracting}
+            error={autofillError}
+          />
+        )}
+
         {/* Tab Toggle Bar — hidden when editing in embedded mode */}
-        {!isEmbeddedMode && (
+        {!isFreshVisit && !isEmbeddedMode && (
           <div className="sticky -top-4 z-30 bg-void -mt-4 pt-4 border-b border-hairline shrink-0">
             <div className="h-10 flex items-end justify-center gap-1.5 sm:gap-2 pb-2.5">
               <button
@@ -2200,7 +2266,7 @@ export default function SubmitClientView({
         )}
 
         {/* MOBILE PROGRESS STRIP — visible only when the sidebar is hidden (<xl) */}
-        <div className="xl:hidden border border-hairline bg-surface/40 p-3 space-y-2.5">
+        <div className={`${isFreshVisit ? "hidden" : "xl:hidden"} border border-hairline bg-surface/40 p-3 space-y-2.5`}>
           <div className="flex items-center justify-between font-mono">
             <span className="text-[10px] font-bold uppercase tracking-wider text-ink flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
@@ -2262,7 +2328,7 @@ export default function SubmitClientView({
         </div>
 
         {/* Page Header — hidden when editing in embedded mode */}
-        {!isEmbeddedMode && (
+        {!isFreshVisit && !isEmbeddedMode && (
           <div className="border border-hairline bg-surface/40 p-4 sm:p-8 space-y-4">
             <div className="border-b border-hairline pb-4 space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
@@ -2286,53 +2352,53 @@ export default function SubmitClientView({
             >
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <span className="text-xs font-bold text-signal uppercase tracking-wider flex items-center gap-1.5">
-                  1-CLICK AI AUTOFILL FROM WEBSITE / GITHUB
+                  Fill this form from your link
                 </span>
                 <span className="text-[10px] text-ink-faint">
-                  NEURAL EXTRACTION ENGINE v2.4
+                  Website or GitHub repo
                 </span>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2 sm:items-stretch">
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={autofillUrl}
-                  onChange={(e) => setAutofillUrl(e.target.value)}
-                  placeholder="Paste product website or GitHub repo URL"
-                  className="flex-1 min-w-0 px-3 py-2 border border-hairline bg-void text-xs font-mono text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal"
+                  onChange={(e) => {
+                    setAutofillUrl(e.target.value);
+                    if (autofillError) setAutofillError("");
+                  }}
+                  placeholder="yourproduct.com"
+                  aria-label="Your website or GitHub repo link"
+                  className="w-full sm:flex-1 min-w-0 min-h-[42px] sm:min-h-0 px-3 py-2 border border-hairline bg-void text-base sm:text-xs font-mono text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal"
                 />
                 <button
                   type="submit"
                   disabled={isExtracting}
-                  className="px-5 py-2 bg-signal text-void text-xs font-bold uppercase hover:bg-signal/90 transition-colors shrink-0 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                  className="min-h-[42px] sm:min-h-0 px-5 py-2 bg-signal text-void text-xs font-bold uppercase hover:bg-signal/90 transition-colors shrink-0 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                 >
                   {isExtracting ? (
                     <>
                       <span className="w-2 h-2 rounded-full bg-void animate-ping" />
-                      <span>Extracting 360° Specs...</span>
+                      <span>Reading your site</span>
                     </>
                   ) : (
-                    <span>Auto-Extract 360° Specs</span>
+                    <span>Fill my listing</span>
                   )}
                 </button>
                 {(() => {
-                  const hasContent =
-                    Object.entries(formData).some(([k, v]) =>
-                      k === "revenueVerified" ? v === true : typeof v === "string" && v.trim().length > 0,
-                    ) ||
-                    features.some((f) => f.trim().length > 0) ||
-                    pricingTiers.some((t) => t.specs.trim().length > 0 || t.price.trim().length > 0) ||
-                    faqs.some((f) => f.q.trim().length > 0 || f.a.trim().length > 0) ||
-                    thumbnailAvif.length > 0 ||
-                    galleryAvif.length > 0 ||
-                    autofillUrl.trim().length > 0;
+                  const hasContent = formHasContent || autofillUrl.trim().length > 0;
                   return (
                     <button
                       type="button"
                       onClick={handleClearForm}
                       disabled={!hasContent}
                       title={hasContent ? "Click twice to wipe every field" : "Form is already empty"}
-                      className={`px-3 py-2 border text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 flex items-center justify-center gap-1.5 ${
+                      className={`min-h-[42px] sm:min-h-0 px-3 py-2 border text-[11px] font-bold uppercase tracking-wider transition-colors shrink-0 flex items-center justify-center gap-1.5 ${
                         !hasContent
                           ? "border-hairline/40 bg-void/40 text-ink-faint cursor-not-allowed opacity-50"
                           : clearArmed
@@ -2353,8 +2419,8 @@ export default function SubmitClientView({
               )}
               {autofillMeta && !autofillError && (
                 <div className="space-y-2">
-                  <div className="text-[10px] font-mono text-ink-dim uppercase tracking-wider">
-                    ✓ Extracted from {autofillMeta.pagesCrawled} page{autofillMeta.pagesCrawled === 1 ? "" : "s"}
+                  <div className="text-xs font-bold text-ink">
+                    <span className="text-verified">✓</span> Draft ready: {fieldTotals.filled} of {fieldTotals.total} fields filled from {autofillMeta.pagesCrawled} page{autofillMeta.pagesCrawled === 1 ? "" : "s"}
                     {autofillMeta.githubStars !== null ? ` · ${autofillMeta.githubStars.toLocaleString()} ★ github` : ""}
                   </div>
                   <div className="flex items-start gap-2 px-3 py-2.5 border border-hairline bg-void text-[10px] font-mono text-ink-dim leading-relaxed">
@@ -2596,7 +2662,7 @@ export default function SubmitClientView({
           )
         )}
 
-        {!submitted && activeTab === "builder" && (
+        {!isFreshVisit && !submitted && activeTab === "builder" && (
           /* Form Builder Sections */
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Section 01: Core Hero Metadata */}
@@ -4587,7 +4653,7 @@ export default function SubmitClientView({
   }
 
   return (
-    <MainLayoutShell leftSidebar={progressSidebar}>
+    <MainLayoutShell leftSidebar={isFreshVisit ? <AutofillStartRail /> : progressSidebar}>
       {formContent}
       {footer && !submitted && <div className="mt-8">{footer}</div>}
     </MainLayoutShell>

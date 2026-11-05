@@ -768,3 +768,22 @@ html {
     transition-property: background-color, border-color, color;
   }
 }
+
+/* /submit start screen: example listing values appear as if being filled in. */
+@keyframes tlf-autofill-value {
+  from {
+    color: transparent;
+    background-color: var(--color-raised);
+  }
+}
+.tlf-autofill-value {
+  border-radius: 4px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  animation: tlf-autofill-value 420ms ease-out backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tlf-autofill-value {
+    animation: none;
+  }
+}
