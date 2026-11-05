@@ -6,6 +6,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import MainLayoutShell from "../MainLayoutShell";
 import { AutofillStart, AutofillStartRail, normalizeProductUrl } from "./AutofillStart";
+import { emptyAutofillBaseline, mergeAutofill } from "./mergeAutofill";
 import { slugify, getStoredSession, saveSession } from "../data";
 import {
   createSubmission,
@@ -1344,7 +1345,15 @@ export default function SubmitClientView({
   };
 
   const [autofillError, setAutofillError] = useState<string>("");
-  const [autofillMeta, setAutofillMeta] = useState<{ pagesCrawled: number; githubStars: number | null } | null>(null);
+  const [autofillMeta, setAutofillMeta] = useState<{ pagesCrawled: number; githubStars: number | null; keptCount: number } | null>(null);
+  // What the last autofill wrote, so its values can be told apart from typed ones.
+  const autofillBaselineRef = React.useRef(emptyAutofillBaseline());
+  // The form as of the latest render. Autofill takes up to a minute and people can
+  // keep typing meanwhile, so the merge reads this rather than the submit-time values.
+  const latestFormRef = React.useRef({ formData, features, pricingTiers, faqs });
+  useEffect(() => {
+    latestFormRef.current = { formData, features, pricingTiers, faqs };
+  }, [formData, features, pricingTiers, faqs]);
   const [clearArmed, setClearArmed] = useState(false);
   const clearArmTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1365,6 +1374,7 @@ export default function SubmitClientView({
     setAutofillUrl("");
     setAutofillError("");
     setAutofillMeta(null);
+    autofillBaselineRef.current = emptyAutofillBaseline();
     setManualEntry(false);
     setEnableRevenueSdk(false);
     setSdkLog("");
@@ -1467,72 +1477,74 @@ export default function SubmitClientView({
         }
       }
 
-      const rawFeatures = Array.isArray(d?.features) ? d.features : [];
-      const feat = [...rawFeatures];
-      while (feat.length < 3) feat.push("");
+      const latest = latestFormRef.current;
+      const merged = mergeAutofill({
+        current: {
+          fields: latest.formData as unknown as Record<string, unknown>,
+          features: latest.features,
+          tiers: latest.pricingTiers,
+          faqs: latest.faqs,
+        },
+        found: {
+          fields: {
+            name: d.name,
+            tagline: d.tagline,
+            category: d.category,
+            makerName: d.makerName,
+            makerHandle: d.makerHandle,
+            websiteUrl: d.websiteUrl || url,
+            videoUrl: normalizeVideoUrl(d.videoUrl || (editTarget?.videoUrl as string) || ""),
+            githubUrl: d.githubUrl,
+            revenue: d.revenue,
+            overviewPitch: d.overviewPitch,
+            targetAudience: d.targetAudience,
+            techStack: arch.techStack || d.techStack,
+            infraHosting: arch.infraHosting || d.infraHosting,
+            apiUrl: arch.apiUrl || d.apiUrl,
+            securityStandards: arch.securityStandards || d.securityStandards,
+            tags: d.tags ? formatTagsToString(d.tags) : "",
+            originStory: d.originStory,
+            makerThesis: d.makerThesis,
+            latestVersion: d.latestVersion,
+            latestChangelog: d.latestChangelog,
+            roadmapQ3: d.roadmapQ3,
+            roadmapQ4: d.roadmapQ4,
+            pricingPartner: d.pricingPartner,
+            supportEmail: d.supportEmail,
+          },
+          features: Array.isArray(d?.features) ? d.features : [],
+          tiers: (Array.isArray(d?.pricingTiers) ? d.pricingTiers : []).map((t) => ({
+            name: t?.name ?? "",
+            price: t?.price ?? "",
+            specs: t?.specs ?? "",
+          })),
+          faqs: (Array.isArray(d?.faqs) ? d.faqs : []).map((f) => ({ q: f?.q ?? "", a: f?.a ?? "" })),
+        },
+        baseline: autofillBaselineRef.current,
+      });
+      autofillBaselineRef.current = merged.baseline;
 
-      const rawTiers = Array.isArray(d?.pricingTiers) ? d.pricingTiers : [];
-      const tiers = (rawTiers.length
-        ? rawTiers
-        : [
-            { name: "Free", price: "", specs: "" },
-            { name: "Pro", price: "", specs: "" },
-          ]
-      ).map((t) => ({
-        name: t?.name ?? "",
-        price: t?.price ?? "",
-        specs: t?.specs ?? "",
+      const planText = (tier?: { price: string; specs: string }) =>
+        tier ? [tier.price, tier.specs].filter(Boolean).join(" · ") : "";
+      setFormData((prev) => ({
+        ...prev,
+        ...merged.fields,
+        feature1: merged.features[0] ?? "",
+        feature2: merged.features[1] ?? "",
+        feature3: merged.features[2] ?? "",
+        freePlan: planText(merged.tiers[0]),
+        proPlan: planText(merged.tiers[1]),
+        enterprisePlan: planText(merged.tiers[2]),
+        faq1Q: merged.faqs[0]?.q ?? "",
+        faq1A: merged.faqs[0]?.a ?? "",
+        faq2Q: merged.faqs[1]?.q ?? "",
+        faq2A: merged.faqs[1]?.a ?? "",
       }));
 
-      const rawFaqs = Array.isArray(d?.faqs) ? d.faqs : [];
-      const faqPairs = rawFaqs.length ? rawFaqs : [{ q: "", a: "" }];
-
-      setFormData((prev) => {
-        const autofillVideo = d.videoUrl || (editTarget?.videoUrl as string) || prev.videoUrl || "";
-        const autofillTags = d.tags ? formatTagsToString(d.tags) : prev.tags;
-        return {
-          ...prev,
-          name: d.name || prev.name,
-          tagline: d.tagline || prev.tagline,
-          category: d.category || prev.category,
-          makerName: d.makerName || prev.makerName,
-          makerHandle: d.makerHandle || prev.makerHandle,
-          websiteUrl: d.websiteUrl || url,
-          videoUrl: normalizeVideoUrl(autofillVideo),
-          githubUrl: d.githubUrl || prev.githubUrl,
-          revenue: d.revenue || prev.revenue,
-          overviewPitch: d.overviewPitch || prev.overviewPitch,
-          feature1: feat[0] ?? prev.feature1,
-          feature2: feat[1] ?? prev.feature2,
-          feature3: feat[2] ?? prev.feature3,
-          targetAudience: d.targetAudience || prev.targetAudience,
-          freePlan: tiers[0] ? [tiers[0].price, tiers[0].specs].filter(Boolean).join(" · ") : prev.freePlan,
-          proPlan: tiers[1] ? [tiers[1].price, tiers[1].specs].filter(Boolean).join(" · ") : prev.proPlan,
-          enterprisePlan: tiers[2] ? [tiers[2].price, tiers[2].specs].filter(Boolean).join(" · ") : prev.enterprisePlan,
-          techStack: arch.techStack || d.techStack || prev.techStack,
-          infraHosting: arch.infraHosting || d.infraHosting || prev.infraHosting,
-          apiUrl: arch.apiUrl || d.apiUrl || prev.apiUrl,
-          securityStandards: arch.securityStandards || d.securityStandards || prev.securityStandards,
-          tags: autofillTags,
-          originStory: d.originStory || prev.originStory,
-          makerThesis: d.makerThesis || prev.makerThesis,
-          latestVersion: d.latestVersion || prev.latestVersion,
-          latestChangelog: d.latestChangelog || prev.latestChangelog,
-          roadmapQ3: d.roadmapQ3 || prev.roadmapQ3,
-          roadmapQ4: d.roadmapQ4 || prev.roadmapQ4,
-          pricingPartner: d.pricingPartner || prev.pricingPartner,
-          faq1Q: faqPairs[0]?.q ?? prev.faq1Q,
-          faq1A: faqPairs[0]?.a ?? prev.faq1A,
-          faq2Q: faqPairs[1]?.q ?? prev.faq2Q,
-          faq2A: faqPairs[1]?.a ?? prev.faq2A,
-          supportEmail: d.supportEmail || prev.supportEmail,
-        };
-      });
-
-      setFeatures(feat.filter(Boolean).length ? feat.filter(Boolean) : feat);
-      setPricingTiers(tiers);
-      setFaqs(faqPairs);
-      setAutofillMeta(json.meta ?? null);
+      setFeatures(merged.features);
+      setPricingTiers(merged.tiers);
+      setFaqs(merged.faqs);
+      setAutofillMeta(json.meta ? { ...json.meta, keptCount: merged.keptCount } : null);
       setManualEntry(true);
       window.scrollTo({ top: 0 });
 
@@ -1562,7 +1574,12 @@ export default function SubmitClientView({
       setAutofillError(err instanceof AutofillNotice ? err.message : AUTOFILL_MANUAL_NOTICE);
       // Don't strand them: open the form with the link they already gave us.
       const urlField = /^https?:\/\/(www\.)?github\.com\//i.test(url) ? "githubUrl" : "websiteUrl";
-      setFormData((prev) => (prev[urlField] ? prev : { ...prev, [urlField]: url }));
+      setFormData((prev) => {
+        if (prev[urlField]) return prev;
+        // Our prefill, not their typing: a retry with a corrected link may replace it.
+        autofillBaselineRef.current.fields[urlField] = url;
+        return { ...prev, [urlField]: url };
+      });
       setManualEntry(true);
       window.scrollTo({ top: 0 });
     } finally {
@@ -2422,6 +2439,7 @@ export default function SubmitClientView({
                   <div className="text-xs font-bold text-ink">
                     <span className="text-verified">✓</span> Draft ready: {fieldTotals.filled} of {fieldTotals.total} fields filled from {autofillMeta.pagesCrawled} page{autofillMeta.pagesCrawled === 1 ? "" : "s"}
                     {autofillMeta.githubStars !== null ? ` · ${autofillMeta.githubStars.toLocaleString()} ★ github` : ""}
+                    {autofillMeta.keptCount > 0 ? ` · Kept what you typed in ${autofillMeta.keptCount} field${autofillMeta.keptCount === 1 ? "" : "s"}` : ""}
                   </div>
                   <div className="flex items-start gap-2 px-3 py-2.5 border border-hairline bg-void text-[10px] font-mono text-ink-dim leading-relaxed">
                     <span className="text-signal font-bold shrink-0 mt-px">TIP →</span>
